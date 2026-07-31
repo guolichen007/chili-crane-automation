@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>chili_crane_perception</name>
+  <version>0.1.0</version>
+  <description>Pit, grasp, grab, and unloading perception contracts.</description>
+
+  <maintainer email="maintainer@example.invalid">Chili Crane Team</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>chili_crane_core</depend>
+  <depend>chili_crane_msgs</depend>
+
+  <export/>
+</package>

@@ -1,0 +1,18 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+
+std_msgs/Header header
+uint8 validity
+string reason
+bool open_limit
+bool closed_limit
+bool running
+bool fault
+bool manual_mode
+bool auto_mode
+float64 motor_current
+bool motor_current_valid
+float64 evidence_age_sec

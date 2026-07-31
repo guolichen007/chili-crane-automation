@@ -1,0 +1,23 @@
+profile:
+  name: replay
+  contract_version: 1
+  implementation_state: NOT_READY
+
+runtime:
+  mode: replay
+  crane_id: crane_01
+  namespace: /crane_01
+  hardware_adapter: mock
+  use_sim_time: true
+
+mock_hardware_adapter:
+  configured_valid_mock: false
+  crane_base_frame: crane_01/base
+
+map_lifecycle:
+  require_frozen_map: true
+  map_mutation_allowed: false
+
+safety:
+  policy_state: NOT_CONFIGURED
+  default_allow_auto_task: false

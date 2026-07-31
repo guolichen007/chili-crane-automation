@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/chili-crane/map-manifest.schema.json",
+  "title": "Chili Crane Map Manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "map_id",
+    "map_version",
+    "track_id",
+    "frame_id",
+    "created_at_utc",
+    "source_git_sha",
+    "source_run_id",
+    "semantic_map_version",
+    "lidar_extrinsic_version",
+    "servo_calibration_version",
+    "artifacts",
+    "checksums_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "map_id": {
+      "type": "string"
+    },
+    "map_version": {
+      "type": "string"
+    },
+    "track_id": {
+      "type": "string"
+    },
+    "frame_id": {
+      "const": "map"
+    },
+    "created_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source_git_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "source_run_id": {
+      "type": "string"
+    },
+    "semantic_map_version": {
+      "type": "string"
+    },
+    "lidar_extrinsic_version": {
+      "type": "string"
+    },
+    "servo_calibration_version": {
+      "type": "string"
+    },
+    "artifacts": {
+      "type": "object",
+      "required": [
+        "localization_map",
+        "display_map",
+        "semantic_map",
+        "calibration"
+      ],
+      "properties": {
+        "localization_map": {
+          "type": "string"
+        },
+        "display_map": {
+          "type": "string"
+        },
+        "semantic_map": {
+          "type": "string"
+        },
+        "calibration": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "checksums_sha256": {
+      "type": "object",
+      "required": [
+        "localization_map",
+        "display_map",
+        "semantic_map",
+        "calibration"
+      ],
+      "properties": {
+        "localization_map": {
+          "$ref": "#/$defs/sha256"
+        },
+        "display_map": {
+          "$ref": "#/$defs/sha256"
+        },
+        "semantic_map": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration": {
+          "$ref": "#/$defs/sha256"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

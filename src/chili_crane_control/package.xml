@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>chili_crane_control</name>
+  <version>0.1.0</version>
+  <description>Fail-safe control, task, and hardware-adapter framework.</description>
+
+  <maintainer email="maintainer@example.invalid">Chili Crane Team</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>chili_crane_msgs</depend>
+  <depend>rospy</depend>
+
+  <export/>
+</package>

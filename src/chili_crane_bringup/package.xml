@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>chili_crane_bringup</name>
+  <version>0.1.0</version>
+  <description>Namespaced launch and profile composition for the chili crane.</description>
+
+  <maintainer email="maintainer@example.invalid">Chili Crane Team</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>chili_crane_control</depend>
+
+  <export/>
+</package>

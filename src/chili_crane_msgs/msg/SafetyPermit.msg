@@ -1,0 +1,19 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+
+std_msgs/Header header
+uint8 validity
+string reason
+bool allow_x_move
+bool allow_y_move
+bool allow_lower
+bool allow_raise
+bool allow_grab_open
+bool allow_grab_close
+bool allow_unload
+bool allow_auto_task
+string[] blocking_reasons
+float64 evidence_age_sec

@@ -1,0 +1,17 @@
+<launch>
+  <arg name="crane_id" default="crane_01"/>
+  <arg
+    name="config_root"
+    default="$(find chili_crane_bringup)/../../config"/>
+  <arg name="use_mock_hardware" default="false"/>
+
+  <param name="/use_sim_time" value="true"/>
+
+  <include file="$(find chili_crane_bringup)/launch/base_system.launch">
+    <arg name="crane_id" value="$(arg crane_id)"/>
+    <arg
+      name="profile_file"
+      value="$(arg config_root)/profiles/replay.yaml"/>
+    <arg name="use_mock_hardware" value="$(arg use_mock_hardware)"/>
+  </include>
+</launch>

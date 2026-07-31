@@ -1,0 +1,17 @@
+config_state: NOT_CONFIGURED
+model_id: NOT_CONFIGURED
+model_frame: crane_01/grab
+
+open_geometry:
+  length_m: null
+  width_m: null
+  height_m: null
+  footprint_xy_m: null
+
+closed_geometry:
+  length_m: null
+  width_m: null
+  height_m: null
+  footprint_xy_m: null
+
+source_cad_version: NOT_CONFIGURED

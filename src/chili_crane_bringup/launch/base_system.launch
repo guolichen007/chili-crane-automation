@@ -1,0 +1,22 @@
+<launch>
+  <arg name="crane_id" default="crane_01"/>
+  <arg name="profile_file"/>
+  <arg name="use_mock_hardware" default="true"/>
+
+  <group ns="$(arg crane_id)">
+    <rosparam command="load" file="$(arg profile_file)"/>
+
+    <node
+      if="$(arg use_mock_hardware)"
+      pkg="chili_crane_control"
+      type="mock_hardware_adapter.py"
+      name="mock_hardware_adapter"
+      output="screen"/>
+
+    <node
+      pkg="chili_crane_control"
+      type="fail_safe_safety_supervisor.py"
+      name="safety_supervisor"
+      output="screen"/>
+  </group>
+</launch>

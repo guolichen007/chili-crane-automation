@@ -1,0 +1,18 @@
+profile:
+  name: mock
+  contract_version: 1
+  implementation_state: NOT_READY
+
+runtime:
+  mode: mock
+  crane_id: crane_01
+  namespace: /crane_01
+  hardware_adapter: mock
+
+mock_hardware_adapter:
+  configured_valid_mock: false
+  crane_base_frame: crane_01/base
+
+safety:
+  policy_state: NOT_CONFIGURED
+  default_allow_auto_task: false

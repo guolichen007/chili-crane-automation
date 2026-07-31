@@ -1,0 +1,13 @@
+config_state: NOT_CONFIGURED
+adapter: mock
+sensor_type: null
+signal_interface: null
+range: null
+unit: null
+update_rate_hz: null
+
+calibration:
+  calibration_id: NOT_CONFIGURED
+  scale: null
+  offset: null
+  zeroing_method: null

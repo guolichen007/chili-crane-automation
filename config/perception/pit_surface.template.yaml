@@ -1,0 +1,9 @@
+config_state: NOT_CONFIGURED
+grid_resolution_m: null
+height_percentile: null
+minimum_points_per_cell: null
+minimum_coverage: null
+maximum_roughness_m: null
+maximum_slope_rad: null
+wall_safety_inset_m: null
+recent_grab_penalty_duration_sec: null

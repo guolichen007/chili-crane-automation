@@ -1,0 +1,19 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+
+std_msgs/Header header
+uint8 validity
+string reason
+string pit_id
+geometry_msgs/Point target_map
+float64 target_surface_z_m
+float64 target_grab_bottom_z_m
+float64 score
+float64 confidence
+float64 wall_clearance_m
+float64 footprint_coverage
+float64 roughness_m
+string reject_reason

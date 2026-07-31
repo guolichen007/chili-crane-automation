@@ -1,0 +1,15 @@
+config_state: NOT_CONFIGURED
+adapter: mock
+board_model: null
+protocol: null
+heartbeat_timeout_sec: null
+command_timeout_sec: null
+safe_output_policy: NOT_CONFIGURED
+
+required_interlocks:
+  mutually_exclusive_y_direction: true
+  mutually_exclusive_z_direction: true
+  mutually_exclusive_grab_direction: true
+  enforce_hard_limits: true
+  reject_lower_without_permit: true
+  release_outputs_on_heartbeat_loss: true

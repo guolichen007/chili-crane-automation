@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/chili-crane/semantic-map.schema.json",
+  "title": "Chili Crane Semantic Map",
+  "type": "object",
+  "required": [
+    "config_state",
+    "schema_version",
+    "map_id",
+    "semantic_version",
+    "frame_id",
+    "track",
+    "pits",
+    "unloading_stations",
+    "safe_wait_pose",
+    "restricted_regions",
+    "calibration_anchors"
+  ],
+  "properties": {
+    "config_state": {
+      "enum": ["NOT_CONFIGURED", "VALID"]
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "map_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "semantic_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "frame_id": {
+      "const": "map"
+    },
+    "track": {
+      "type": "object",
+      "required": [
+        "track_id",
+        "origin_map_m",
+        "direction_map_xy",
+        "valid_x_range_m"
+      ],
+      "properties": {
+        "track_id": {
+          "type": "string"
+        },
+        "origin_map_m": {
+          "$ref": "#/$defs/point2OrNull"
+        },
+        "direction_map_xy": {
+          "$ref": "#/$defs/point2OrNull"
+        },
+        "valid_x_range_m": {
+          "$ref": "#/$defs/rangeOrNull"
+        }
+      },
+      "additionalProperties": false
+    },
+    "pits": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pit"
+      }
+    },
+    "unloading_stations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/unloadingStation"
+      }
+    },
+    "safe_wait_pose": {
+      "$ref": "#/$defs/pose2OrNull"
+    },
+    "restricted_regions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/restrictedRegion"
+      }
+    },
+    "calibration_anchors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/calibrationAnchor"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "config_state": {
+            "const": "VALID"
+          }
+        },
+        "required": ["config_state"]
+      },
+      "then": {
+        "properties": {
+          "map_id": {
+            "not": {
+              "const": "NOT_CONFIGURED"
+            }
+          },
+          "semantic_version": {
+            "not": {
+              "const": "NOT_CONFIGURED"
+            }
+          },
+          "track": {
+            "properties": {
+              "origin_map_m": {
+                "$ref": "#/$defs/point2"
+              },
+              "direction_map_xy": {
+                "$ref": "#/$defs/point2"
+              },
+              "valid_x_range_m": {
+                "$ref": "#/$defs/point2"
+              }
+            }
+          },
+          "pits": {
+            "minItems": 1
+          },
+          "unloading_stations": {
+            "minItems": 1
+          },
+          "safe_wait_pose": {
+            "$ref": "#/$defs/pose2"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "point2": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "point2OrNull": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/point2"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rangeOrNull": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/point2"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "pose2": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "pose2OrNull": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/pose2"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "point3": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "polygon": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/point2"
+      }
+    },
+    "pit": {
+      "type": "object",
+      "required": [
+        "pit_id",
+        "polygon_map_m",
+        "wall_top_z_m",
+        "pit_bottom_z_m",
+        "safety_inset_m"
+      ],
+      "properties": {
+        "pit_id": {
+          "type": "string"
+        },
+        "polygon_map_m": {
+          "$ref": "#/$defs/polygon"
+        },
+        "wall_top_z_m": {
+          "type": "number"
+        },
+        "pit_bottom_z_m": {
+          "type": "number"
+        },
+        "safety_inset_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "unloadingStation": {
+      "type": "object",
+      "required": ["station_id", "target_pose_map", "roi_polygon_map_m"],
+      "properties": {
+        "station_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_pose_map": {
+          "$ref": "#/$defs/pose2"
+        },
+        "roi_polygon_map_m": {
+          "$ref": "#/$defs/polygon"
+        }
+      },
+      "additionalProperties": false
+    },
+    "restrictedRegion": {
+      "type": "object",
+      "required": ["region_id", "polygon_map_m", "reason"],
+      "properties": {
+        "region_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "polygon_map_m": {
+          "$ref": "#/$defs/polygon"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "calibrationAnchor": {
+      "type": "object",
+      "required": ["anchor_id", "position_map_m", "kind"],
+      "properties": {
+        "anchor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "position_map_m": {
+          "$ref": "#/$defs/point3"
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

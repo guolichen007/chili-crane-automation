@@ -1,0 +1,28 @@
+# Catkin / ROS build products
+/build/
+/devel/
+/install/
+/logs/
+/.catkin_tools/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local recordings, maps, and credentials
+/.local-data/
+/bags/
+/maps/*/*.pcd
+*.bag
+*.db3
+.env
+
+# Desktop Codex working memory (local-only; never commit)
+/LOCAL_PROJECT_CONTEXT.md

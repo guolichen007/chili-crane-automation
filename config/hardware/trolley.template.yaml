@@ -1,0 +1,19 @@
+config_state: NOT_CONFIGURED
+adapter: mock
+position_sensor: draw_wire
+signal_interface: null
+range_m: null
+update_rate_hz: null
+motor_control_mode: null
+vfd_available: null
+
+calibration:
+  calibration_id: NOT_CONFIGURED
+  direction: null
+  scale_m_per_raw_unit: null
+  offset_m: null
+
+limits:
+  left_input: null
+  right_input: null
+  fault_input: null

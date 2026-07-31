@@ -1,0 +1,12 @@
+config_state: NOT_CONFIGURED
+adapter: mock
+primary_position_source: lidar_grab_tracking
+draw_wire_position_sensor: false
+motor_control_mode: null
+vfd_available: null
+brake_interface: null
+
+limits:
+  upper_input: null
+  lower_input: null
+  fault_input: null

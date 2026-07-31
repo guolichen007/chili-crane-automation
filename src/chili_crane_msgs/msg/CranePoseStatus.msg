@@ -1,0 +1,20 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+
+std_msgs/Header header
+uint8 validity
+string reason
+string map_id
+uint64 map_generation
+geometry_msgs/PoseWithCovariance pose
+geometry_msgs/Vector3 velocity_mps
+float64 servo_x_m
+float64 ndt_fitness
+float64 observability_ratio
+geometry_msgs/Vector3 ndt_correction_m
+bool servo_prior_used
+bool ndt_measurement_used
+bool track_constraint_applied

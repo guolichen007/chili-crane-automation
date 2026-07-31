@@ -1,0 +1,17 @@
+config_state: NOT_CONFIGURED
+schema_version: 1
+map_id: NOT_CONFIGURED
+semantic_version: NOT_CONFIGURED
+frame_id: map
+
+track:
+  track_id: track_01
+  origin_map_m: null
+  direction_map_xy: null
+  valid_x_range_m: null
+
+pits: []
+unloading_stations: []
+safe_wait_pose: null
+restricted_regions: []
+calibration_anchors: []

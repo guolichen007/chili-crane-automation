@@ -1,0 +1,16 @@
+* text=auto eol=lf
+
+*.bat text eol=crlf
+
+*.dwg binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.pcd binary
+*.bag binary
+*.db3 binary
+*.mp4 binary
+*.pdf binary
+*.pptx binary
+*.docx binary
+*.xlsx binary

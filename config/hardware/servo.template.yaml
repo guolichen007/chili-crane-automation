@@ -1,0 +1,13 @@
+config_state: NOT_CONFIGURED
+adapter: mock
+protocol: null
+raw_unit: null
+update_rate_hz: null
+absolute_position: null
+homing_method: null
+
+calibration:
+  calibration_id: NOT_CONFIGURED
+  direction: null
+  scale_m_per_raw_unit: null
+  offset_m: null

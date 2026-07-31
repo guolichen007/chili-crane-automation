@@ -1,0 +1,25 @@
+config_state: NOT_CONFIGURED
+contract_version: 1
+output_frame: crane_01/base
+output_topic: lidar/merged_points
+
+lidars:
+  - sensor_id: lidar_left
+    topic: NOT_CONFIGURED
+    source_frame: NOT_CONFIGURED
+    extrinsic_lidar_to_crane_base: null
+  - sensor_id: lidar_right
+    topic: NOT_CONFIGURED
+    source_frame: NOT_CONFIGURED
+    extrinsic_lidar_to_crane_base: null
+
+synchronization:
+  maximum_pair_delta_sec: null
+  stale_timeout_sec: null
+  maximum_queue_size: null
+  consume_once: true
+  allow_old_frame_reuse: false
+
+single_lidar_fallback:
+  enabled: false
+  authorization_source: NOT_CONFIGURED

@@ -1,0 +1,15 @@
+config_state: NOT_CONFIGURED
+adapter: mock
+control_interface: null
+
+inputs:
+  open_limit: null
+  closed_limit: null
+  fault: null
+  running: null
+  motor_current: null
+
+outputs:
+  open: null
+  close: null
+  stop_or_release: null
