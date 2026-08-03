@@ -5,10 +5,9 @@
 namespace chili_crane_slam {
 
 enum class RuntimeMode : std::uint8_t {
-    NOT_CONFIGURED = 0,
-    MAPPING = 1,
-    LOCALIZATION = 2,
-    REPLAY = 3,
+    MAPPING = 0,
+    LOCALIZATION = 1,
+    REPLAY = 2,
 };
 
 inline bool mapMutationAllowed(RuntimeMode mode) noexcept {

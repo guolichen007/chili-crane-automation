@@ -13,5 +13,12 @@ float64 velocity_mps
 bool homed
 bool running
 bool fault
+bool drive_ready
+bool servo_enabled
+bool positive_limit
+bool negative_limit
+bool communication_ok
+int32 fault_code
+uint64 source_counter
 string calibration_id
 float64 evidence_age_sec

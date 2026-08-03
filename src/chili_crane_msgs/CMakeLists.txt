@@ -9,6 +9,8 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_message_files(
   FILES
+  AuthorizedCommand.msg
+  CommandExecutionState.msg
   CranePoseStatus.msg
   ControlBoardState.msg
   ControlIntent.msg

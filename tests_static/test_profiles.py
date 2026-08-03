@@ -35,6 +35,7 @@ class RuntimeProfileTest(unittest.TestCase):
 
     def test_mock_is_not_valid_by_default(self):
         profile = load_profile("mock")
+        self.assertEqual("localization", profile["runtime"]["mode"])
         self.assertFalse(
             profile["mock_hardware_adapter"]["configured_valid_mock"]
         )
@@ -48,6 +49,13 @@ class RuntimeProfileTest(unittest.TestCase):
                     "configured_valid_mock",
                     profile["mock_hardware_adapter"],
                 )
+
+    def test_runtime_modes_are_only_mapping_localization_or_replay(self):
+        allowed = {"mapping", "localization", "replay"}
+        for name in ("mapping", "localization", "mock", "replay"):
+            with self.subTest(profile=name):
+                profile = load_profile(name)
+                self.assertIn(profile["runtime"]["mode"], allowed)
 
 
 if __name__ == "__main__":

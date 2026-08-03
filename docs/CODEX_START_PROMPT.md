@@ -45,6 +45,7 @@ Hard constraints:
 - mapping and frozen-map localization remain separate modes;
 - changing chili surfaces are excluded from localization-map evidence;
 - raw GrabIoState and fused perception GrabState remain separate;
+- hardware adapters consume only bound, unexpired AuthorizedCommand messages;
 - do not copy the whole warehouse application or its cargo safety vocabulary;
 - every NDT-derived change records upstream SHA, source paths and adaptations.
 

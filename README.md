@@ -39,8 +39,10 @@ src/chili_crane_control/      Safety, task orchestration, and adapters
 src/chili_crane_bringup/      Namespaced launch composition
 config/                       Site-independent templates and profiles
 maps/                         Versioned map artifact conventions
+scripts/validation/           Exact-SHA Ubuntu validation entry point
 tools/                        Repository contract checks
 tests_static/                 Windows-safe static contract tests
+.github/workflows/            Python 3.8 static CI only (no ROS build claim)
 ```
 
 For a fresh Desktop Codex task, begin with
@@ -62,6 +64,13 @@ Windows checks do not replace Ubuntu or field evidence.
 The initial pre-commit result is recorded in
 `docs/validation/WINDOWS_STATIC_20260731.md`.
 
+## Accepted runtime baseline
+
+Phase 1 targets native Ubuntu 20.04.6 LTS, ROS Noetic, `catkin_tools`, Python
+3.8, C++17, and GCC 9.x. Windows remains an editing, static-check, interface
+test, documentation, and Git environment. The project does not currently
+maintain a parallel ROS2 implementation.
+
 ## Windows static checks
 
 ```text
@@ -73,9 +82,10 @@ python -m unittest discover -s tests_static -p "test_*.py"
 ## Ubuntu handoff
 
 Ubuntu validation must start from an exact Git SHA and follow
-`docs/validation/UBUNTU_VALIDATION_RUNBOOK.md`. The intended runtime baseline
-is still a proposed decision because the historical hardware sheet says Ubuntu
-22.04 while the reusable upstream is ROS1 Noetic/catkin. See
+`docs/validation/UBUNTU_VALIDATION_RUNBOOK.md`. The Phase 1 runtime baseline is
+accepted as Ubuntu 20.04.6 LTS with ROS Noetic. A historical procurement sheet
+mentions Ubuntu 22.04; any such requirement needs a separate migration or
+containerization decision. See
 `docs/decisions/0001-runtime_baseline.md`.
 
 ## Reference upstream

@@ -1,0 +1,25 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+
+uint8 STATE_UNKNOWN=0
+uint8 STATE_REJECTED=1
+uint8 STATE_ACCEPTED=2
+uint8 STATE_EXECUTING=3
+uint8 STATE_COMPLETED=4
+uint8 STATE_FAILED=5
+
+std_msgs/Header header
+uint8 validity
+string reason
+string command_id
+string task_id
+string intent_id
+uint8 state
+bool accepted
+bool executing
+bool completed
+bool failed
+float64 evidence_age_sec

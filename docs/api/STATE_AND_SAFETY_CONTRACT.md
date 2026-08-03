@@ -30,15 +30,33 @@ fault evidence.
 ## Control intent
 
 `ControlIntent` expresses a semantic request such as move X, move Y, raise,
-lower, open, close, or stop. It is not permission and must not be sent directly
-to electrical outputs.
+lower, open, close, or stop on `control/requested_intent`. It is not permission
+and must never be consumed by a hardware adapter.
+
+## One-time command authorization
+
+The safety/authorization boundary creates an `AuthorizedCommand` only by
+binding one requested `intent_id` to a specific `permit_id`, permit generation,
+issue time, and expiry time. The hardware adapter consumes only
+`control/authorized_command` and rejects commands that are invalid, stale,
+expired, identity-incomplete, or not bound to a permit.
+
+```text
+Planner / task -> control/requested_intent
+Safety gate    -> control/authorized_command
+Adapter        -> control/execution_state
+```
+
+A prior permit cannot authorize a later intent by topic freshness alone. Phase
+0 publishes only invalid/expired authorization records for integration testing
+and never produces physical output.
 
 ## Safety permit
 
 `SafetyPermit` contains false-by-default permissions:
 
-- X movement;
-- Y movement;
+- X positive and X negative movement independently;
+- Y positive and Y negative movement independently;
 - lower;
 - raise;
 - grab open;
@@ -46,8 +64,9 @@ to electrical outputs.
 - unload;
 - automatic task.
 
-The actuator adapter requires both a fresh intent and a fresh permit. A permit
-heartbeat does not make stale input evidence fresh.
+Directional permissions allow a separately implemented safety policy to block
+motion toward a hazard while preserving an explicitly evaluated escape
+direction. A permit heartbeat does not make stale input evidence fresh.
 
 ## Conflict examples
 

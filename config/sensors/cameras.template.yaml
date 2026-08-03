@@ -1,0 +1,25 @@
+config_state: NOT_CONFIGURED
+contract_version: 1
+
+cameras:
+  - sensor_id: camera_left
+    role:
+      - grab_opening_review
+      - anomaly_evidence
+      - unloading_review
+    topic: NOT_CONFIGURED
+    frame_id: NOT_CONFIGURED
+    intrinsic_version: NOT_CONFIGURED
+    extrinsic_version: NOT_CONFIGURED
+    enabled: false
+
+  - sensor_id: camera_right
+    role:
+      - grab_opening_review
+      - anomaly_evidence
+      - unloading_review
+    topic: NOT_CONFIGURED
+    frame_id: NOT_CONFIGURED
+    intrinsic_version: NOT_CONFIGURED
+    extrinsic_version: NOT_CONFIGURED
+    enabled: false

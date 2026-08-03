@@ -34,6 +34,20 @@ class SemanticMapContractTest(unittest.TestCase):
             }.issubset(required)
         )
 
+    def test_cpp_contract_uses_schema_names_without_aliases(self):
+        header = (
+            ROOT
+            / "src"
+            / "chili_crane_core"
+            / "include"
+            / "chili_crane_core"
+            / "semantic_map.hpp"
+        ).read_text(encoding="utf-8")
+        self.assertIn("std::uint32_t schema_version", header)
+        self.assertIn("std::string semantic_version", header)
+        self.assertIn("Validity config_state", header)
+        self.assertNotRegex(header, r"std::string\s+version\s*;")
+
     def test_template_validates_but_cannot_claim_valid(self):
         template = yaml.safe_load(
             (

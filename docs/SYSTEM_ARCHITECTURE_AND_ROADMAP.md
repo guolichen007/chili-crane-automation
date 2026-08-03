@@ -50,7 +50,9 @@ Topics are relative inside a crane namespace:
 /crane_01/perception/grasp_target
 /crane_01/perception/grab_state
 /crane_01/safety/permit
-/crane_01/control/intent
+/crane_01/control/requested_intent
+/crane_01/control/authorized_command
+/crane_01/control/execution_state
 /crane_01/task/status
 ```
 
@@ -85,8 +87,11 @@ merged cloud + expected ROI + known grab model + limit signals
 CranePoseStatus + GrabState + semantic map + normalized hardware health
   -> SafetySupervisor -> SafetyPermit
 
-TaskStateMachine + GraspTarget + SafetyPermit
-  -> ControlIntent -> Mock/real adapter -> electrical actuation layer
+TaskStateMachine + GraspTarget
+  -> ControlIntent
+  -> Safety authorization + bound permit generation/expiry
+  -> AuthorizedCommand
+  -> Mock/real adapter -> CommandExecutionState
 ```
 
 Registration, pit-surface, and grab-tracking outputs are separate products.
@@ -189,8 +194,13 @@ envelope used by safety.
 
 ## 10. Safety and actuation
 
-Permissions include X/Y movement, lowering, raising, grab open, grab close,
-unload, and full automatic task. Every permission is false by default.
+Permissions independently cover positive/negative X, positive/negative Y,
+lowering, raising, grab open, grab close, unload, and full automatic task.
+Every permission is false by default.
+
+Hardware adapters never consume raw `ControlIntent`. A command must bind one
+intent identity to one permit identity/generation and a bounded validity
+window. Phase 0 emits no valid command and has no physical output.
 
 Examples:
 

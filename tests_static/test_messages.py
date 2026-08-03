@@ -18,8 +18,10 @@ class MessageContractTest(unittest.TestCase):
     def test_safety_permissions_are_explicit(self):
         text = (MSG_DIR / "SafetyPermit.msg").read_text(encoding="utf-8")
         expected = {
-            "allow_x_move",
-            "allow_y_move",
+            "allow_x_positive",
+            "allow_x_negative",
+            "allow_y_positive",
+            "allow_y_negative",
             "allow_lower",
             "allow_raise",
             "allow_grab_open",
@@ -29,6 +31,81 @@ class MessageContractTest(unittest.TestCase):
         }
         actual = set(re.findall(r"^bool (allow_[a-z_]+)$", text, re.MULTILINE))
         self.assertEqual(expected, actual)
+        for field in (
+            "string permit_id",
+            "uint64 permit_generation",
+            "string evaluated_intent_id",
+            "time issued_stamp",
+            "time expire_stamp",
+        ):
+            self.assertIn(field, text)
+
+    def test_authorized_command_binds_intent_permit_and_expiry(self):
+        text = (MSG_DIR / "AuthorizedCommand.msg").read_text(encoding="utf-8")
+        for field in (
+            "string command_id",
+            "string intent_id",
+            "string permit_id",
+            "uint64 permit_generation",
+            "time issued_stamp",
+            "time expire_stamp",
+        ):
+            self.assertIn(field, text)
+
+    def test_execution_state_exposes_rejection_and_completion(self):
+        text = (MSG_DIR / "CommandExecutionState.msg").read_text(
+            encoding="utf-8"
+        )
+        for field in (
+            "STATE_REJECTED",
+            "STATE_EXECUTING",
+            "STATE_COMPLETED",
+            "bool accepted",
+            "bool failed",
+        ):
+            self.assertIn(field, text)
+
+    def test_mock_adapter_consumes_only_authorized_commands(self):
+        adapter = (
+            ROOT
+            / "src"
+            / "chili_crane_control"
+            / "scripts"
+            / "mock_hardware_adapter.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("control/authorized_command", adapter)
+        self.assertNotIn("control/requested_intent", adapter)
+        self.assertNotIn("ControlIntent", adapter)
+
+    def test_fail_safe_supervisor_sets_all_permissions_false(self):
+        supervisor = (
+            ROOT
+            / "src"
+            / "chili_crane_control"
+            / "scripts"
+            / "fail_safe_safety_supervisor.py"
+        ).read_text(encoding="utf-8")
+        safety = (MSG_DIR / "SafetyPermit.msg").read_text(encoding="utf-8")
+        permissions = re.findall(
+            r"^bool (allow_[a-z_]+)$", safety, re.MULTILINE
+        )
+        for permission in permissions:
+            self.assertIn("permit.{} = False".format(permission), supervisor)
+
+    def test_intent_and_authorized_command_actions_match(self):
+        def action_pairs(name):
+            text = (MSG_DIR / name).read_text(encoding="utf-8")
+            pairs = re.findall(
+                r"^uint8 (ACTION_[A-Z0-9_]+)=(\d+)$",
+                text,
+                re.MULTILINE,
+            )
+            return [(action, int(value)) for action, value in pairs]
+
+        self.assertEqual(
+            action_pairs("ControlIntent.msg"),
+            action_pairs("AuthorizedCommand.msg"),
+        )
 
     def test_grab_contract_has_conflict_state(self):
         text = (MSG_DIR / "GrabState.msg").read_text(encoding="utf-8")
@@ -57,6 +134,19 @@ class MessageContractTest(unittest.TestCase):
         self.assertIn("bool upper_limit", text)
         self.assertIn("bool lower_limit", text)
         self.assertIn("float64 evidence_age_sec", text)
+
+    def test_servo_contract_reserves_generic_drive_health(self):
+        text = (MSG_DIR / "ServoState.msg").read_text(encoding="utf-8")
+        for field in (
+            "bool drive_ready",
+            "bool servo_enabled",
+            "bool positive_limit",
+            "bool negative_limit",
+            "bool communication_ok",
+            "int32 fault_code",
+            "uint64 source_counter",
+        ):
+            self.assertIn(field, text)
 
 
 if __name__ == "__main__":

@@ -17,7 +17,8 @@ uint8 ACTION_HOLD=8
 std_msgs/Header header
 uint8 validity
 string reason
-string request_id
+string intent_id
+string task_id
 uint8 action
 float64 target_x_m
 float64 target_y_m

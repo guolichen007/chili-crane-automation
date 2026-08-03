@@ -4,7 +4,7 @@ profile:
   implementation_state: NOT_READY
 
 runtime:
-  mode: mock
+  mode: localization
   crane_id: crane_01
   namespace: /crane_01
   hardware_adapter: mock

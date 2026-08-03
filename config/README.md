@@ -12,3 +12,5 @@ Runtime profiles define lifecycle behavior:
 - `mock.yaml`: fail-safe interface development.
 
 Site-specific calibrated files should be versioned only after field review.
+The dual-camera template keeps both auxiliary cameras disabled and all topic,
+frame, intrinsic, and extrinsic identities `NOT_CONFIGURED` until calibration.

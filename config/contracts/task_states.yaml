@@ -1,0 +1,24 @@
+contract_version: 1
+states:
+  - {name: IDLE, value: 0}
+  - {name: TASK_ACCEPTED, value: 1}
+  - {name: LOCALIZATION_READY, value: 2}
+  - {name: NAVIGATING_TO_PIT, value: 3}
+  - {name: PIT_POSITIONED, value: 4}
+  - {name: SCANNING_PIT, value: 5}
+  - {name: GRASP_TARGET_READY, value: 6}
+  - {name: POSITIONING_TROLLEY, value: 7}
+  - {name: WAITING_STABLE, value: 8}
+  - {name: LOWERING, value: 9}
+  - {name: CONTACT_DETECTED, value: 10}
+  - {name: CLOSING_GRAB, value: 11}
+  - {name: LOAD_VERIFY, value: 12}
+  - {name: RAISING_TO_SAFE_HEIGHT, value: 13}
+  - {name: NAVIGATING_TO_UNLOAD, value: 14}
+  - {name: UNLOAD_READY, value: 15}
+  - {name: OPENING_GRAB, value: 16}
+  - {name: UNLOAD_VERIFY, value: 17}
+  - {name: RETURNING_TO_SAFE_WAIT, value: 18}
+  - {name: DONE, value: 19}
+  - {name: FAULT, value: 20}
+  - {name: MANUAL_OVERRIDE, value: 21}

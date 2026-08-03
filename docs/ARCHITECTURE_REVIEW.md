@@ -31,7 +31,8 @@ The system is not approved for physical automatic motion.
 9. Require typed, false-by-default safety permissions before control.
 10. Start with mock adapters that remain `NOT_CONFIGURED`.
 11. Keep ScanContext/global place recovery disabled until real data supports it.
-12. Resolve Ubuntu/ROS baseline before claiming a build target.
+12. Use the accepted Ubuntu 20.04.6/ROS Noetic baseline without claiming a
+    build until exact-SHA Ubuntu evidence exists.
 
 ## Direct reuse classification
 
@@ -65,7 +66,8 @@ The system is not approved for physical automatic motion.
 
 ## Open architecture risks
 
-- ROS1 Noetic versus Ubuntu 22.04 procurement baseline;
+- future Ubuntu 22.04 procurement pressure versus the accepted Phase 1
+  Ubuntu 20.04.6/ROS Noetic baseline;
 - repetitive rail geometry and false global matches;
 - unknown LiDAR coverage/reflectivity near the 10 m range;
 - grab self-occlusion and open/closed envelope calibration;

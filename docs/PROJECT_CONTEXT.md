@@ -213,14 +213,18 @@ permission, not merely a marker.
 The control boundary separates:
 
 1. normalized device state;
-2. high-level `ControlIntent`;
+2. requested high-level `ControlIntent`;
 3. `SafetyPermit`;
-4. a device-specific adapter.
+4. a one-time `AuthorizedCommand` bound to intent, permit generation, and
+   expiry;
+5. a device-specific adapter and `CommandExecutionState`.
 
 All autonomous outputs fail closed. Invalid localization blocks
 geometry-dependent X/Y motion. Stale grab tracking blocks lowering. Limit,
 manual mode, e-stop, communication loss, and conflicting open/closed signals
 block the affected actions.
+
+Hardware adapters never consume raw requested intents.
 
 Software supplements but never replaces certified electrical safety.
 
@@ -270,8 +274,8 @@ draw-wire feedback. This repository interprets it as “Y uses draw-wire; Z does
 not” and keeps final field confirmation open.
 
 The procurement sheet also says Ubuntu 22.04 while the reusable upstream is
-ROS1 Noetic/catkin. Runtime baseline resolution is documented in
-`docs/decisions/0001-runtime_baseline.md`.
+ROS1 Noetic/catkin. ADR 0001 accepts native Ubuntu 20.04.6 with ROS Noetic for
+Phase 1; any Ubuntu 22.04 requirement is a separate migration decision.
 
 ## 11. Known unknowns
 
@@ -284,7 +288,6 @@ Do not guess production values for:
 - grab dimensions/CAD and open/closed envelopes;
 - safety margins, speed limits, stop distances, and contact thresholds;
 - unloading detection source;
-- final edge-server OS/runtime;
 - multi-crane collision/scheduling policy.
 
 Every unknown must remain a configuration placeholder, adapter boundary, or

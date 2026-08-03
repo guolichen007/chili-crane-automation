@@ -23,7 +23,9 @@ perception/grasp_target
 perception/grab_state
 perception/unloading_cart
 safety/permit
-control/intent
+control/requested_intent
+control/authorized_command
+control/execution_state
 task/status
 ```
 

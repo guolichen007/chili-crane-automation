@@ -1,32 +1,43 @@
 # ADR 0001: Runtime Baseline
 
-- Status: `PROPOSED`
+- Status: `ACCEPTED`
 - Decision owner: project technical lead
 
 ## Context
 
 The reusable NDT upstream is a ROS1 Noetic/catkin workspace. A historical
-procurement sheet specifies Ubuntu 22.04 for edge servers. The project has not
-yet confirmed whether to:
+procurement sheet specifies Ubuntu 22.04 for edge servers, while the current
+Phase 1 priority is minimizing algorithm-extraction and field-validation risk.
 
-1. use Ubuntu 20.04 + ROS1 Noetic for direct upstream compatibility;
-2. use Ubuntu 22.04 with a controlled container/source-built ROS1 stack;
-3. port the new project to ROS2 while selectively extracting algorithms.
+## Decision
 
-This decision changes build tooling, message/runtime integration, dependency
-versions, deployment, and validation.
+Phase 1 freezes the runtime and validation baseline as:
 
-## Phase 0 position
+```text
+Operating system: Ubuntu 20.04.6 LTS
+ROS: ROS Noetic
+Build system: catkin_tools
+Python: 3.8
+C++: C++17
+Compiler: GCC 9.x
+Runtime: native Ubuntu
+```
 
-The package skeleton follows ROS1/catkin interfaces because it minimizes the
-first NDT extraction risk. This is not a final OS approval. No Ubuntu build is
-claimed.
+Algorithm development, ROS bag replay, hardware integration, and field
+validation use this baseline. Windows is limited to editing, static checks,
+interface tests that do not require ROS, documentation, and Git operations.
+Windows evidence never substitutes for an Ubuntu build or runtime result.
 
-## Required evidence before acceptance
+The repository does not maintain parallel ROS1 and ROS2 implementations. If a
+future purchased server is required to run Ubuntu 22.04, containerization or a
+system/ROS migration must be evaluated in a separate ADR and branch.
 
-- confirmed edge-server OS policy;
-- support/maintenance requirements;
-- dependency availability for PCL, Sophus, ndt_omp, and drivers;
-- build proof on the selected clean image;
-- deployment and recovery strategy;
-- expected project lifetime and migration cost.
+## Consequences
+
+- the ROS1/catkin package skeleton remains the only active implementation;
+- C++ public contracts compile as C++17 targets on the Ubuntu baseline;
+- Python runtime code and tooling remain compatible with Python 3.8;
+- Ubuntu build, roslaunch, bag, and field status remain `NOT_RUN` until executed
+  against an exact pushed SHA;
+- the historical Ubuntu 22.04 procurement preference is recorded but does not
+  silently alter Phase 1.

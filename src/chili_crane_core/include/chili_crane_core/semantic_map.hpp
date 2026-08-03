@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -64,8 +65,9 @@ struct TrackDefinition {
 };
 
 struct SemanticMap {
+    std::uint32_t schema_version = 1U;
     std::string map_id;
-    std::string version;
+    std::string semantic_version;
     std::string frame_id = "map";
     TrackDefinition track;
     std::vector<PitDefinition> pits;
@@ -73,7 +75,7 @@ struct SemanticMap {
     Pose2d safe_wait_pose;
     std::vector<RestrictedRegionDefinition> restricted_regions;
     std::vector<CalibrationAnchorDefinition> calibration_anchors;
-    Validity validity = Validity::NOT_CONFIGURED;
+    Validity config_state = Validity::NOT_CONFIGURED;
 };
 
 }  // namespace chili_crane_core

@@ -1,7 +1,5 @@
 * text=auto eol=lf
 
-*.bat text eol=crlf
-
 *.dwg binary
 *.jpg binary
 *.jpeg binary

@@ -7,8 +7,15 @@ uint8 VALID=4
 std_msgs/Header header
 uint8 validity
 string reason
-bool allow_x_move
-bool allow_y_move
+string permit_id
+uint64 permit_generation
+string evaluated_intent_id
+time issued_stamp
+time expire_stamp
+bool allow_x_positive
+bool allow_x_negative
+bool allow_y_positive
+bool allow_y_negative
 bool allow_lower
 bool allow_raise
 bool allow_grab_open

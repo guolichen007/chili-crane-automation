@@ -2,6 +2,17 @@
 
 Run only against an exact pushed SHA.
 
+Accepted Phase 1 baseline:
+
+```text
+OS: Ubuntu 20.04.6 LTS
+ROS: ROS Noetic
+BUILD_SYSTEM: catkin_tools
+PYTHON: 3.8
+CXX: C++17
+COMPILER: GCC 9.x
+```
+
 ## Handoff record
 
 ```text
@@ -38,5 +49,21 @@ EVIDENCE_DIRECTORY:
 
 ## Phase 0 note
 
-Until ADR 0001 is resolved, the clean build command and base image remain
-`NOT_CONFIGURED`. Do not choose an OS silently.
+ADR 0001 fixes the target baseline but does not constitute build evidence.
+Use `scripts/validation/ubuntu20_phase0_validate.sh` from an exact pushed SHA.
+Until that script and the runbook are actually executed on Ubuntu, build,
+roslaunch, bag, and field results remain `NOT_RUN`.
+
+Example invocation from the repository root:
+
+```bash
+scripts/validation/ubuntu20_phase0_validate.sh \
+  --workspace "$PWD" \
+  --evidence-dir "$PWD/../chili-crane-evidence" \
+  --expected-sha "$(git rev-parse HEAD)"
+```
+
+Use an evidence directory outside the tracked repository. The script verifies
+the OS/ROS/Python/GCC baseline, exact SHA, clean tree, dependencies, catkin
+build/tests, launch entry, false-default permit, and `NOT_CONFIGURED` mock
+hardware topics before writing any PASS status.

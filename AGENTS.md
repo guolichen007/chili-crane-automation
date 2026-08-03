@@ -56,6 +56,20 @@ bag replay, runtime evidence, and field validation against an exact Git SHA.
 
 The runtime target is Linux/Ubuntu/ROS even when files are edited on Windows.
 
+The accepted Phase 1 runtime baseline is:
+
+- Ubuntu 20.04.6 LTS;
+- ROS Noetic;
+- `catkin_tools`;
+- Python 3.8;
+- C++17 with GCC 9.x;
+- native Ubuntu runtime.
+
+Windows is limited to editing, static/interface checks, documentation, and Git
+operations. The repository does not maintain parallel ROS1 and ROS2
+implementations. A future Ubuntu 22.04 requirement needs a separate migration
+or containerization decision.
+
 - all first-party text files use LF;
 - text is UTF-8 without BOM;
 - every text file ends with one newline;

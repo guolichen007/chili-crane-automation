@@ -8,8 +8,9 @@ explicit developer action and still does not create a SafetyPermit.
 import rospy
 
 from chili_crane_msgs.msg import (
+    AuthorizedCommand,
+    CommandExecutionState,
     ControlBoardState,
-    ControlIntent,
     GrabIoState,
     HoistState,
     LoadState,
@@ -32,6 +33,7 @@ class MockHardwareAdapter:
         self._trolley_position_m = float(
             rospy.get_param("~trolley_position_m", 0.0)
         )
+        self._source_counter = 0
         self._servo_pub = rospy.Publisher(
             "hardware/servo_state", ServoState, queue_size=1
         )
@@ -52,8 +54,16 @@ class MockHardwareAdapter:
             ControlBoardState,
             queue_size=1,
         )
-        self._intent_sub = rospy.Subscriber(
-            "control/intent", ControlIntent, self._on_intent, queue_size=10
+        self._execution_pub = rospy.Publisher(
+            "control/execution_state",
+            CommandExecutionState,
+            queue_size=10,
+        )
+        self._command_sub = rospy.Subscriber(
+            "control/authorized_command",
+            AuthorizedCommand,
+            self._on_authorized_command,
+            queue_size=10,
         )
 
         publish_rate_hz = max(
@@ -79,6 +89,7 @@ class MockHardwareAdapter:
 
     def _publish(self, _event: rospy.timer.TimerEvent) -> None:
         stamp = rospy.Time.now()
+        self._source_counter += 1
 
         servo = ServoState()
         servo.header.stamp = stamp
@@ -88,6 +99,13 @@ class MockHardwareAdapter:
         servo.position_m = self._servo_position_m
         servo.homed = self._configured
         servo.fault = False
+        servo.drive_ready = self._configured
+        servo.servo_enabled = False
+        servo.positive_limit = False
+        servo.negative_limit = False
+        servo.communication_ok = self._configured
+        servo.fault_code = 0
+        servo.source_counter = self._source_counter
         servo.calibration_id = (
             "mock_explicit" if self._configured else "NOT_CONFIGURED"
         )
@@ -168,13 +186,48 @@ class MockHardwareAdapter:
         board.evidence_age_sec = 0.0 if self._configured else 1.0e9
         self._board_pub.publish(board)
 
-    @staticmethod
-    def _on_intent(intent: ControlIntent) -> None:
+    def _on_authorized_command(self, command: AuthorizedCommand) -> None:
+        stamp = rospy.Time.now()
+        execution = CommandExecutionState()
+        execution.header.stamp = stamp
+        execution.validity = CommandExecutionState.VALID
+        execution.command_id = command.command_id
+        execution.task_id = command.task_id
+        execution.intent_id = command.intent_id
+        execution.state = CommandExecutionState.STATE_REJECTED
+        execution.accepted = False
+        execution.executing = False
+        execution.completed = False
+        execution.failed = True
+
+        if command.validity != AuthorizedCommand.VALID:
+            execution.reason = "authorized_command_not_valid"
+        elif (
+            not command.command_id
+            or not command.intent_id
+            or not command.permit_id
+        ):
+            execution.reason = "authorized_command_identity_missing"
+        elif command.expire_stamp <= command.issued_stamp:
+            execution.reason = "authorized_command_expiry_invalid"
+        elif stamp >= command.expire_stamp:
+            execution.reason = "authorized_command_expired"
+        else:
+            execution.reason = "mock_adapter_has_no_physical_output"
+
+        if command.header.stamp.is_zero():
+            execution.evidence_age_sec = 1.0e9
+        else:
+            execution.evidence_age_sec = max(
+                0.0, (stamp - command.header.stamp).to_sec()
+            )
+        self._execution_pub.publish(execution)
         rospy.logwarn_throttle(
             2.0,
-            "Mock adapter received action=%d request_id=%s; no physical output exists.",
-            intent.action,
-            intent.request_id,
+            "Mock adapter rejected command_id=%s action=%d: %s",
+            command.command_id,
+            command.action,
+            execution.reason,
         )
 
 

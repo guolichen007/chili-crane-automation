@@ -5,73 +5,21 @@ Required columns:
 stamp_sec, raw_position, position_m, velocity_mps, valid, homed, fault
 """
 
-import csv
-from dataclasses import dataclass
+import time
 from pathlib import Path
-from typing import List
 
 import rospy
 
+from chili_crane_control.servo_csv import (
+    NOT_CONFIGURED,
+    VALID,
+    classify_sample,
+    evidence_age_seconds,
+    load_samples,
+    mapped_sample_time,
+    scheduled_monotonic_time,
+)
 from chili_crane_msgs.msg import ServoState
-
-
-@dataclass(frozen=True)
-class ServoCsvSample:
-    stamp_sec: float
-    raw_position: float
-    position_m: float
-    velocity_mps: float
-    valid: bool
-    homed: bool
-    fault: bool
-
-
-def _parse_bool(value: str) -> bool:
-    normalized = value.strip().lower()
-    if normalized in {"1", "true", "yes"}:
-        return True
-    if normalized in {"0", "false", "no"}:
-        return False
-    raise ValueError(f"invalid boolean value: {value!r}")
-
-
-def load_samples(csv_path: Path) -> List[ServoCsvSample]:
-    with csv_path.open("r", encoding="utf-8", newline="") as stream:
-        reader = csv.DictReader(stream)
-        required = {
-            "stamp_sec",
-            "raw_position",
-            "position_m",
-            "velocity_mps",
-            "valid",
-            "homed",
-            "fault",
-        }
-        missing = required.difference(reader.fieldnames or [])
-        if missing:
-            raise ValueError(
-                "missing required CSV columns: " + ", ".join(sorted(missing))
-            )
-        samples = [
-            ServoCsvSample(
-                stamp_sec=float(row["stamp_sec"]),
-                raw_position=float(row["raw_position"]),
-                position_m=float(row["position_m"]),
-                velocity_mps=float(row["velocity_mps"]),
-                valid=_parse_bool(row["valid"]),
-                homed=_parse_bool(row["homed"]),
-                fault=_parse_bool(row["fault"]),
-            )
-            for row in reader
-        ]
-    if not samples:
-        raise ValueError("servo CSV contains no samples")
-    if any(
-        right.stamp_sec <= left.stamp_sec
-        for left, right in zip(samples, samples[1:])
-    ):
-        raise ValueError("servo CSV timestamps must be strictly increasing")
-    return samples
 
 
 def main() -> None:
@@ -85,32 +33,43 @@ def main() -> None:
     calibration_id = str(
         rospy.get_param("~calibration_id", "NOT_CONFIGURED")
     )
-    calibration_configured = calibration_id not in {
-        "",
-        "NOT_CONFIGURED",
-    }
+    stamp_policy = str(rospy.get_param("~stamp_policy", "mapped")).strip()
+    if stamp_policy not in {"mapped", "source"}:
+        raise RuntimeError("~stamp_policy must be 'mapped' or 'source'")
     publisher = rospy.Publisher(
         "hardware/servo_state", ServoState, queue_size=10
     )
-    start_wall = rospy.Time.now()
+    start_wall = time.monotonic()
     start_sample = samples[0].stamp_sec
+    start_ros = rospy.Time.now().to_sec()
 
-    for sample in samples:
+    for source_counter, sample in enumerate(samples, start=1):
         if rospy.is_shutdown():
             break
-        target_elapsed = sample.stamp_sec - start_sample
-        while (
-            not rospy.is_shutdown()
-            and (rospy.Time.now() - start_wall).to_sec() < target_elapsed
-        ):
-            rospy.sleep(0.001)
+        scheduled_time = scheduled_monotonic_time(
+            start_wall, start_sample, sample.stamp_sec
+        )
+        while not rospy.is_shutdown() and time.monotonic() < scheduled_time:
+            time.sleep(0.001)
+
+        if stamp_policy == "source":
+            evidence_stamp_sec = sample.stamp_sec
+        else:
+            evidence_stamp_sec = mapped_sample_time(
+                start_ros, start_sample, sample.stamp_sec
+            )
+        publish_ros_sec = rospy.Time.now().to_sec()
+        effective_publish_sec = (
+            publish_ros_sec if publish_ros_sec > 0.0 else evidence_stamp_sec
+        )
 
         message = ServoState()
-        message.header.stamp = rospy.Time.now()
+        message.header.stamp = rospy.Time.from_sec(evidence_stamp_sec)
         message.header.frame_id = frame_id
-        if not calibration_configured:
+        classification = classify_sample(calibration_id, sample)
+        if classification == NOT_CONFIGURED:
             message.validity = ServoState.NOT_CONFIGURED
-        elif sample.valid and not sample.fault and sample.homed:
+        elif classification == VALID:
             message.validity = ServoState.VALID
         else:
             message.validity = ServoState.DEGRADED
@@ -127,8 +86,17 @@ def main() -> None:
         message.homed = sample.homed
         message.running = abs(sample.velocity_mps) > 1.0e-6
         message.fault = sample.fault
+        message.drive_ready = classification == VALID
+        message.servo_enabled = False
+        message.positive_limit = False
+        message.negative_limit = False
+        message.communication_ok = classification == VALID
+        message.fault_code = -1 if sample.fault else 0
+        message.source_counter = source_counter
         message.calibration_id = calibration_id
-        message.evidence_age_sec = 0.0
+        message.evidence_age_sec = evidence_age_seconds(
+            effective_publish_sec, evidence_stamp_sec
+        )
         publisher.publish(message)
 
 

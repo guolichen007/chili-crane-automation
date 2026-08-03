@@ -9,5 +9,6 @@ lifecycle parameters for later nodes.
 
 The launch-file default `config_root` resolves the repository-level `config`
 directory in a source workspace. Installed deployments must pass
-`config_root:=<absolute-linux-path>` until the runtime-baseline ADR defines the
-final packaging layout.
+`config_root:=<absolute-linux-path>`. Every public entry launch accepts this
+argument. Phase 0 intentionally does not claim that repository-level configs
+are installed into package share; that packaging decision remains for Phase 1.
