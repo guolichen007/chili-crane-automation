@@ -6,7 +6,7 @@ from rclpy.clock import Clock, ClockType
 from chili_crane_control.qos import command_qos, state_qos
 from chili_crane_msgs.msg import (
     AuthorizedCommand, CommandExecutionState, ControlBoardState,
-    GrabIoState, HoistState, LoadState, ServoState, TrolleyState,
+    GrabIoState, HoistState, LoadState, ServoState, TrolleyState, RemoteControlState,
 )
 
 
@@ -24,6 +24,7 @@ class MockHardwareAdapter(Node):
             "servo_state": ServoState, "trolley_state": TrolleyState,
             "hoist_state": HoistState, "load_state": LoadState,
             "grab_io_state": GrabIoState, "control_board_state": ControlBoardState,
+            "remote_control_state": RemoteControlState,
         }
         self._publishers_by_topic = {
             topic: self.create_publisher(kind, "hardware/" + topic, state_qos())
@@ -56,6 +57,11 @@ class MockHardwareAdapter(Node):
                 message.motion = HoistState.MOTION_UNKNOWN
             elif topic == "load_state":
                 message.load_state = LoadState.LOAD_UNKNOWN
+            elif topic == "remote_control_state":
+                message.control_mode = "BLOCKED"
+                message.release_automatic_outputs = True
+                message.discard_pending_commands = True
+                message.e_stop_known = False
             elif topic == "control_board_state":
                 message.safety_ok = False
                 message.safety_ok_known = False

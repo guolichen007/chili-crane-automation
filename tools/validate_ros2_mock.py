@@ -17,7 +17,7 @@ def main():
     from chili_crane_control.qos import state_qos, command_qos
     from chili_crane_msgs.msg import (
         SafetyPermit, ServoState, TrolleyState, HoistState, LoadState,
-        GrabIoState, ControlBoardState, ControlIntent, AuthorizedCommand, CommandExecutionState,
+        GrabIoState, ControlBoardState, RemoteControlState, ControlIntent, AuthorizedCommand, CommandExecutionState,
     )
     parser = argparse.ArgumentParser()
     parser.add_argument("--namespace", default="crane_01")
@@ -40,12 +40,17 @@ def main():
         "servo_state": ServoState, "trolley_state": TrolleyState,
         "hoist_state": HoistState, "load_state": LoadState,
         "grab_io_state": GrabIoState, "control_board_state": ControlBoardState,
+        "remote_control_state": RemoteControlState,
     }.items():
         def hardware_callback(msg, topic=topic, kind=kind):
             if msg.validity != kind.NOT_CONFIGURED:
                 failure.append(topic + " is not NOT_CONFIGURED")
             if topic == "control_board_state" and (msg.safety_ok or msg.safety_ok_known or msg.e_stop_known):
                 failure.append("mock board must not manufacture safety/estop evidence")
+            if topic == "remote_control_state" and (
+                    msg.control_mode != "BLOCKED" or not msg.release_automatic_outputs
+                    or not msg.discard_pending_commands or msg.e_stop_known):
+                failure.append("mock remote state must block automatic takeover")
             received[topic] = msg
         subscriptions.append(node.create_subscription(
             kind, "hardware/" + topic, hardware_callback, state_qos()))
@@ -70,7 +75,7 @@ def main():
         CommandExecutionState, "control/execution_state", execution_callback, state_qos(depth=10)))
     publisher = node.create_publisher(ControlIntent, "control/requested_intent", command_qos())
     required = {"permit", "servo_state", "trolley_state", "hoist_state", "load_state",
-                "grab_io_state", "control_board_state", "denied_command", "rejected_execution"}
+                "grab_io_state", "control_board_state", "remote_control_state", "denied_command", "rejected_execution"}
     started, next_publish = time.monotonic(), 0.0
     try:
         while time.monotonic() - started < args.timeout_sec:
