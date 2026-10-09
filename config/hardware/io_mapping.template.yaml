@@ -1,0 +1,46 @@
+config_state: NOT_CONFIGURED
+contract_version: 2
+total_di_channels: 24
+devices:
+  adam6052: {di_count: 8}
+  adam6251: {di_count: 16}
+# Names are a semantic inventory, not an assertion of 25 dedicated channels.
+# Some feedback may be absent or supplied over another interface; freeze the
+# actual 24-channel point table with the manufacturer before declaring VALID.
+digital_inputs:
+  mode_auto: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  safety_ok: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  y_left_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  y_right_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  z_top_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  z_bottom_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  g_open_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  g_close_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  e_stop: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  power_ok: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  y_fault: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  z_fault: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  g_fault: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  z_brake: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  overload: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  remote_receiver_ready: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  remote_x_positive: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  remote_x_negative: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  remote_y_left: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  remote_y_right: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  remote_z_up: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  remote_z_down: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  remote_g_open: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  remote_g_close: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  remote_stop: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+digital_outputs:
+  y_left: {device: adam6052, channel: 0}
+  y_right: {device: adam6052, channel: 1}
+  z_up: {device: adam6052, channel: 2}
+  z_down: {device: adam6052, channel: 3}
+  g_open: {device: adam6052, channel: 4}
+  g_close: {device: adam6052, channel: 5}
+reserved_do: [6, 7]
+stale_timeout_sec: 1.0
+physical_output_enabled: false
+automatic_control_enabled: false
