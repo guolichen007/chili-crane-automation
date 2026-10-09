@@ -1,42 +1,26 @@
 #!/usr/bin/env python3
-"""Phase 0 safety publisher.
-
-This node deliberately grants no permission. It makes the safety topic and
-fail-closed integration behavior available before a real evidence policy is
-implemented.
-"""
-
-import rospy
-
+"""Phase 0 denies every intent; no physical output."""
+import rclpy
+from rclpy.node import Node
+from rclpy.clock import Clock, ClockType
+from chili_crane_control.qos import command_qos, state_qos
 from chili_crane_msgs.msg import AuthorizedCommand, ControlIntent, SafetyPermit
 
 
-class FailSafeSafetySupervisor:
-    def __init__(self) -> None:
-        self._publisher = rospy.Publisher(
-            "safety/permit", SafetyPermit, queue_size=1, latch=True
-        )
-        self._authorized_command_publisher = rospy.Publisher(
-            "control/authorized_command",
-            AuthorizedCommand,
-            queue_size=10,
-        )
-        self._intent_subscriber = rospy.Subscriber(
-            "control/requested_intent",
-            ControlIntent,
-            self._reject_intent,
-            queue_size=10,
-        )
-        publish_rate_hz = max(
-            1.0, float(rospy.get_param("~publish_rate_hz", 10.0))
-        )
-        self._timer = rospy.Timer(
-            rospy.Duration(1.0 / publish_rate_hz), self._publish
-        )
+class FailSafeSafetySupervisor(Node):
+    def __init__(self):
+        super().__init__("safety_supervisor")
+        self._publisher = self.create_publisher(SafetyPermit, "safety/permit", state_qos())
+        self._command_pub = self.create_publisher(
+            AuthorizedCommand, "control/authorized_command", command_qos())
+        self._intent_sub = self.create_subscription(
+            ControlIntent, "control/requested_intent", self._reject_intent, command_qos())
+        self._steady_clock = Clock(clock_type=ClockType.STEADY_TIME)
+        self._timer = self.create_timer(0.1, self._publish, clock=self._steady_clock)
 
-    def _publish(self, _event: rospy.timer.TimerEvent) -> None:
+    def _publish(self):
         permit = SafetyPermit()
-        permit.header.stamp = rospy.Time.now()
+        permit.header.stamp = self.get_clock().now().to_msg()
         permit.validity = SafetyPermit.NOT_CONFIGURED
         permit.reason = "phase0_safety_policy_not_implemented"
         permit.permit_id = "phase0-fail-closed"
@@ -54,16 +38,12 @@ class FailSafeSafetySupervisor:
         permit.allow_grab_close = False
         permit.allow_unload = False
         permit.allow_auto_task = False
-        permit.blocking_reasons = [
-            "SAFETY_POLICY_NOT_IMPLEMENTED",
-            "HARDWARE_NOT_CONFIGURED",
-        ]
+        permit.blocking_reasons = ["SAFETY_POLICY_NOT_IMPLEMENTED", "HARDWARE_NOT_CONFIGURED"]
         permit.evidence_age_sec = 1.0e9
         self._publisher.publish(permit)
 
-    def _reject_intent(self, intent: ControlIntent) -> None:
-        """Publish an explicitly invalid command for integration visibility."""
-        stamp = rospy.Time.now()
+    def _reject_intent(self, intent):
+        stamp = self.get_clock().now().to_msg()
         command = AuthorizedCommand()
         command.header.stamp = stamp
         command.validity = AuthorizedCommand.NOT_CONFIGURED
@@ -80,21 +60,20 @@ class FailSafeSafetySupervisor:
         command.target_y_m = intent.target_y_m
         command.target_grab_bottom_z_m = intent.target_grab_bottom_z_m
         command.speed_scale = intent.speed_scale
-        self._authorized_command_publisher.publish(command)
-        rospy.logwarn_throttle(
-            2.0,
-            "Rejected requested intent_id=%s; Phase 0 grants no authorization.",
-            intent.intent_id,
-        )
+        self._command_pub.publish(command)
 
 
-def main() -> None:
-    rospy.init_node("fail_safe_safety_supervisor")
-    FailSafeSafetySupervisor()
-    rospy.logwarn(
-        "Phase 0 safety supervisor is fail-closed; no automatic action is permitted."
-    )
-    rospy.spin()
+def main():
+    rclpy.init()
+    node = FailSafeSafetySupervisor()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":

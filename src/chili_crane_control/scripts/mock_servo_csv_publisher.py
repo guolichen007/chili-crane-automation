@@ -1,103 +1,92 @@
 #!/usr/bin/env python3
-"""Replay normalized servo samples from CSV for interface development.
-
-Required columns:
-stamp_sec, raw_position, position_m, velocity_mps, valid, homed, fault
-"""
-
+"""CSV replay is scheduled with monotonic time, never ROS /clock."""
 import time
 from pathlib import Path
-
-import rospy
-
+import rclpy
+from rclpy.node import Node
+from rclpy.clock import Clock, ClockType
+from rclpy.time import Time
+from chili_crane_control.qos import state_qos
 from chili_crane_control.servo_csv import (
-    NOT_CONFIGURED,
-    VALID,
-    classify_sample,
-    evidence_age_seconds,
-    load_samples,
-    mapped_sample_time,
-    scheduled_monotonic_time,
+    classify_sample, evidence_age_seconds, load_samples,
+    mapped_sample_time, scheduled_monotonic_time,
 )
 from chili_crane_msgs.msg import ServoState
 
 
-def main() -> None:
-    rospy.init_node("mock_servo_csv_publisher")
-    csv_file = str(rospy.get_param("~csv_file", "")).strip()
-    if not csv_file:
-        raise RuntimeError("~csv_file is required; no default data is invented")
+class ServoCsvPublisher(Node):
+    def __init__(self):
+        super().__init__("mock_servo_csv_publisher")
+        for name, value in {
+            "csv_file": "", "frame_id": "crane_01/base",
+            "calibration_id": "NOT_CONFIGURED", "stamp_policy": "mapped",
+        }.items():
+            self.declare_parameter(name, value)
+        csv_file = self.get_parameter("csv_file").value
+        if not csv_file:
+            raise ValueError("csv_file is required")
+        self._samples = load_samples(Path(csv_file))
+        self._policy = self.get_parameter("stamp_policy").value
+        if self._policy not in {"source", "mapped"}:
+            raise ValueError("stamp_policy must be source or mapped")
+        self._publisher = self.create_publisher(
+            ServoState, "hardware/servo_state", state_qos(depth=10))
+        self._wall = time.monotonic()
+        self._source = self._samples[0].stamp_sec
+        self._ros = self.get_clock().now().nanoseconds / 1.0e9
+        self._index = 0
+        self._steady_clock = Clock(clock_type=ClockType.STEADY_TIME)
+        self._timer = self.create_timer(0.002, self._tick, clock=self._steady_clock)
 
-    samples = load_samples(Path(csv_file))
-    frame_id = str(rospy.get_param("~frame_id", "crane_01/base"))
-    calibration_id = str(
-        rospy.get_param("~calibration_id", "NOT_CONFIGURED")
-    )
-    stamp_policy = str(rospy.get_param("~stamp_policy", "mapped")).strip()
-    if stamp_policy not in {"mapped", "source"}:
-        raise RuntimeError("~stamp_policy must be 'mapped' or 'source'")
-    publisher = rospy.Publisher(
-        "hardware/servo_state", ServoState, queue_size=10
-    )
-    start_wall = time.monotonic()
-    start_sample = samples[0].stamp_sec
-    start_ros = rospy.Time.now().to_sec()
-
-    for source_counter, sample in enumerate(samples, start=1):
-        if rospy.is_shutdown():
-            break
-        scheduled_time = scheduled_monotonic_time(
-            start_wall, start_sample, sample.stamp_sec
-        )
-        while not rospy.is_shutdown() and time.monotonic() < scheduled_time:
-            time.sleep(0.001)
-
-        if stamp_policy == "source":
-            evidence_stamp_sec = sample.stamp_sec
-        else:
-            evidence_stamp_sec = mapped_sample_time(
-                start_ros, start_sample, sample.stamp_sec
-            )
-        publish_ros_sec = rospy.Time.now().to_sec()
-        effective_publish_sec = (
-            publish_ros_sec if publish_ros_sec > 0.0 else evidence_stamp_sec
-        )
-
+    def _tick(self):
+        if self._index >= len(self._samples):
+            self._timer.cancel()
+            return
+        sample = self._samples[self._index]
+        if time.monotonic() < scheduled_monotonic_time(self._wall, self._source, sample.stamp_sec):
+            return
+        evidence = sample.stamp_sec if self._policy == "source" else mapped_sample_time(
+            self._ros, self._source, sample.stamp_sec)
+        now = self.get_clock().now().nanoseconds / 1.0e9
         message = ServoState()
-        message.header.stamp = rospy.Time.from_sec(evidence_stamp_sec)
-        message.header.frame_id = frame_id
-        classification = classify_sample(calibration_id, sample)
-        if classification == NOT_CONFIGURED:
-            message.validity = ServoState.NOT_CONFIGURED
-        elif classification == VALID:
-            message.validity = ServoState.VALID
-        else:
-            message.validity = ServoState.DEGRADED
-        message.reason = (
-            "csv_sample_valid"
-            if message.validity == ServoState.VALID
-            else "csv_calibration_not_configured"
-            if message.validity == ServoState.NOT_CONFIGURED
-            else "csv_sample_invalid_unhomed_or_fault"
-        )
+        message.header.stamp = Time(nanoseconds=int(evidence * 1.0e9)).to_msg()
+        message.header.frame_id = self.get_parameter("frame_id").value
+        calibration = self.get_parameter("calibration_id").value
+        classification = classify_sample(calibration, sample)
+        message.validity = getattr(ServoState, classification)
+        message.reason = "csv_" + classification.lower()
         message.raw_position = sample.raw_position
         message.position_m = sample.position_m
         message.velocity_mps = sample.velocity_mps
         message.homed = sample.homed
         message.running = abs(sample.velocity_mps) > 1.0e-6
         message.fault = sample.fault
-        message.drive_ready = classification == VALID
-        message.servo_enabled = False
-        message.positive_limit = False
-        message.negative_limit = False
-        message.communication_ok = classification == VALID
+        message.drive_ready = classification == "VALID"
+        message.communication_ok = classification == "VALID"
         message.fault_code = -1 if sample.fault else 0
-        message.source_counter = source_counter
-        message.calibration_id = calibration_id
-        message.evidence_age_sec = evidence_age_seconds(
-            effective_publish_sec, evidence_stamp_sec
-        )
-        publisher.publish(message)
+        message.source_counter = self._index + 1
+        message.calibration_id = calibration
+        if now <= 0.0 or evidence > now:
+            message.validity = ServoState.STALE
+            message.reason = "csv_ros_clock_unavailable_or_future"
+            message.evidence_age_sec = 1.0e9
+        else:
+            message.evidence_age_sec = evidence_age_seconds(now, evidence)
+        self._publisher.publish(message)
+        self._index += 1
+
+
+def main():
+    rclpy.init()
+    node = ServoCsvPublisher()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 if __name__ == "__main__":
