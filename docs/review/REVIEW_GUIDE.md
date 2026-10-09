@@ -30,3 +30,9 @@
 审查输出给出优先级、文件/行、复现条件、风险和建议，不仅写“看起来可以”。
 改架构需ADR；补接口需配置/测试/文档同步；现场值必须有记录。
 当前可调速及固定低速均只是策略框架，不承诺厂家点动能力或动态性能。
+
+## 精确SHA证据入口
+
+[Phase0.5软件验证记录](../validation/PHASE05_SOFTWARE_470089b.md)记录已实际验证的软件SHA；
+[当前评审分支](https://github.com/guolichen007/chili-crane-automation/tree/codex/architecture-freeze-v1)
+及该分支最新Actions确定最终HEAD。不要把文档归档提交的SHA与历史验证记录混为一谈。
