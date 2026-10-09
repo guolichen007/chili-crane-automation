@@ -1,0 +1,57 @@
+contract_version: 1
+config_version: NOT_CONFIGURED
+config_state: NOT_CONFIGURED
+physical_output_enabled: false
+automatic_control_enabled: false
+x:
+  drive_type: SERVO_POSITION
+  verified: false
+  protocol: NOT_CONFIGURED
+y:
+  drive_profile: NOT_CONFIGURED
+  supported_profiles: [VARIABLE_SPEED, FIXED_SLOW]
+  position_source: RS485_PULL_WIRE
+  verified: false
+  speed_command_supported: NOT_CONFIGURED
+  stop_distance_verified: false
+  reaction_time_verified: false
+  fixed_speed_verified_safe: false
+  pulse_jog_allowed: NOT_CONFIGURED
+  minimum_on_time: null
+  minimum_off_time: null
+  tolerance_m: null
+  settle_sec: null
+  stop_model:
+      sensor_latency: null
+      processing_latency: null
+      communication_latency: null
+      output_release_latency: null
+      mechanical_coast_distance: null
+      safety_margin: null
+z:
+  drive_profile: NOT_CONFIGURED
+  supported_profiles: [VARIABLE_SPEED, FIXED_SLOW]
+  position_source: DUAL_LIDAR_GRAB_BOTTOM
+  verified: false
+  speed_command_supported: NOT_CONFIGURED
+  stop_distance_verified: false
+  reaction_time_verified: false
+  fixed_speed_verified_safe: false
+  automatic_lowering_allowed: false
+  pulse_jog_allowed: NOT_CONFIGURED
+  minimum_on_time: null
+  minimum_off_time: null
+  tolerance_m: null
+  settle_sec: null
+  stop_model:
+      sensor_latency: null
+      processing_latency: null
+      communication_latency: null
+      output_release_latency: null
+      mechanical_coast_distance: null
+      safety_margin: null
+g:
+  drive_type: DIRECTION_LIMIT
+  verified: false
+  open_limit_required: true
+  close_limit_required: true

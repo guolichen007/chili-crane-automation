@@ -1,0 +1,23 @@
+config_state: NOT_CONFIGURED
+contract_version: 1
+enabled: false
+crane_namespace: crane_01
+storage_id: NOT_CONFIGURED
+output_directory: NOT_CONFIGURED
+# Relative topics; prefix the confirmed namespace when recording is authorized.
+topics:
+  - task/status
+  - task/cycle_status
+  - system/mode
+  - system/readiness
+  - run/manifest
+  - safety/permit
+  - safety/event
+  - safety/fault_event
+  - control/authorized_command
+  - control/actuation_request
+  - control/execution_state
+  - perception/grab_state
+  - perception/grasp_target
+  - hardware/trolley_state
+  - localization/pose

@@ -1,5 +1,5 @@
 config_state: NOT_CONFIGURED
-contract_version: 2
+contract_version: 3
 total_di_channels: 24
 devices:
   adam6052: {di_count: 8}
@@ -44,3 +44,33 @@ reserved_do: [6, 7]
 stale_timeout_sec: 1.0
 physical_output_enabled: false
 automatic_control_enabled: false
+
+# Physical assignments are separate from optional logical capabilities.
+assignment_states: [ASSIGNED, RESERVED, NOT_CONFIGURED]
+physical_channels:
+  adam6052:
+    - {channel: 0, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 1, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 2, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 3, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 4, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 5, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 6, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 7, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+  adam6251:
+    - {channel: 0, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 1, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 2, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 3, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 4, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 5, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 6, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 7, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 8, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 9, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 10, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 11, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 12, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 13, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 14, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 15, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}

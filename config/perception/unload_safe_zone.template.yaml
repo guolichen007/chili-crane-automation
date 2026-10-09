@@ -1,0 +1,12 @@
+config_state: NOT_CONFIGURED
+contract_version: 1
+frame_id: NOT_CONFIGURED
+geometry_version: NOT_CONFIGURED
+x_min: null
+x_max: null
+y_min: null
+y_max: null
+z_min: null
+z_max: null
+flow_projection_verified: false
+automatic_grab_open_allowed: false

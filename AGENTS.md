@@ -161,3 +161,13 @@ Stubs are acceptable while protocols are unknown, but they must remain visibly
 极性经配置确认。遥控器状态不得直接变成自动授权。厂家协议只进入
 chili_crane_hardware。bench 默认只读，DO 仅允许显式门禁和有限脉冲；
 production 不加载 bench writer。所有未确认设备参数继续 NOT_CONFIGURED。
+
+## 9. Phase 0.5 / Public delivery
+
+Follow ADR0004 and docs/api/PHASE05_CONTRACTS.md. Hardware consumes ActuationRequest,
+not AuthorizedCommand. Separate SystemMode and Task/Cycle; epoch/session/sequence must
+invalidate stale commands. STOP may only de-energize, never bypass permission to energize.
+Y/Z profiles are independent; unverified stopping/capability blocks automatic actions.
+Use CONTRIBUTING.md and Conventional Commit titles. Before SSH push run check_delivery.py
+with the exact base SHA. Do not force-push, rewrite public history, touch main, upload local
+memory/secrets, or claim production readiness. CI/mock and field evidence stay separate.

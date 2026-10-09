@@ -1,0 +1,8 @@
+config_state: NOT_CONFIGURED
+contract_version: 1
+drive_profile: FIXED_SLOW
+verified: false
+speed_command_valid: false
+pulse_jog_enabled: false
+y: {fixed_speed_mps: null, tolerance_m: null, settle_sec: null}
+z: {fixed_speed_mps: null, tolerance_m: null, settle_sec: null, automatic_lowering_allowed: false}

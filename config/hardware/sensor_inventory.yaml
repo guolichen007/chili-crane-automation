@@ -1,0 +1,38 @@
+contract_version: 1
+config_version: phase05-reported-assets-v1
+config_state: PARTIALLY_REPORTED
+# Reported assets only. This file neither starts drivers nor proves calibration.
+sensors:
+  er1_204:
+    vendor: RoboSense
+    model: ER1
+    ip: 192.168.1.204
+    udp_ports: [7799, 6688]
+    port_roles: NOT_CONFIGURED
+    physical_side: NOT_CONFIGURED
+    source_frame: NOT_CONFIGURED
+    calibration_id: NOT_CONFIGURED
+    enabled: true
+    driver_enabled: false
+  er1_205:
+    vendor: RoboSense
+    model: ER1
+    ip: 192.168.1.205
+    udp_ports: [6699, 7788]
+    port_roles: NOT_CONFIGURED
+    physical_side: NOT_CONFIGURED
+    source_frame: NOT_CONFIGURED
+    calibration_id: NOT_CONFIGURED
+    enabled: true
+    driver_enabled: false
+  camera_a:
+    vendor: Hikrobot
+    reported_ip: "192.168.180"
+    network_config_state: NEEDS_CONFIRMATION
+    physical_side: NOT_CONFIGURED
+    driver_enabled: false
+    enabled_for_control: false
+  camera_b:
+    config_state: NOT_CONFIGURED
+    driver_enabled: false
+    enabled_for_control: false

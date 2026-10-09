@@ -23,3 +23,7 @@ cameras:
     intrinsic_version: NOT_CONFIGURED
     extrinsic_version: NOT_CONFIGURED
     enabled: false
+
+enabled_for_control: false
+asset_to_mount: {camera_a: NOT_CONFIGURED, camera_b: NOT_CONFIGURED}
+reserved_topics: [camera_left/image_raw, camera_left/camera_info, camera_right/image_raw, camera_right/camera_info]

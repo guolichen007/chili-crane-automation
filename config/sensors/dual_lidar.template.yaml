@@ -23,3 +23,18 @@ synchronization:
 single_lidar_fallback:
   enabled: false
   authorization_source: NOT_CONFIGURED
+
+asset_inventory: hardware/sensor_inventory.yaml
+asset_to_mount:
+  er1_204: NOT_CONFIGURED
+  er1_205: NOT_CONFIGURED
+reserved_raw_topics: [lidar/er1_204/points, lidar/er1_205/points]
+cloud_products:
+  registration: localization/registration_cloud
+  pit_surface: perception/pit_cloud
+  grab_roi: perception/grab_cloud
+  wall_geometry: perception/wall_geometry
+readiness_requirements:
+  each_sensor: [online, fresh, frame_valid, calibration_valid]
+  pair: [pairing_valid, extrinsic_valid, coverage_valid]
+automatic_single_lidar_lowering_allowed: false

@@ -1,0 +1,10 @@
+config_state: NOT_CONFIGURED
+contract_version: 1
+run_id: NOT_CONFIGURED
+task_id: NOT_CONFIGURED
+cycle_id: NOT_CONFIGURED
+git_sha: NOT_CONFIGURED
+config_hash: NOT_CONFIGURED
+map_id: NOT_CONFIGURED
+sensor_calibration_ids: []
+grab_geometry_version: NOT_CONFIGURED

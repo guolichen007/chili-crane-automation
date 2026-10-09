@@ -1,0 +1,15 @@
+config_state: NOT_CONFIGURED
+contract_version: 1
+drive_profile: VARIABLE_SPEED
+verified: false
+# Synthetic tests supply their own values; never deploy guessed speeds.
+y:
+  bands:
+    - {phase: JOG, distance_threshold_m: null, speed_mps: null}
+    - {phase: SLOW, distance_threshold_m: null, speed_mps: null}
+    - {phase: FAST, distance_threshold_m: null, speed_mps: null}
+z:
+  bands:
+    - {phase: CREEP, distance_threshold_m: null, speed_mps: null}
+    - {phase: SLOW_DOWN, distance_threshold_m: null, speed_mps: null}
+    - {phase: NORMAL_DOWN, distance_threshold_m: null, speed_mps: null}
