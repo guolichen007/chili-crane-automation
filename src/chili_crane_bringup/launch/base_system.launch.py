@@ -23,6 +23,11 @@ def compose(context):
     nodes = [Node(
         package="chili_crane_control", executable="fail_safe_safety_supervisor.py",
         namespace=namespace, name="safety_supervisor", parameters=[common], output="screen")]
+    nodes.append(Node(
+        package="chili_crane_control", executable="action_executor.py",
+        namespace=namespace, parameters=[common, {
+            "capability_config": str(root / "control" / "axis_capabilities.template.yaml"),
+        }], output="screen"))
     if LaunchConfiguration("entry_mode").perform(context) == "bench":
         for device in ("adam6052", "adam6251"):
             nodes.append(Node(

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Unconfigured hardware mock rejects all actions including valid commands."""
+"""Unconfigured hardware mock rejects energization and acknowledges logical STOP."""
 import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock, ClockType
 from chili_crane_control.qos import command_qos, state_qos
 from chili_crane_msgs.msg import (
-    AuthorizedCommand, CommandExecutionState, ControlBoardState,
+    ActuationRequest, CommandExecutionState, ControlBoardState,
     GrabIoState, HoistState, LoadState, ServoState, TrolleyState, RemoteControlState,
 )
 
@@ -33,7 +33,7 @@ class MockHardwareAdapter(Node):
         self._execution_pub = self.create_publisher(
             CommandExecutionState, "control/execution_state", state_qos(depth=10))
         self._command_sub = self.create_subscription(
-            AuthorizedCommand, "control/authorized_command",
+            ActuationRequest, "control/actuation_request",
             self._on_authorized_command, command_qos())
         self._steady_clock = Clock(clock_type=ClockType.STEADY_TIME)
         self._timer = self.create_timer(0.1, self._publish, clock=self._steady_clock)
@@ -77,7 +77,7 @@ class MockHardwareAdapter(Node):
         execution = CommandExecutionState()
         execution.header.stamp = self.get_clock().now().to_msg()
         execution.validity = CommandExecutionState.VALID
-        execution.command_id = command.command_id
+        execution.command_id = command.source_command_id
         execution.task_id = command.task_id
         execution.intent_id = command.intent_id
         execution.state = CommandExecutionState.STATE_REJECTED
@@ -85,12 +85,17 @@ class MockHardwareAdapter(Node):
         execution.executing = False
         execution.completed = False
         execution.failed = True
-        if command.validity != AuthorizedCommand.VALID:
-            execution.reason = "authorized_command_not_valid"
-        elif not all((command.command_id, command.intent_id, command.permit_id)):
-            execution.reason = "authorized_command_identity_missing"
+        if command.enable is not True:
+            # STOP is accepted even with invalid/expired permit. No physical proof.
+            execution.validity = CommandExecutionState.NOT_CONFIGURED
+            execution.state = CommandExecutionState.STATE_ACCEPTED
+            execution.accepted = True
+            execution.failed = False
+            execution.reason = "stop_received_physical_off_not_verified"
+        elif command.speed_command_valid:
+            execution.reason = "mock_adapter_has_no_speed_or_physical_output"
         elif issued <= 0 or expires <= issued or now < issued or now >= expires:
-            execution.reason = "authorized_command_time_invalid"
+            execution.reason = "actuation_request_time_invalid"
         else:
             execution.reason = "mock_adapter_has_no_physical_output"
         evidence = stamp_ns(command.header.stamp)

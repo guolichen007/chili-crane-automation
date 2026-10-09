@@ -18,6 +18,7 @@ def main():
     from chili_crane_msgs.msg import (
         SafetyPermit, ServoState, TrolleyState, HoistState, LoadState,
         GrabIoState, ControlBoardState, RemoteControlState, ControlIntent, AuthorizedCommand, CommandExecutionState,
+        ActuationRequest, SystemModeStatus, SystemReadiness,
     )
     parser = argparse.ArgumentParser()
     parser.add_argument("--namespace", default="crane_01")
@@ -62,20 +63,48 @@ def main():
             received["denied_command"] = msg
 
     def execution_callback(msg):
+        if msg.intent_id == "validation-energize":
+            if msg.accepted or msg.completed or not msg.failed:
+                failure.append("mock hardware accepted injected energization")
+            received["energize_rejected"] = msg
         if msg.intent_id == "validation-intent":
-            if msg.accepted or msg.executing or msg.completed or not msg.failed:
-                failure.append("mock adapter accepted or executed a command")
-            if msg.state != CommandExecutionState.STATE_REJECTED:
-                failure.append("mock command not rejected")
-            received["rejected_execution"] = msg
+            if not msg.accepted or msg.executing or msg.completed or msg.failed:
+                failure.append("STOP must be logically accepted but never physical completion")
+            if msg.reason != "stop_received_physical_off_not_verified":
+                failure.append("mock STOP must not claim physical OFF")
+            received["stop_execution"] = msg
+
+    def actuation_callback(msg):
+        if msg.source_command_id == "synthetic-negative-injection":
+            return  # Explicit negative test, not an executor output.
+        if msg.enable or msg.direction != 0 or msg.speed_command_valid:
+            failure.append("mock executor must emit de-energize only")
+        received["actuation"] = msg
+
+    def mode_callback(msg):
+        if not msg.release_automatic_outputs or not msg.require_new_task or not msg.session_id:
+            failure.append("mode must release outputs and require a new task")
+        received["mode"] = msg
+
+    def ready_callback(msg):
+        if msg.system_ready or msg.z_lower_ready:
+            failure.append("unconfigured runtime became READY")
+        received["readiness"] = msg
 
     subscriptions.append(node.create_subscription(
         AuthorizedCommand, "control/authorized_command", command_callback, command_qos()))
     subscriptions.append(node.create_subscription(
         CommandExecutionState, "control/execution_state", execution_callback, state_qos(depth=10)))
+    subscriptions.append(node.create_subscription(
+        ActuationRequest, "control/actuation_request", actuation_callback, command_qos()))
+    subscriptions.append(node.create_subscription(
+        SystemModeStatus, "system/mode", mode_callback, state_qos()))
+    subscriptions.append(node.create_subscription(
+        SystemReadiness, "system/readiness", ready_callback, state_qos()))
     publisher = node.create_publisher(ControlIntent, "control/requested_intent", command_qos())
+    injection = node.create_publisher(ActuationRequest, "control/actuation_request", command_qos())
     required = {"permit", "servo_state", "trolley_state", "hoist_state", "load_state",
-                "grab_io_state", "control_board_state", "remote_control_state", "denied_command", "rejected_execution"}
+                "grab_io_state", "control_board_state", "remote_control_state", "denied_command", "stop_execution", "actuation", "mode", "readiness", "energize_rejected"}
     started, next_publish = time.monotonic(), 0.0
     try:
         while time.monotonic() - started < args.timeout_sec:
@@ -88,6 +117,18 @@ def main():
                 intent.action = ControlIntent.ACTION_STOP_ALL
                 intent.validity = ControlIntent.VALID
                 publisher.publish(intent)
+                negative = ActuationRequest()
+                negative.header.stamp = node.get_clock().now().to_msg()
+                negative.issued_stamp = negative.header.stamp
+                negative.expire_stamp.sec = negative.issued_stamp.sec + 1
+                negative.expire_stamp.nanosec = negative.issued_stamp.nanosec
+                negative.validity = ActuationRequest.VALID
+                negative.axis = "Y"
+                negative.direction = 1
+                negative.enable = True
+                negative.source_command_id = "synthetic-negative-injection"
+                negative.intent_id = "validation-energize"
+                injection.publish(negative)
                 next_publish = now + 0.5
             rclpy.spin_once(node, timeout_sec=0.1)
             if failure:

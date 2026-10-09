@@ -65,7 +65,7 @@ class MessageContractTest(unittest.TestCase):
         ):
             self.assertIn(field, text)
 
-    def test_mock_adapter_consumes_only_authorized_commands(self):
+    def test_mock_adapter_consumes_only_actuation_requests(self):
         adapter = (
             ROOT
             / "src"
@@ -73,7 +73,8 @@ class MessageContractTest(unittest.TestCase):
             / "scripts"
             / "mock_hardware_adapter.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("control/authorized_command", adapter)
+        self.assertIn("control/actuation_request", adapter)
+        self.assertNotIn("control/authorized_command", adapter)
         self.assertNotIn("control/requested_intent", adapter)
         self.assertNotIn("ControlIntent", adapter)
 
