@@ -1,0 +1,24 @@
+config_state: NOT_CONFIGURED
+device_id: pull_wire_y
+protocol_config:
+  serial_device: NOT_CONFIGURED
+  baudrate: NOT_CONFIGURED
+  parity: NOT_CONFIGURED
+  stopbits: NOT_CONFIGURED
+  slave_id: NOT_CONFIGURED
+  function_code: NOT_CONFIGURED
+  register_offset: NOT_CONFIGURED
+  data_type: NOT_CONFIGURED
+  byte_order: NOT_CONFIGURED
+  word_order: NOT_CONFIGURED
+  timeout_sec: 0.5
+calibration:
+  calibration_id: NOT_CONFIGURED
+  scale_m_per_unit: NOT_CONFIGURED
+  offset_m: NOT_CONFIGURED
+  direction: NOT_CONFIGURED
+  zero_raw: NOT_CONFIGURED
+  min_m: NOT_CONFIGURED
+  max_m: NOT_CONFIGURED
+poll_rate_hz: 5.0
+stale_timeout_sec: 1.0
