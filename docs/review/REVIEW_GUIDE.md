@@ -36,5 +36,6 @@
 ## 精确SHA证据入口
 
 [Phase0.5软件验证记录](../validation/PHASE05_SOFTWARE_470089b.md)记录已实际验证的软件SHA；
+[R1软件验证记录](../validation/PHASE05_R1_SOFTWARE_b53534a.md)记录R1实际构建与回归结果。
 [当前评审分支](https://github.com/guolichen007/chili-crane-automation/tree/codex/architecture-freeze-r1)
 及该分支最新Actions确定最终HEAD。不要把文档归档提交的SHA与历史验证记录混为一谈。
