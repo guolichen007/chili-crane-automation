@@ -1,6 +1,6 @@
 # 辣椒地池行车自动抓取框架
 
-当前版本为 **Phase 0 / ROS2 Humble 硬件台架框架**，不是可运行的无人行车。
+当前版本为 **Phase 0.5 / ROS2 Humble 架构与 mock 策略基线**，不是可运行的无人行车。
 运行基线：Ubuntu 22.04.x、ROS2 Humble、Python 3.10、C++17、GCC 11、ament/colcon。
 ROS1 旧框架已由 ADR 0003 取代；NDT-SLAM-Warehouse 仅为只读算法参考。
 
@@ -18,6 +18,14 @@ ROS1 旧框架已由 ADR 0003 取代；NDT-SLAM-Warehouse 仅为只读算法参�
 遥控输入用于观测、冲突诊断和自动控制仲裁，不把遥控动作转发成自动 DO。
 AUTO→REMOTE 释放自动输出、作废旧指令；REMOTE→AUTO 必须静止、六路输出
 已验证 OFF、模式/安全有效且无遥控冲突，重新接受任务。本版正常运行不产生有效自动许可。
+Y/Z分别支持可调速与固定低速策略契约，现场能力及停车验收未确认，不能启用自动运动。
+
+## Phase 0.5 架构
+
+任务/抓取周期 → 意图 → 安全许可 → 授权 → ActionExecutor → ActuationRequest → 硬件。
+新增会话/epoch/序号拒绝旧命令，STOP始终允许向OFF退化；每斗完成后重新扫描料面。
+当前仅纯策略/mock，不含真实驱动、NDT、料面或抓斗算法。
+详见[接口契约](docs/api/PHASE05_CONTRACTS.md)与[验收矩阵](docs/api/phase05_acceptance.yaml)。
 
 ## 七包边界
 
@@ -54,6 +62,10 @@ production 当前也只是 fail-closed mock；bench_io 为只读采集，不启�
 所有自动许可默认 false，未知参数保持 NOT_CONFIGURED。
 
 ## 交接与证据
+
+对外/GPT审查先读[审查指南](docs/review/REVIEW_GUIDE.md)，贡献与推送遵循
+[CONTRIBUTING](CONTRIBUTING.md)，已接受决策与OPEN项分开记录。
+设备资产地址不自动映射左右或端口角色；相机地址未补全，不进入控制闭环。
 
 先读 [项目上下文](docs/PROJECT_CONTEXT.md)、[架构](docs/SYSTEM_ARCHITECTURE_AND_ROADMAP.md)、
 [台架手册](docs/hardware/HARDWARE_BENCH_RUNBOOK.md)、

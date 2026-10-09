@@ -1,0 +1,57 @@
+contract_version: 1
+scope: PHASE05_INTERFACES_AND_SYNTHETIC_MOCK
+base_sha: 0f8d749085d7d9f9903047eb2522fd4580b57e27
+validation_commands:
+  - python tools/check_repo_contracts.py
+  - python -m unittest discover -s tests_static -p "test_*.py"
+  - python tools/validate_architecture_scenarios.py
+  - bash scripts/validation/ubuntu22_ros2_phase0_validate.sh
+contracts:
+  - id: SENSOR_INVENTORY_CONTRACT
+    implementation: config/hardware/sensor_inventory.yaml
+    scope_status: REPORTED_ASSET_ONLY
+  - id: DUAL_LIDAR_CONTRACT
+    implementation: config/sensors/dual_lidar.template.yaml
+    scope_status: INTERFACE_ONLY
+  - id: AXIS_CAPABILITY_CONTRACT
+    implementation: config/control/axis_capabilities.template.yaml
+    scope_status: PURE_POLICY_MOCK
+  - id: VARIABLE_SPEED_PROFILE
+    implementation: config/control/profiles/variable_speed.yaml
+    scope_status: PURE_POLICY_MOCK
+  - id: FIXED_SLOW_PROFILE
+    implementation: config/control/profiles/fixed_slow.yaml
+    scope_status: PURE_POLICY_MOCK
+  - id: STOP_DISTANCE_CONTRACT
+    implementation: src/chili_crane_control/src/chili_crane_control/contracts.py
+    scope_status: PURE_POLICY_MOCK
+  - id: ACTION_EXECUTOR_CONTRACT
+    implementation: src/chili_crane_control/src/chili_crane_control/execution.py
+    scope_status: PURE_POLICY_MOCK
+  - id: ACTUATION_REQUEST_CONTRACT
+    implementation: src/chili_crane_msgs/msg/ActuationRequest.msg
+    scope_status: INTERFACE_MOCK
+  - id: STOP_DOMINANCE_CONTRACT
+    implementation: src/chili_crane_hardware/scripts/mock_hardware_adapter.py
+    scope_status: INTERFACE_MOCK
+  - id: SYSTEM_MODE_CONTRACT
+    implementation: src/chili_crane_msgs/msg/SystemModeStatus.msg
+    scope_status: INTERFACE_MOCK
+  - id: TASK_CYCLE_CONTRACT
+    implementation: src/chili_crane_control/src/chili_crane_control/cycle.py
+    scope_status: PURE_POLICY_MOCK
+  - id: REMOTE_HANDOVER_CONTRACT
+    implementation: src/chili_crane_control/src/chili_crane_control/execution.py
+    scope_status: PURE_POLICY_MOCK
+  - id: READINESS_CONTRACT
+    implementation: src/chili_crane_msgs/msg/SystemReadiness.msg
+    scope_status: INTERFACE_MOCK
+  - id: SAFETY_EVENT_CONTRACT
+    implementation: src/chili_crane_msgs/msg/SafetyEvent.msg
+    scope_status: INTERFACE_MOCK
+  - id: PROVENANCE_CONTRACT
+    implementation: config/recording/run_manifest.template.yaml
+    scope_status: INTERFACE_ONLY
+live_hardware: NOT_RUN
+bag: NOT_RUN
+field: NOT_RUN

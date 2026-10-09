@@ -60,3 +60,11 @@ heartbeat must not refresh measurement evidence time.
 有限 lifespan，同时校验 issue/expiry。禁止 transient-local 复用旧授权。
 原始8/16DI必须带设备身份、原始极性、通信状态、采样计数与 evidence_age_sec。
 24DI 的语义映射在 hardware 层完成；定时发布不得刷新原始测量年龄。
+
+## Phase 0.5新增接口
+
+system/mode、system/readiness、task/cycle_status、run/manifest、safety/event、safety/fault_event、
+control/actuation_request；雷达reserved raw topics及registration/pit/grab/wall四产品见模板。
+ActionExecutor订阅authorized_command，hardware仅订阅actuation_request。
+相机保留左右image_raw/camera_info接口且disabled；A/B到左右映射未知。
+新增消息契约未发布对应真实算法/录包/周期管理节点，不能根据topic预留推导实现。

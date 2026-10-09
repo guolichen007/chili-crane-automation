@@ -6,6 +6,9 @@ OUTPUT_SHA:
 BRANCH:
 EXPECTED_RUNTIME: Ubuntu 22.04.x / ROS2 Humble / Python 3.10 / GCC 11 / C++17
 SOURCE_NDT_SHA: 42f921e91574ff0f29b91fc08cbade67c976aa36
+MOCK_SCENARIO_STATUS:
+ARCHITECTURE_ADR: 0004
+BREAKING_CHANGE: hardware consumes ActuationRequest; task21=ABORTED; rebuild all consumers
 DI_REQUIREMENT: 24DI including remote-controller inputs; channel map OPEN
 WINDOWS_STATIC:
 CI_BUILD:

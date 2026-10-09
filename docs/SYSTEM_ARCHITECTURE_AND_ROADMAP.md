@@ -100,7 +100,7 @@ TaskStateMachine + GraspTarget
   -> ControlIntent
   -> Safety authorization + bound permit generation/expiry
   -> AuthorizedCommand
-  -> Mock/real adapter -> CommandExecutionState
+  -> ActionExecutor -> ActuationRequest -> Mock/real adapter -> CommandExecutionState
 ```
 
 Registration, pit-surface, and grab-tracking outputs are separate products.
@@ -311,3 +311,12 @@ rosidl 消息、七包 ament、rclpy fail-closed 节点、安装配置、ROS2 la
 ADAM TCP/拉绳 RTU 的纯协议与校准、逐点 DI 极性与遥控仲裁、只读 bench_io、
 显式门控单路限时 DO 台架工具及软件验证。算法、X 真实伺服、负载、
 生产控制回路、MES 和现场接线不属于本次实现。
+
+## Phase 0.5 — Architecture Freeze
+
+冻结七包职责和PHASE05_CONTRACTS中的Executor、Y/Z独立能力、STOP dominance、
+系统模式/重复周期、epoch/会话、readiness、事件、证据和资产配置。
+以纯策略/mock验收，不把框架当现场自动化成功。已公开接口演进需ADR与兼容说明。
+后续Phase1双ER1驱动/同步/外参；Phase2语义/CAD/静态结构；Phase3 X先验+NDT；
+Phase4料面/安全抓点；Phase5抓斗bottom/envelope/swing；Phase6真实安全证据及控制整定；
+Phase7完整重复抓取卸料现场验收。

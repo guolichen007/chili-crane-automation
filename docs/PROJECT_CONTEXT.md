@@ -227,7 +227,7 @@ The control boundary separates:
 3. `SafetyPermit`;
 4. a one-time `AuthorizedCommand` bound to intent, permit generation, and
    expiry;
-5. a device-specific adapter and `CommandExecutionState`.
+5. ActionExecutor -> ActuationRequest -> a device-specific adapter and CommandExecutionState.
 
 All autonomous outputs fail closed. Invalid localization blocks
 geometry-dependent X/Y motion. Stale grab tracking blocks lowering. Limit,
@@ -264,7 +264,7 @@ UNLOAD_VERIFY
 RETURNING_TO_SAFE_WAIT
 DONE
 FAULT
-MANUAL_OVERRIDE
+ABORTED
 ```
 
 Phase 0 defines the interface and skeleton only.
@@ -318,3 +318,13 @@ Do not guess production values for:
 
 Every unknown must remain a configuration placeholder, adapter boundary, or
 open field question.
+
+## Phase 0.5 当前补充（2026-10-09）
+
+按用户确认实施完整架构冻结，ADR0004及PHASE05_CONTRACTS为当前契约。
+双ER1报告地址/端口已进入资产清单，但左右、端口角色、外参和时钟未知；
+Camera A报告192.168.180不完整，保持NEEDS_CONFIRMATION且不进控制闭环。
+Y/Z调速能力未确认，分别选择VARIABLE_SPEED或FIXED_SLOW；停车/响应/安全速度未经
+验收禁止相应自动运动。控制链新增Executor/ActuationRequest和session/epoch/sequence。
+任务与系统模式分离，重复Cycle每斗重扫；24物理DI与可选逻辑能力分离。
+未实现驱动、NDT、料面、抓斗算法、MES或真实闭环，实机项继续NOT_RUN。

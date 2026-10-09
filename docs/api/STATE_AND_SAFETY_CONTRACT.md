@@ -37,13 +37,16 @@ and must never be consumed by a hardware adapter.
 
 The safety/authorization boundary creates an `AuthorizedCommand` only by
 binding one requested `intent_id` to a specific `permit_id`, permit generation,
-issue time, and expiry time. The hardware adapter consumes only
-`control/authorized_command` and rejects commands that are invalid, stale,
-expired, identity-incomplete, or not bound to a permit.
+issue time, and expiry time. ActionExecutor checks permit identity, generation,
+intent, session, epoch, sequence and expiry before producing an ActuationRequest.
+The hardware adapter consumes only control/actuation_request and rejects
+unverified energization. De-energize/STOP is not blocked by an expired permit;
+without device evidence a logical STOP is not physical OFF completion.
 
 ```text
 Planner / task -> control/requested_intent
 Safety gate    -> control/authorized_command
+Executor       -> control/actuation_request
 Adapter        -> control/execution_state
 ```
 
@@ -88,3 +91,10 @@ mode_policy 返回释放自动输出、作废待执行命令、要求新任务�
 它不是 SafetyPermit。正常框架未配置静止/OFF证据，所以 AUTO_PENDING 也不能运动。
 24物理输入与可选语义名称不是一一等同；缺失语义必须保持未知，不能猜配线。
 台架DO工具是独立隔离测试入口，不连接规划/感知/自动授权链。
+
+## Phase 0.5 接口升级
+
+完整定义见PHASE05_CONTRACTS。硬件仅接ActuationRequest，不接原始授权；
+Stop/de-energize不因许可过期而拒绝，但没有physical OFF反馈不能宣称动作完成。
+自动energize需要session/epoch/sequence、授权与permit绑定及动作readiness有效。
+新增EvidenceMetadata未知时保持阻断；TaskState不再表示遥控状态。

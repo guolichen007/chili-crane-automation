@@ -31,7 +31,9 @@ GitHub Actions 的 Humble 容器使用同一脚本：这是云端软件验证，
 ## mock 预期
 
 所有 SafetyPermit 动作许可 false；6个基础 mock 硬件状态及遥控状态 NOT_CONFIGURED；
-safety_ok_known/e_stop_known=false；请求仅得到无效授权和拒绝执行。
+safety_ok_known/e_stop_known=false；请求仅得到无效授权和OFF请求；STOP逻辑接收不等于实物OFF。
+观察system/mode、system/readiness及actuation_request，确认自动enable=false。
+同一脚本额外执行27项synthetic fault scenarios，证据写入architecture-scenarios.json。
 CSV 回放节点用于输入契约验证，不使整机 READY。
 production/mapping/localization 当前均不启动真实控制输出。
 

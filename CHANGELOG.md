@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Phase 0.5 Architecture Freeze
+
+- 新增reported设备资产、24DI物理/逻辑分层、Y/Z独立能力与停止模型。
+- 新增Executor、ActuationRequest、readiness、SystemMode、重复Cycle和typed events。
+- 新增session/epoch/sequence、STOP dominance与27项纯策略/故障情景。
+- 新增证据元数据/RunManifest/禁用录包骨架、工程推送门控和外部审查入口。
+- BREAKING CHANGE：硬件订阅ActuationRequest，TaskState21改ABORTED，新增消息字段；
+  全消费者clean rebuild，不能混用旧生成消息或推断实机能力。
+- 仅接口与mock基线，无生产release或hardware/bag/field验收。
+
 ## 0.2.0 - ROS2 Humble / 硬件台架框架
 
 - ADR 0003 切换 Ubuntu22.04/Humble/Python3.10/GCC11，保留旧ADR/验证脚本为历史。

@@ -2,8 +2,10 @@
 
 先完整阅读 AGENTS.md、PROJECT_CONTEXT.md、SYSTEM_ARCHITECTURE_AND_ROADMAP.md、
 ADR 0003、NDT_REUSE_PLAN.md、api 契约及硬件台架手册，再修改代码。
-当前框架从输入 SHA 355051277167d83797e0cf985b79d515c17f4fda 迁移，
-分支 codex/ros2-humble-hardware-bench-v1；不得改 main 或 NDT 源仓库。
+当前Phase0.5基于SHA 0f8d749085d7d9f9903047eb2522fd4580b57e27，
+分支codex/architecture-freeze-v1；不得改main或NDT源仓库。
+先读ADR0004、api/PHASE05_CONTRACTS、验收矩阵和外部审查入口。
+严格按CONTRIBUTING规范提交/推送，消息破坏性变更需clean rebuild。
 
 ## 不可遗忘的当前需求
 

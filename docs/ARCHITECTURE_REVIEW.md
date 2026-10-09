@@ -95,3 +95,10 @@ The system is not approved for physical automatic motion.
 ADAM WDT 会被其他 TCP 客户端刷新，因此 DO 台架要求独占、持续故障锁存及
 现场 FSV/WDT OFF 验证；设备掉线不能靠 Python finally 保证关断。
 软件评审通过不表示电气或现场安全验收通过。
+
+## Phase0.5补充评审
+
+本轮采用ADR0004。原硬件直接接授权接口由Executor/ActuationRequest替代；
+架构基线具备27项纯策略与故障场景，生产readiness仍false。
+X/G执行策略、真实Task/Cycle ROS调度、算法与实际安全证据仍是后续工作，
+不得将当前接口桩描述为实机控制完成。
