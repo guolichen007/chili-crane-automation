@@ -77,3 +77,14 @@ direction. A permit heartbeat does not make stale input evidence fresh.
 - load missing -> never classify contact/load success;
 - manual mode or e-stop -> block autonomous output;
 - communication timeout -> release/stop outputs according to board contract.
+
+## 遥控器与24DI（当前确认）
+
+6052 8DI + 6251 16DI，共24DI；遥控器输入包含在总容量内。
+ControlBoardState.safety_ok/safety_ok_known 与 e_stop/e_stop_known 独立。
+RemoteControlState 预留接收器就绪、模式、安全、X/Y/Z/G方向、停止及冲突状态。
+缺少点位、未知极性、陈旧采样或反向同时有效均阻止自动接管。
+mode_policy 返回释放自动输出、作废待执行命令、要求新任务的决策；
+它不是 SafetyPermit。正常框架未配置静止/OFF证据，所以 AUTO_PENDING 也不能运动。
+24物理输入与可选语义名称不是一一等同；缺失语义必须保持未知，不能猜配线。
+台架DO工具是独立隔离测试入口，不连接规划/感知/自动授权链。

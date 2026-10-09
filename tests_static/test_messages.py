@@ -35,8 +35,8 @@ class MessageContractTest(unittest.TestCase):
             "string permit_id",
             "uint64 permit_generation",
             "string evaluated_intent_id",
-            "time issued_stamp",
-            "time expire_stamp",
+            "builtin_interfaces/Time issued_stamp",
+            "builtin_interfaces/Time expire_stamp",
         ):
             self.assertIn(field, text)
 
@@ -47,8 +47,8 @@ class MessageContractTest(unittest.TestCase):
             "string intent_id",
             "string permit_id",
             "uint64 permit_generation",
-            "time issued_stamp",
-            "time expire_stamp",
+            "builtin_interfaces/Time issued_stamp",
+            "builtin_interfaces/Time expire_stamp",
         ):
             self.assertIn(field, text)
 
@@ -69,7 +69,7 @@ class MessageContractTest(unittest.TestCase):
         adapter = (
             ROOT
             / "src"
-            / "chili_crane_control"
+            / "chili_crane_hardware"
             / "scripts"
             / "mock_hardware_adapter.py"
         ).read_text(encoding="utf-8")

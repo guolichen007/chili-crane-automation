@@ -1,0 +1,38 @@
+name: ROS2 Humble software build and mock
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  ros2-humble:
+    runs-on: ubuntu-22.04
+    container: ros:humble-ros-base-jammy
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install software dependencies
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y git gcc g++ python3-pip python3-colcon-common-extensions python3-rosdep lsb-release
+          python3 -m pip install -r requirements-dev.txt
+          rosdep update --rosdistro humble
+          rosdep install --from-paths src --ignore-src --rosdistro humble -r -y
+      - name: Build, test and inspect fail-closed mock
+        shell: bash
+        run: |
+          bash scripts/validation/ubuntu22_ros2_phase0_validate.sh \
+            --workspace "$GITHUB_WORKSPACE" \
+            --evidence-dir /tmp/chili-ros2-evidence \
+            --expected-sha "$GITHUB_SHA"
+      - name: Archive exact-SHA software evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros2-humble-software-evidence
+          path: /tmp/chili-ros2-evidence
+          if-no-files-found: warn

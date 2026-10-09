@@ -1,14 +1,6 @@
 # chili_crane_slam
 
-Phase 0 defines dual-LiDAR, runtime-mode, and servo-prior contracts only.
+双雷达同步/轨道定位契约与公共头文件。上游NDT只读，算法尚未迁移；映射与冻结地图定位分离。
 
-Planned extraction order:
-
-1. consume-once merger and typed diagnostics;
-2. generic semantic/dynamic registration masks;
-3. observability and fitness circuit breaker;
-4. servo-seeded NDT and pose fusion;
-5. rail-aware relocalization and immutable map snapshots.
-
-Every adapted file must record upstream path and SHA. No NDT implementation has
-yet been claimed to build in this repository.
+运行目标 Ubuntu22.04 / ROS2 Humble / Python3.10 / GCC11 / C++17 / ament。
+Windows只做静态检查；详见 docs/PROJECT_CONTEXT.md 和硬件台架手册。

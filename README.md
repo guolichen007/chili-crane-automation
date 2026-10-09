@@ -1,77 +1,39 @@
-# Chili Crane Automation
+# 辣椒地池行车自动抓取框架
 
-Software and algorithm baseline for a dual-LiDAR automatic crane serving
-indoor chili storage pits.
+当前版本为 **Phase 0 / ROS2 Humble 硬件台架框架**，不是可运行的无人行车。
+运行基线：Ubuntu 22.04.x、ROS2 Humble、Python 3.10、C++17、GCC 11、ament/colcon。
+ROS1 旧框架已由 ADR 0003 取代；NDT-SLAM-Warehouse 仅为只读算法参考。
 
-This repository currently contains the **Phase 0 architecture/bootstrap**. It
-defines stable contracts, fail-safe mock adapters, semantic-map templates,
-mapping/localization profiles, and the package boundaries needed before field
-hardware protocols are frozen. It is not yet a field-ready automatic control
-system.
+## 当前设备与边界
 
-## Target workflow
+- 双 3D 雷达、X 伺服位置先验、固定轨道/语义地图；算法待迁移。
+- Y 小车以 RS485 Modbus RTU 拉绳位移为主位置反馈；Z 以雷达抓斗跟踪为主。
+- ADAM-6052：8DI + 8DO；ADAM-6251：16DI。**初始合计 24DI，包含遥控器输入**。
+- 24DI 是物理容量，不是已确认点表。遥控命令、模式、安全、限位、故障的
+  分配及每点极性全部待现场确认，禁止照旧版“最低 8DI”实施。
+- DO0..5 预留 Y左/右、Z上/下、G开/关；DO6/7 保留，实际继电器接线仍需确认。
+- ADAM 是远程 I/O，不是安全控制器；原厂硬接线急停、限位、方向互锁、
+  制动和遥控/自动物理互斥必须保留。责任边界为中间继电器干接点输出。
 
-The system will receive a pit task, localize the bridge crane on its rail,
-scan the selected pit, build a 2.5D chili-surface model, choose a safe grasp
-region, track the known grab mechanism, lower/close/raise it, move to the fixed
-unloading station, unload, return to a safe wait position, and report evidence
-and task state.
+遥控输入用于观测、冲突诊断和自动控制仲裁，不把遥控动作转发成自动 DO。
+AUTO→REMOTE 释放自动输出、作废旧指令；REMOTE→AUTO 必须静止、六路输出
+已验证 OFF、模式/安全有效且无遥控冲突，重新接受任务。本版正常运行不产生有效自动许可。
 
-The intended localization relationship is:
+## 七包边界
 
-```text
-servo X prior + frozen static LiDAR map + semantic rail constraints
-    -> fused crane pose and localization quality
-```
-
-Changing chili surfaces are task-perception inputs, not localization-map
-evidence.
-
-## Repository layout
-
-```text
-docs/                         Requirements, decisions, APIs, and validation
-src/chili_crane_msgs/         ROS message contracts only
-src/chili_crane_core/         Hardware-neutral domain and geometry contracts
-src/chili_crane_slam/         Dual-LiDAR, mapping, localization, and fusion
-src/chili_crane_perception/   Pit surface, grasp planning, and grab tracking
-src/chili_crane_control/      Safety, task orchestration, and adapters
-src/chili_crane_bringup/      Namespaced launch composition
-config/                       Site-independent templates and profiles
-maps/                         Versioned map artifact conventions
-scripts/validation/           Exact-SHA Ubuntu validation entry point
-tools/                        Repository contract checks
-tests_static/                 Windows-safe static contract tests
-.github/workflows/            Python 3.8 static CI only (no ROS build claim)
-```
-
-For a fresh Desktop Codex task, begin with
-`docs/CODEX_START_PROMPT.md`. The canonical requirements/reuse/architecture
-handoff is linked there.
-
-## Current validation status
-
-| Check | Status |
+| 包 | 职责 |
 |---|---|
-| Windows repository/static contracts | Run locally before each commit |
-| Ubuntu catkin build | `NOT_RUN` |
-| ROS launch smoke test | `NOT_RUN` |
-| ROS bag replay | `NOT_RUN` |
-| Sensor/control-board validation | `NOT_RUN` |
-| Chili field acceptance | `NOT_RUN` |
+| chili_crane_msgs | ROS2 rosidl 消息 |
+| chili_crane_core | 硬件无关状态、地图、几何、任务契约 |
+| chili_crane_slam | 双雷达/轨道定位接口；NDT 待迁移 |
+| chili_crane_perception | 地池表面、抓取目标、抓斗接口；算法待实现 |
+| chili_crane_control | 安全、仲裁、任务与 QoS，不含设备寄存器 |
+| chili_crane_hardware | ADAM、拉绳、标准化状态、mock、隔离台架工具 |
+| chili_crane_bringup | 安装后的配置与 launch.py 组合 |
 
-Windows checks do not replace Ubuntu or field evidence.
-The initial pre-commit result is recorded in
-`docs/validation/WINDOWS_STATIC_20260731.md`.
+## 检查与启动
 
-## Accepted runtime baseline
-
-Phase 1 targets native Ubuntu 20.04.6 LTS, ROS Noetic, `catkin_tools`, Python
-3.8, C++17, and GCC 9.x. Windows remains an editing, static-check, interface
-test, documentation, and Git environment. The project does not currently
-maintain a parallel ROS2 implementation.
-
-## Windows static checks
+Windows 只编辑、静态测试、Git；不在 Windows 声称 ROS 编译/实机成功。
 
 ```text
 git diff --check
@@ -79,17 +41,25 @@ python tools/check_repo_contracts.py
 python -m unittest discover -s tests_static -p "test_*.py"
 ```
 
-## Ubuntu handoff
+Ubuntu 精确 SHA 验证见 [运行手册](docs/validation/UBUNTU_VALIDATION_RUNBOOK.md)。
+构建后：
 
-Ubuntu validation must start from an exact Git SHA and follow
-`docs/validation/UBUNTU_VALIDATION_RUNBOOK.md`. The Phase 1 runtime baseline is
-accepted as Ubuntu 20.04.6 LTS with ROS Noetic. A historical procurement sheet
-mentions Ubuntu 22.04; any such requirement needs a separate migration or
-containerization decision. See
-`docs/decisions/0001-runtime_baseline.md`.
+```bash
+ros2 launch chili_crane_bringup mock_system.launch.py
+ros2 launch chili_crane_bringup production.launch.py
+ros2 launch chili_crane_bringup bench_io.launch.py config_root:=/absolute/site/config
+```
 
-## Reference upstream
+production 当前也只是 fail-closed mock；bench_io 为只读采集，不启动 DO 写入器。
+所有自动许可默认 false，未知参数保持 NOT_CONFIGURED。
 
-Selective reuse is based on `guolichen007/NDT-SLAM-Warehouse`. The inspected
-local reference SHA and adaptation matrix are recorded in
-`docs/NDT_REUSE_PLAN.md`.
+## 交接与证据
+
+先读 [项目上下文](docs/PROJECT_CONTEXT.md)、[架构](docs/SYSTEM_ARCHITECTURE_AND_ROADMAP.md)、
+[台架手册](docs/hardware/HARDWARE_BENCH_RUNBOOK.md)、
+[启动交接](docs/CODEX_START_PROMPT.md)。
+GitHub Actions 提供 Python 3.10 静态检查与 Humble 容器 build/test/mock；
+只有实际成功的精确 SHA CI 才构成云端软件证据，不代表原生 Ubuntu、bag 或现场验收。
+所有 LIVE_* 在未连接设备前保持 NOT_RUN。
+Humble 支持窗口至 2027-05，后续升级需要独立 ADR。
+本机维护的 LOCAL_PROJECT_CONTEXT.md 已被忽略，不上传 GitHub。

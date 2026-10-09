@@ -1,28 +1,6 @@
 # chili_crane_control
 
-Phase 0 provides:
+安全监督、请求/授权/执行仲裁与遥控模式策略，rclpy mock CSV和可靠VOLATILE QoS。所有自动许可false；厂商协议在hardware。
 
-- a mock normalized hardware publisher;
-- an optional servo CSV replay publisher;
-- a safety supervisor that grants no permissions;
-- a one-time authorization contract between requested intent and hardware.
-
-There is no real board, servo, trolley, hoist, grab, or load protocol in this
-release. Future real adapters must preserve the normalized message contract and
-the board must independently enforce direction interlocks, limits, timeouts,
-heartbeat loss, and safe output release.
-
-The raw grab electrical interface is `GrabIoState`; fused grab pose and height
-remain perception outputs in `GrabState`. Control-board evidence has a separate
-`ControlBoardState` contract.
-
-The adapter subscribes only to `control/authorized_command`, never raw
-`control/requested_intent`. Phase 0 rejects every command and publishes a
-`CommandExecutionState`; it does not toggle a physical output.
-
-Servo CSV replay schedules samples with `time.monotonic()` and never waits on
-ROS time. `stamp_policy:=mapped` maps source offsets onto the ROS time observed
-at replay start; `stamp_policy:=source` preserves CSV source stamps. If
-`/use_sim_time` has no clock yet, publication still progresses on the wall
-schedule and evidence age is computed from the selected evidence timestamp
-rather than refreshed by a timer heartbeat.
+运行目标 Ubuntu22.04 / ROS2 Humble / Python3.10 / GCC11 / C++17 / ament。
+Windows只做静态检查；详见 docs/PROJECT_CONTEXT.md 和硬件台架手册。

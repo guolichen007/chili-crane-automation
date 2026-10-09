@@ -1,5 +1,14 @@
 # Project Context
 
+## 当前版本确认（2026-10-09）
+
+运行基线已切换 Ubuntu 22.04.x / ROS2 Humble / Python 3.10 / GCC 11 / ament/colcon，
+见 ADR 0003。当前是框架及隔离台架准备，不是自动抓取上线。
+初始 I/O 为 ADAM-6052 的 8DI 加 ADAM-6251 的 16DI，**合计 24DI，包含遥控器控制输入**。
+设备/通道/有效电平的逐点接线仍 OPEN；旧交接 V1.1 的最低 8DI 不是当前容量。
+遥控状态必须经硬件标准化接口进入控制仲裁，不能由感知直接驱动输出。
+
+
 ## 1. Objective and current phase
 
 Build an automatic crane system for indoor chili pits. Phase 1 focuses on one
@@ -65,7 +74,8 @@ with servo/track gating and argues against unrestricted place recognition.
 - Z: hoist, ordinary motor, no draw-wire displacement sensor in the current
   baseline;
 - G: grab open/close actuation;
-- a real-time control board between the edge server and electrical actuation;
+- ADAM-6052/6251 remote I/O between the edge server and intermediate relays;
+- deterministic safety/interlocks remain in the crane manufacturer's electrical layer;
 - no PLC in the current baseline;
 - original e-stop, limits, brake, contactors, and electrical safety remain
   authoritative.
@@ -273,9 +283,25 @@ draw-wire sensor, while its tables and detailed sections repeatedly confirm Y
 draw-wire feedback. This repository interprets it as “Y uses draw-wire; Z does
 not” and keeps final field confirmation open.
 
-The procurement sheet also says Ubuntu 22.04 while the reusable upstream is
-ROS1 Noetic/catkin. ADR 0001 accepts native Ubuntu 20.04.6 with ROS Noetic for
-Phase 1; any Ubuntu 22.04 requirement is a separate migration decision.
+The upstream remains ROS1 Noetic/catkin and read-only. The current explicit
+migration replaces ADR 0001 with ADR 0003: Ubuntu 22.04.x / ROS2 Humble.
+Do not retain a second ROS1 implementation or claim the NDT algorithm has been ported.
+
+V1.1 (2026-09-22) confirms the relay boundary, six automatic direction outputs,
+hardware mode isolation and separate safety_ok. Its minimum-eight-input table
+is SUPERSEDED by the user's current 24DI requirement, including remote inputs.
+The PDF's generic real-time-board safety allocation is SUPERSEDED: ADAM handles
+I/O; the original crane electrical layer owns hardwired safety and interlocks.
+Full 24-channel assignment, unused channels and absent semantic inputs are OPEN.
+
+AUTO to REMOTE releases outputs and discards queued commands. REMOTE to AUTO
+requires stopped state, all six outputs OFF readback, valid mode_auto/safety_ok,
+no remote conflict and a new task. Software cannot substitute for physical
+break-before-make mode isolation or the always-effective original e-stop.
+
+ADAM DI polarity differs by model: do not assume a shared active-high mapping.
+Missing e-stop evidence remains unknown and cannot be inferred from safety_ok.
+See docs/hardware/HARDWARE_BENCH_RUNBOOK.md for vendor sources and bench gates.
 
 ## 11. Known unknowns
 

@@ -6,7 +6,7 @@ unknowns with production constants for convenience.
 ## Runtime and compute
 
 - final edge-server model and GPU requirement;
-- Ubuntu/ROS baseline decision;
+- native Ubuntu 22.04 / Humble deployment and later support-window migration;
 - network topology, bandwidth, time synchronization, and clock source;
 - data retention and bag/video storage budget.
 
@@ -49,7 +49,7 @@ unknowns with production constants for convenience.
 - load/tension sensor type, mounting, range, units, calibration, and dynamics;
 - empty/contact/loaded evidence definitions and false-positive tolerance.
 
-## Control board and electrical layer
+## ADAM, remote controller and electrical layer
 
 - board model, protocol, DI/DO/AI/AO/RS485 capacity;
 - command acknowledgement, sequence ID, watchdog, and heartbeat semantics;
@@ -65,3 +65,15 @@ unknowns with production constants for convenience.
 - safe wait pose, no-go regions, and maintenance zones;
 - two-crane collision/scheduling responsibility;
 - access to real chili and repeated production grasp cycles.
+
+## 当前24DI点表（必须厂家确认）
+
+物理容量已确认：6052 DI0..7 + 6251 DI0..15；包含遥控器输入。
+须逐点记录 device/channel/端子/线号/信号名/常开常闭/raw电平/invert/断线表现。
+核实遥控接收器是否提供独立干接点、方向/停止/就绪信号，哪些语义不存在，
+X遥控方向是否独立于原伺服接口；不得假设24通道能同时覆盖全部可选语义。
+
+确认中间继电器隔离、电流/电压、原厂接线责任、模式先断后合、六输出OFF读回、
+ADAM 固件与 FSV 全LOW、WDT实际超时和其他TCP客户端影响。
+确认 IP/unit ID、拉绳 /dev/serial/by-id、串口/地址/寄存器/端序/比例/零点/方向/范围。
+全量点表未确认前 I/O配置保持 NOT_CONFIGURED，台架输出门控保持关闭。

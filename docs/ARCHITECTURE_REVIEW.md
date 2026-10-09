@@ -21,7 +21,7 @@ The system is not approved for physical automatic motion.
 ## Decisions
 
 1. Build a new chili repository; do not rename/copy the NDT workspace.
-2. Keep six stable ROS packages.
+2. Keep seven stable ROS2 packages, separating hardware from control.
 3. Split localization, pit-surface, and grab-tracking point-cloud products.
 4. Treat the servo as a normalized prior and NDT as gated spatial correction.
 5. Treat CAD/DWG as an offline semantic-map source.
@@ -31,8 +31,8 @@ The system is not approved for physical automatic motion.
 9. Require typed, false-by-default safety permissions before control.
 10. Start with mock adapters that remain `NOT_CONFIGURED`.
 11. Keep ScanContext/global place recovery disabled until real data supports it.
-12. Use the accepted Ubuntu 20.04.6/ROS Noetic baseline without claiming a
-    build until exact-SHA Ubuntu evidence exists.
+12. Use Ubuntu 22.04.x/ROS2 Humble (ADR 0003); claim software build only against
+    exact-SHA evidence, distinguishing CI container from native field runtime.
 
 ## Direct reuse classification
 
@@ -66,8 +66,7 @@ The system is not approved for physical automatic motion.
 
 ## Open architecture risks
 
-- future Ubuntu 22.04 procurement pressure versus the accepted Phase 1
-  Ubuntu 20.04.6/ROS Noetic baseline;
+- ROS1 upstream extraction and ROS2 timing/QoS adaptation; Humble support ends 2027-05;
 - repetitive rail geometry and false global matches;
 - unknown LiDAR coverage/reflectivity near the 10 m range;
 - grab self-occlusion and open/closed envelope calibration;
@@ -88,3 +87,11 @@ The system is not approved for physical automatic motion.
 - safety output is false by default;
 - static checks pass on Windows;
 - Ubuntu/bag/field status remains `NOT_RUN`.
+
+## 2026-10-09 硬件评审补充
+
+初始 24DI 必须包含遥控器状态，点表未确认不可硬编码。
+安全链 safety_ok 与 e-stop 独立；未知急停不能根据 safety_ok 伪造。
+ADAM WDT 会被其他 TCP 客户端刷新，因此 DO 台架要求独占、持续故障锁存及
+现场 FSV/WDT OFF 验证；设备掉线不能靠 Python finally 保证关断。
+软件评审通过不表示电气或现场安全验收通过。

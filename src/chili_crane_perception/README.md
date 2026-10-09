@@ -1,11 +1,6 @@
 # chili_crane_perception
 
-Phase 0 reserves contracts for:
+地池表面、抓取目标、已知抓斗跟踪/底部/外包络接口。算法尚未实现，不驱动任何设备输出。
 
-- semantic pit cropping and a robust 2.5D surface grid;
-- footprint-based grasp candidates and rejection reasons;
-- known open/closed grab geometry and tracking lifecycle;
-- wall-clearance evidence;
-- unloading-cart observations.
-
-This package never publishes actuator outputs.
+运行目标 Ubuntu22.04 / ROS2 Humble / Python3.10 / GCC11 / C++17 / ament。
+Windows只做静态检查；详见 docs/PROJECT_CONTEXT.md 和硬件台架手册。

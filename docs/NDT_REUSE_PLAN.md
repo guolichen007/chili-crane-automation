@@ -190,3 +190,10 @@ FIELD_STATUS:
 
 No reused algorithm is “validated for chili” until the relevant evidence is
 attached to the exact chili SHA.
+
+## 当前 ROS2 迁移边界
+
+上游仍是 ROS1，只读 SHA 42f921e91574ff0f29b91fc08cbade67c976aa36。
+本仓库已改 Humble/ament；本次仅迁移接口与台架框架，不声称完成 NDT/PCL 算法迁移。
+后续先抽取无 ROS 的同步、观测性、fitness、轨道约束机制，再编写 ROS2 薄节点、
+QoS/时钟/rosbag2 测试。不要复制 catkin、rospy、旧消息/launch或旧CRLF例外。

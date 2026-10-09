@@ -2,19 +2,16 @@ import importlib.util
 import unittest
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
-CHECKER_PATH = ROOT / "tools" / "check_repo_contracts.py"
-SPEC = importlib.util.spec_from_file_location("python38_checker", CHECKER_PATH)
+SPEC = importlib.util.spec_from_file_location("python310_checker", ROOT / "tools/check_repo_contracts.py")
 CHECKER = importlib.util.module_from_spec(SPEC)
-assert SPEC.loader is not None
 SPEC.loader.exec_module(CHECKER)
 
 
-class Python38ContractTest(unittest.TestCase):
-    def test_first_party_python_is_python38_compatible(self):
+class Python310ContractTest(unittest.TestCase):
+    def test_first_party_python310_compatibility(self):
         errors = []
-        CHECKER.check_python38_compatibility(ROOT, errors)
+        CHECKER.check_python310_compatibility(ROOT, errors)
         self.assertEqual([], errors)
 
 

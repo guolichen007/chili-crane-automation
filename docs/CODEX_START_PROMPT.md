@@ -1,74 +1,23 @@
-# Desktop Codex Start Prompt
+# Desktop Codex 当前启动交接
 
-Use this prompt when opening a fresh Desktop Codex task for this repository.
-Replace local paths if the workspaces move.
+先完整阅读 AGENTS.md、PROJECT_CONTEXT.md、SYSTEM_ARCHITECTURE_AND_ROADMAP.md、
+ADR 0003、NDT_REUSE_PLAN.md、api 契约及硬件台架手册，再修改代码。
+当前框架从输入 SHA 355051277167d83797e0cf985b79d515c17f4fda 迁移，
+分支 codex/ros2-humble-hardware-bench-v1；不得改 main 或 NDT 源仓库。
 
-```text
-Open the local chili-crane-automation repository and treat its AGENTS.md as
-authoritative repository instructions. You may read the local reference
-workspace C:/Users/13576/Desktop/NDT-slam-ws, but it is read-only upstream
-evidence rather than the chili project's source of truth.
+## 不可遗忘的当前需求
 
-Before changing code, read completely:
-- AGENTS.md
-- docs/PROJECT_CONTEXT.md
-- docs/NDT_REUSE_PLAN.md
-- docs/SYSTEM_ARCHITECTURE_AND_ROADMAP.md
-- docs/ARCHITECTURE_REVIEW.md
-- docs/api/TOPIC_AND_TF_CONTRACT.md
-- docs/api/STATE_AND_SAFETY_CONTRACT.md
-- the relevant accepted/proposed ADRs under docs/decisions/
+- Ubuntu 22.04.x / ROS2 Humble / Python 3.10 / GCC 11 / C++17。
+- 6052 8DI8DO + 6251 16DI = **初始 24DI，包括遥控器输入**。
+- 完整24点分配、极性、遥控电气接口、设备 IP/unit、拉绳寄存器/格式/标定 OPEN。
+- DO0..5 预留六动作；6/7 保留，正常运行 physical_output_enabled=false。
+- 硬接线急停、方向互锁、限位、制动、遥控/自动物理互斥归原厂电气。
+- 遥控输入用于观测/仲裁，不直接透传自动 DO；回自动必须验证静止/OFF并接新任务。
+- 双雷达和 NDT 仍只是算法接口；不得报告算法、bag 或实机成功。
+- Windows 只写代码和静态测试；Ubuntu/CI 才可做 ROS2 build/test/mock。
+- 每次提交运行 AGENTS 的三个检查，Linux LF / UTF-8无BOM / C++17。
+- SSH git 推送；不需要 gh。忽略本机 LOCAL_PROJECT_CONTEXT.md 并持续维护。
 
-For any NDT adaptation, also inspect the exact upstream implementation at the
-SHA recorded in docs/NDT_REUSE_PLAN.md. Do not rely only on upstream prose.
-
-Start by reporting:
-1. the requested outcome and current repository state;
-2. assumptions and unresolved hardware/interface questions;
-3. the package boundaries affected;
-4. the exact NDT files or ideas proposed for reuse;
-5. Windows-static checks that can run here;
-6. Ubuntu, ROS bag, hardware, and field checks that remain NOT_RUN;
-7. the intended branch/commit scope.
-
-Then implement the smallest complete vertical slice that preserves the
-established contracts.
-
-Hard constraints:
-- all first-party text is UTF-8 without BOM, LF-only, and newline-terminated;
-- runtime/config paths use Linux conventions and never a Windows drive;
-- Windows static checks cannot be described as Ubuntu ROS validation;
-- never guess an unconfirmed device protocol, register, topic, extrinsic,
-  calibration, pit dimension, grab dimension, safety threshold, or speed;
-- hardware protocols stay behind adapters;
-- missing/stale/conflicting/unconfigured evidence fails closed;
-- mapping and frozen-map localization remain separate modes;
-- changing chili surfaces are excluded from localization-map evidence;
-- raw GrabIoState and fused perception GrabState remain separate;
-- hardware adapters consume only bound, unexpired AuthorizedCommand messages;
-- do not copy the whole warehouse application or its cargo safety vocabulary;
-- every NDT-derived change records upstream SHA, source paths and adaptations.
-
-Before each commit run:
-git diff --check
-python tools/check_repo_contracts.py
-python -m unittest discover -s tests_static -p "test_*.py"
-
-At handoff report:
-INPUT_SHA / OUTPUT_SHA / BRANCH / PUSHED
-WINDOWS_STATIC_STATUS
-UBUNTU_BUILD_STATUS / ROSLAUNCH_STATUS / BAG_STATUS / FIELD_STATUS
-open decisions, new configuration required, and the next Ubuntu commands.
-```
-
-## Canonical four-file handoff
-
-The compact long-term handoff consists of:
-
-1. `PROJECT_CONTEXT.md` — requirements, equipment baseline and unknowns;
-2. `NDT_REUSE_PLAN.md` — inspected upstream evidence and adaptation boundaries;
-3. `SYSTEM_ARCHITECTURE_AND_ROADMAP.md` — stable system structure and phases;
-4. this file — repeatable execution prompt for a fresh Desktop Codex task.
-
-`AGENTS.md` is the automatically discovered repository policy above those four
-handoff documents.
+下一步先取得厂家签字的24点表、有效电平、隔离继电器边界与 WDT/FSV OFF 证据，
+然后 Ubuntu 精确 SHA 原生验证，随后台架只读；有真实双雷达/伺服 rosbag2 后才迁算法。
+未知参数继续 NOT_CONFIGURED；不通过“缺报警”推导 SAFE。

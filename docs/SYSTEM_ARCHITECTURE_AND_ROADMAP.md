@@ -29,15 +29,24 @@ wall clearance inputs, and unloading observations. It never actuates hardware.
 
 ### `chili_crane_control`
 
-Normalized I/O, safety supervisor, command arbitration, task state machine,
-timeouts/watchdogs, mock adapters, and future device adapters.
+Safety supervisor, remote/automatic arbitration, task state machine and
+command expiry. No vendor protocols or register access.
+
+### `chili_crane_hardware`
+
+ADAM-6052/6251 adapters, 24DI including remote inputs, pull-wire protocol and
+calibration, normalized device state, fail-closed mocks and isolated bench CLIs.
+Hardware read loops never consume requested intents. Normal runtime has no DO writer.
 
 ### `chili_crane_bringup`
 
 Per-crane namespace, profile composition, mapping/localization/replay/mock
 launch, health gates, and later RViz configuration.
 
-Do not create more packages until a clear ownership boundary exists.
+The seventh package makes the hardware/protocol ownership boundary explicit.
+
+Current runtime: Ubuntu 22.04.x / ROS2 Humble / ament/colcon / Python 3.10 /
+GCC 11 / C++17. Historical ROS1 planning is superseded by ADR 0003.
 
 ## 3. Namespace and frames
 
@@ -212,16 +221,27 @@ Examples:
 - manual mode/e-stop/heartbeat loss -> block autonomous outputs;
 - conflicting grab limits -> block grab motion.
 
-The real-time board is responsible for deterministic direction interlocks,
-limits, action timeouts, communication safe state, and output release. The
-edge server sends semantic intents and permissions, not raw uncontrolled
-strong-current commands.
+The manufacturer's electrical layer owns hardwired e-stop, limits, direction
+interlocks, brake sequencing and automatic/remote physical isolation. ADAM is
+remote I/O, not a safety PLC. Its verified WDT/FSV OFF behavior is a separate
+bench gate, not proof of safety certification. The relay dry-contact boundary
+separates our interface from manufacturer motor/contactors/brakes.
+
+24DI includes remote observations. Raw DI -> per-channel polarity mapping ->
+RemoteControlState/ControlBoardState -> mode arbitration -> SafetyPermit.
+Missing/stale/conflicting mode or remote evidence releases automatic outputs
+and invalidates queued commands; AUTO re-entry requires new task acceptance.
+No remote button is relayed directly to an automatic output in this framework.
+
+ROS2 uses reliable VOLATILE bounded QoS; command history depth is one, finite
+lifespan and explicit issued/expiry checks. DDS is not an electrical watchdog.
+A heartbeat cannot refresh sensor evidence; monotonic elapsed time governs age.
 
 ## 11. Phase roadmap
 
 ### Phase 0 - bootstrap
 
-Governance, messages, six packages, semantic schema, profile separation,
+Governance, messages, seven packages, semantic schema, profile separation,
 fail-safe mocks, static contracts, architecture decisions, and validation
 handoff.
 
@@ -230,7 +250,8 @@ handoff.
 Adapt the consume-once merger, extrinsics, typed timing/health diagnostics, and
 explicit fallback policy.
 
-Ubuntu evidence: catkin build, topic smoke, bag pairing/timing diagnostics.
+Ubuntu evidence: colcon build/test, ROS2 topic smoke, rosbag2 pairing/timing diagnostics.
+ROS1 bags need a separately reviewed conversion/replay route, not assumed compatibility.
 
 ### Phase 2 - semantic map and single-track mapping
 
@@ -272,9 +293,9 @@ Windows:
 
 Ubuntu:
 
-- clean catkin build;
-- C++ gtest/rostest;
-- roslaunch smoke;
+- clean colcon build;
+- ament gtest/pytest;
+- ros2 launch mock smoke;
 - ROS bag replay and timing/performance evidence.
 
 Site:
@@ -283,3 +304,10 @@ Site:
 - real chili surfaces and repeated grabs;
 - wall-adjacent material, high/low fill, post-grab holes;
 - failure injection and complete closed-loop acceptance.
+
+## 13. 本次迁移完成范围
+
+rosidl 消息、七包 ament、rclpy fail-closed 节点、安装配置、ROS2 launch、
+ADAM TCP/拉绳 RTU 的纯协议与校准、逐点 DI 极性与遥控仲裁、只读 bench_io、
+显式门控单路限时 DO 台架工具及软件验证。算法、X 真实伺服、负载、
+生产控制回路、MES 和现场接线不属于本次实现。

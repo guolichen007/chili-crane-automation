@@ -1,40 +1,24 @@
+import ast
 import unittest
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
-LAUNCH_DIR = ROOT / "src" / "chili_crane_bringup" / "launch"
+LAUNCH_DIR = ROOT / "src/chili_crane_bringup/launch"
 
 
 class LaunchContractTest(unittest.TestCase):
-    def test_public_entry_launches_accept_config_root(self):
-        entry_points = {
-            "mapping.launch",
-            "localization.launch",
-            "mock_system.launch",
-            "bag_replay.launch",
-        }
-        for name in sorted(entry_points):
-            with self.subTest(launch=name):
-                root = ET.parse(LAUNCH_DIR / name).getroot()
-                args = {
-                    element.attrib.get("name")
-                    for element in root.findall("arg")
-                }
-                self.assertIn("config_root", args)
+    def test_installed_configuration_override(self):
+        for name in ("mock_system", "mapping", "localization", "bag_replay", "production", "bench_io"):
+            text = (LAUNCH_DIR / (name + ".launch.py")).read_text(encoding="utf-8")
+            ast.parse(text)
+            self.assertIn('DeclareLaunchArgument("config_root", default_value=share + "/config")', text)
 
-    def test_source_default_is_explicitly_overridable(self):
-        for path in LAUNCH_DIR.glob("*.launch"):
-            if path.name == "base_system.launch":
-                continue
-            root = ET.parse(path).getroot()
-            config_arg = next(
-                element
-                for element in root.findall("arg")
-                if element.attrib.get("name") == "config_root"
-            )
-            self.assertIn("default", config_arg.attrib)
+    def test_launch_does_not_start_writer(self):
+        for path in LAUNCH_DIR.glob("*.launch.py"):
+            self.assertNotIn("adam_do_test", path.read_text(encoding="utf-8"))
+        text = (LAUNCH_DIR / "base_system.launch.py").read_text(encoding="utf-8")
+        self.assertIn('physical_output_enabled', text)
+        self.assertIn('raise ValueError("launch is read-only', text)
 
 
 if __name__ == "__main__":

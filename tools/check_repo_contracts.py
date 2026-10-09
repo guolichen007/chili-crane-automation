@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Validate repository contracts without requiring ROS or Ubuntu."""
 
+import ast
 import json
 import re
 import sys
@@ -48,11 +49,14 @@ EXCLUDED_DIRECTORIES = {
     "devel",
     "install",
     "logs",
+    "log",
+    ".local-data",
 }
 EXPECTED_PACKAGES = {
     "chili_crane_bringup",
     "chili_crane_control",
     "chili_crane_core",
+    "chili_crane_hardware",
     "chili_crane_msgs",
     "chili_crane_perception",
     "chili_crane_slam",
@@ -79,6 +83,11 @@ REQUIRED_FILES = {
     "docs/validation/UBUNTU_VALIDATION_RUNBOOK.md",
     "docs/validation/WINDOWS_STATIC_01ce545.md",
     "scripts/validation/ubuntu20_phase0_validate.sh",
+    "scripts/validation/ubuntu22_ros2_phase0_validate.sh",
+    "docs/decisions/0003-ros2-humble-hardware-bench.md",
+    "config/hardware/io_mapping.template.yaml",
+    "config/hardware/pull_wire.template.yaml",
+    ".github/workflows/ros2-humble.yml",
 }
 
 
@@ -180,42 +189,36 @@ def check_packages(root: Path, errors: List[str]) -> None:
 
 
 def check_xml_and_launch(root: Path, errors: List[str]) -> None:
-    paths = list((root / "src").rglob("*.launch"))
-    for path in paths:
-        try:
-            root_element = ET.parse(path).getroot()
-        except ET.ParseError as exc:
-            errors.append(f"invalid launch XML: {_relative(path, root)}: {exc}")
+    if list((root / "src").rglob("*.launch")):
+        errors.append("active ROS1 XML launch is forbidden")
+    forbidden = re.compile(r"\b(?:catkin|rospy|roslaunch|rostest|message_generation|message_runtime)\b")
+    for path in iter_text_files(root / "src"):
+        if path.suffix == ".md":
             continue
-        if root_element.tag != "launch":
-            errors.append(f"launch root is not <launch>: {_relative(path, root)}")
-
+        if forbidden.search(path.read_text(encoding="utf-8")):
+            errors.append("active ROS1 dependency: " + _relative(path, root))
+    for path in (root / "src").glob("*/package.xml"):
+        package = ET.parse(path).getroot()
+        if package.attrib.get("format") != "3":
+            errors.append("ROS2 package format must be 3: " + _relative(path, root))
+        if package.findtext("export/build_type") != "ament_cmake":
+            errors.append("package must export ament_cmake: " + _relative(path, root))
 
 def check_launch_config_root(root: Path, errors: List[str]) -> None:
     launch_dir = root / "src" / "chili_crane_bringup" / "launch"
-    public_entries = {
-        "bag_replay.launch",
-        "localization.launch",
-        "mapping.launch",
-        "mock_system.launch",
-    }
-    for name in sorted(public_entries):
-        path = launch_dir / name
+    for name in ("mapping", "localization", "mock_system", "bag_replay", "production", "bench_io"):
+        path = launch_dir / (name + ".launch.py")
         if not path.is_file():
-            errors.append(f"missing public launch entry: {_relative(path, root)}")
+            errors.append("missing ROS2 launch: " + str(path))
             continue
-        launch = ET.parse(path).getroot()
-        args = {
-            element.attrib.get("name"): element.attrib
-            for element in launch.findall("arg")
-        }
-        if "config_root" not in args:
-            errors.append(f"launch entry lacks config_root: {_relative(path, root)}")
-        elif "default" not in args["config_root"]:
-            errors.append(
-                f"launch config_root is not overridable: {_relative(path, root)}"
-            )
-
+        text = path.read_text(encoding="utf-8")
+        if 'DeclareLaunchArgument("config_root", default_value=share + "/config")' not in text:
+            errors.append("launch must use installed overridable config_root: " + name)
+        if "adam_do_test" in text:
+            errors.append("launch must never load bench output writer")
+    cmake = (launch_dir.parent / "CMakeLists.txt").read_text(encoding="utf-8")
+    if "install(DIRECTORY ../../config/" not in cmake:
+        errors.append("bringup must install configuration into package share")
 
 def load_yaml(path: Path, root: Path, errors: List[str]):
     try:
@@ -330,8 +333,8 @@ def check_messages(root: Path, errors: List[str]) -> None:
         "string intent_id",
         "string permit_id",
         "uint64 permit_generation",
-        "time issued_stamp",
-        "time expire_stamp",
+        "builtin_interfaces/Time issued_stamp",
+        "builtin_interfaces/Time expire_stamp",
     ):
         if field not in authorized:
             errors.append(f"AuthorizedCommand missing field: {field}")
@@ -343,7 +346,7 @@ def check_message_generation(root: Path, errors: List[str]) -> None:
     cmake = (message_dir.parent / "CMakeLists.txt").read_text(encoding="utf-8")
     declared = set(
         re.findall(
-            r"^\s+([A-Za-z0-9_]+\.msg)\s*$",
+            r'^\s+"msg/([A-Za-z0-9_]+\.msg)"\s*$',
             cmake,
             re.MULTILINE,
         )
@@ -387,52 +390,21 @@ def check_python_syntax(root: Path, errors: List[str]) -> None:
             errors.append(f"Python syntax error: {_relative(path, root)}: {exc}")
 
 
-def check_python38_compatibility(root: Path, errors: List[str]) -> None:
-    forbidden_patterns = (
-        (
-            re.compile(r"\b[A-Za-z_][A-Za-z0-9_.]*\s*\|\s*None\b"),
-            "PEP 604 union annotation",
-        ),
-        (
-            re.compile(r"\bNone\s*\|\s*[A-Za-z_][A-Za-z0-9_.]*\b"),
-            "PEP 604 union annotation",
-        ),
-        (
-            re.compile(r"\b(?:list|dict|set|tuple|frozenset|type)\s*\["),
-            "Python 3.9 built-in generic annotation",
-        ),
-        (
-            re.compile(r"^\s*match\s+.+:\s*$", re.MULTILINE),
-            "Python 3.10 match statement",
-        ),
-        (
-            re.compile(r"^\s*(?:from\s+tomllib\s+import|import\s+tomllib)\b", re.MULTILINE),
-            "Python 3.11 tomllib module",
-        ),
-        (
-            re.compile(r"^\s*(?:from\s+(?:zoneinfo|graphlib)\s+import|import\s+(?:zoneinfo|graphlib))\b", re.MULTILINE),
-            "Python 3.9 standard-library module",
-        ),
-        (
-            re.compile(r"\.(?:removeprefix|removesuffix)\("),
-            "Python 3.9 string method",
-        ),
-        (
-            re.compile(r"\.(?:is_relative_to|hardlink_to)\("),
-            "post-Python-3.8 pathlib method",
-        ),
-    )
+def check_python310_compatibility(root: Path, errors: List[str]) -> None:
     for path in iter_first_party_files(root):
-        if path.suffix.lower() != ".py":
+        if path.suffix != ".py" or ".local-data" in path.parts:
             continue
-        text = path.read_text(encoding="utf-8")
-        for pattern, description in forbidden_patterns:
-            if pattern.search(text):
-                errors.append(
-                    f"{description} is forbidden for Python 3.8: "
-                    + _relative(path, root)
-                )
-
+        source = path.read_text(encoding="utf-8")
+        try:
+            tree = ast.parse(source, feature_version=(3, 10))
+        except SyntaxError as exc:
+            errors.append("Python 3.10 syntax: " + _relative(path, root) + ": " + str(exc))
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import) and any(item.name == "tomllib" for item in node.names):
+                errors.append("Python 3.11 tomllib is forbidden: " + _relative(path, root))
+            if isinstance(node, ast.ImportFrom) and node.module == "tomllib":
+                errors.append("Python 3.11 tomllib is forbidden: " + _relative(path, root))
 
 def check_gitattributes(root: Path, errors: List[str]) -> None:
     text = (root / ".gitattributes").read_text(encoding="utf-8")
@@ -522,7 +494,7 @@ def check_hardware_authorization_boundary(root: Path, errors: List[str]) -> None
     adapter = (
         root
         / "src"
-        / "chili_crane_control"
+        / "chili_crane_hardware"
         / "scripts"
         / "mock_hardware_adapter.py"
     ).read_text(encoding="utf-8")
@@ -557,7 +529,7 @@ def check_cpp_compile_contracts(root: Path, errors: List[str]) -> None:
         cmake = (package_dir / "CMakeLists.txt").read_text(encoding="utf-8")
         if "set(CMAKE_CXX_STANDARD 17)" not in cmake:
             errors.append(f"C++17 is not enforced: {package}")
-        if "catkin_add_gtest" not in cmake:
+        if "ament_add_gtest" not in cmake:
             errors.append(f"public-header gtest target missing: {package}")
         if not (package_dir / test_source).is_file():
             errors.append(f"public-header compile source missing: {package}")
@@ -583,7 +555,7 @@ def check_static_ci(root: Path, errors: List[str]) -> None:
     path = root / ".github" / "workflows" / "static-contracts.yml"
     text = path.read_text(encoding="utf-8")
     for required in (
-        'python-version: "3.8"',
+        'python-version: "3.10"',
         "python tools/check_repo_contracts.py",
         'python -m unittest discover -s tests_static -p "test_*.py"',
     ):
@@ -599,42 +571,24 @@ def check_static_ci(root: Path, errors: List[str]) -> None:
 
 
 def check_ubuntu_validation_script(root: Path, errors: List[str]) -> None:
-    path = root / "scripts" / "validation" / "ubuntu20_phase0_validate.sh"
+    path = root / "scripts" / "validation" / "ubuntu22_ros2_phase0_validate.sh"
     text = path.read_text(encoding="utf-8")
     if not text.startswith("#!/usr/bin/env bash\nset -euo pipefail\n"):
-        errors.append("Ubuntu validation script must start fail-fast")
-    for argument in ("--workspace", "--evidence-dir", "--expected-sha"):
-        if argument not in text:
-            errors.append("Ubuntu validation script missing argument: " + argument)
-    for required in (
-        "Ubuntu 20.04.6",
-        "ROS_DISTRO",
-        'python_version" != "3.8"',
-        'gcc_version%%.*}" != "9"',
-        "catkin build",
-        "catkin test",
-        "control_board_state",
-    ):
+        errors.append("Ubuntu22 validation script must be fail-fast")
+    for required in ("--workspace", "--evidence-dir", "--expected-sha", "22.04",
+                     "humble", "3.10", " build --base-paths", "colcon test", "validate_ros2_mock.py"):
         if required not in text:
-            errors.append("Ubuntu validation script missing check: " + required)
-
+            errors.append("Ubuntu22 script missing: " + required)
 
 def check_runtime_baseline(root: Path, errors: List[str]) -> None:
-    adr = (
-        root / "docs" / "decisions" / "0001-runtime_baseline.md"
-    ).read_text(encoding="utf-8")
-    for required in (
-        "Status: `ACCEPTED`",
-        "Ubuntu 20.04.6 LTS",
-        "ROS Noetic",
-        "catkin_tools",
-        "Python: 3.8",
-        "C++: C++17",
-        "GCC 9.x",
-    ):
+    adr = (root / "docs/decisions/0003-ros2-humble-hardware-bench.md").read_text(encoding="utf-8")
+    for required in ("Status: `ACCEPTED`", "Ubuntu 22.04", "ROS 2 Humble",
+                     "Python 3.10", "C++17", "GCC 11", "24DI"):
         if required not in adr:
-            errors.append("runtime ADR missing accepted baseline: " + required)
-
+            errors.append("runtime ADR missing: " + required)
+    old = (root / "docs/decisions/0001-runtime_baseline.md").read_text(encoding="utf-8")
+    if "Status: `SUPERSEDED`" not in old:
+        errors.append("ROS1 historical ADR must be SUPERSEDED")
 
 def check_validation_claims(root: Path, errors: List[str]) -> None:
     validation_root = root / "docs" / "validation"
@@ -654,6 +608,37 @@ def check_validation_claims(root: Path, errors: List[str]) -> None:
             )
 
 
+def check_hardware_bench(root: Path, errors: List[str]) -> None:
+    config = load_yaml(root / "config/hardware/io_mapping.template.yaml", root, errors) or {}
+    if config.get("total_di_channels") != 24:
+        errors.append("current baseline must have 24 DI including remote inputs")
+    if config.get("devices") != {"adam6052": {"di_count": 8}, "adam6251": {"di_count": 16}}:
+        errors.append("ADAM channel inventory must be 8+16")
+    inputs = config.get("digital_inputs", {})
+    for name in ("mode_auto", "safety_ok", "remote_receiver_ready", "remote_y_left", "remote_g_close"):
+        if name not in inputs:
+            errors.append("missing semantic input: " + name)
+    for item in inputs.values():
+        if item != {"device": "NOT_CONFIGURED", "channel": "NOT_CONFIGURED", "invert": "NOT_CONFIGURED"}:
+            errors.append("template must not guess DI device/channel/polarity")
+    for package in ("chili_crane_core", "chili_crane_control"):
+        for path in iter_text_files(root / "src" / package):
+            if path.suffix == ".md":
+                continue
+            if re.search(r"\b(?:ModbusTcpTransport|Adam6052RegisterMap|Adam6251RegisterMap)\b",
+                         path.read_text(encoding="utf-8")):
+                errors.append("vendor protocol outside hardware: " + _relative(path, root))
+    qos = (root / "src/chili_crane_control/src/chili_crane_control/qos.py").read_text(encoding="utf-8")
+    if "TRANSIENT_LOCAL" in qos or "VOLATILE" not in qos:
+        errors.append("command QoS must be VOLATILE")
+    for path in (root / "src/chili_crane_hardware/src/chili_crane_hardware").rglob("*.py"):
+        if "nodes" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8")
+        if re.search(r"^\s*(?:import rclpy|from rclpy)", text, re.MULTILINE):
+            errors.append("pure hardware module must be ROS independent: " + str(path))
+
+
 def collect_errors(root: Optional[Path] = None) -> List[str]:
     root = root or repo_root()
     errors: List[str] = []
@@ -670,7 +655,7 @@ def collect_errors(root: Optional[Path] = None) -> List[str]:
     check_message_generation(root, errors)
     check_json_schemas(root, errors)
     check_python_syntax(root, errors)
-    check_python38_compatibility(root, errors)
+    check_python310_compatibility(root, errors)
     check_gitattributes(root, errors)
     check_camera_template(root, errors)
     check_task_state_consistency(root, errors)
@@ -682,6 +667,7 @@ def collect_errors(root: Optional[Path] = None) -> List[str]:
     check_ubuntu_validation_script(root, errors)
     check_runtime_baseline(root, errors)
     check_validation_claims(root, errors)
+    check_hardware_bench(root, errors)
     return errors
 
 

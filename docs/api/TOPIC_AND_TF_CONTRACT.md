@@ -14,6 +14,9 @@ hardware/hoist_state
 hardware/load_state
 hardware/grab_io_state
 hardware/control_board_state
+hardware/remote_control_state
+hardware/adam6052/raw_di
+hardware/adam6251/raw_di
 hardware/sensor_health
 lidar/merged_points
 lidar/diagnostics
@@ -49,3 +52,11 @@ opening classification. The hardware adapter must never fabricate the latter.
 
 Evidence age is based on the original sensor timestamp. A timer publication or
 heartbeat must not refresh measurement evidence time.
+
+## ROS2 通信契约
+
+使用 rclpy / rosidl；时间字段为 builtin_interfaces/Time。
+状态 QoS reliable + VOLATILE + depth=1 + 有限 lifespan；命令 depth=1、
+有限 lifespan，同时校验 issue/expiry。禁止 transient-local 复用旧授权。
+原始8/16DI必须带设备身份、原始极性、通信状态、采样计数与 evidence_age_sec。
+24DI 的语义映射在 hardware 层完成；定时发布不得刷新原始测量年龄。

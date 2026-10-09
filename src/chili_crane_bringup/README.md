@@ -1,14 +1,6 @@
 # chili_crane_bringup
 
-Launch files compose profiles under a per-crane namespace.
+ROS2 launch.py，命名空间、安装配置config_root、mapping/localization/replay/mock/production/bench_io组合。production当前仅mock；bench_io只读。
 
-Phase 0 launch files start only the fail-safe control skeleton and optional mock
-adapter. They do not start an NDT mapper/localizer or real hardware driver.
-`mapping` and `localization` currently establish mutually exclusive map
-lifecycle parameters for later nodes.
-
-The launch-file default `config_root` resolves the repository-level `config`
-directory in a source workspace. Installed deployments must pass
-`config_root:=<absolute-linux-path>`. Every public entry launch accepts this
-argument. Phase 0 intentionally does not claim that repository-level configs
-are installed into package share; that packaging decision remains for Phase 1.
+运行目标 Ubuntu22.04 / ROS2 Humble / Python3.10 / GCC11 / C++17 / ament。
+Windows只做静态检查；详见 docs/PROJECT_CONTEXT.md 和硬件台架手册。
