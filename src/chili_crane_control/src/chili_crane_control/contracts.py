@@ -38,7 +38,9 @@ class Evidence:
                 and max_age > 0 and 0 < self.measurement_stamp <= self.receive_stamp <= now
                 and now - self.measurement_stamp <= max_age
                 and type(self.source_counter) is int and self.source_counter > 0
+                and isinstance(self.calibration_id, str)
                 and self.calibration_id not in ("", "NOT_CONFIGURED")
+                and isinstance(self.config_version, str)
                 and self.config_version not in ("", "NOT_CONFIGURED"))
 
 

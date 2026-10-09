@@ -160,6 +160,7 @@ class ArchitectureScenarios(unittest.TestCase):
         action = command(active_authority())
         for bad in (replace(permit(action), permit_id="other"),
                     replace(permit(action), permit_generation=2),
+                    replace(permit(action), permit_generation=True),
                     replace(permit(action), evaluated_intent_id="other"),
                     replace(permit(action), direction_allowed=False)):
             self.assertFalse(bad.authorizes(action, 11))
@@ -200,6 +201,7 @@ class ArchitectureScenarios(unittest.TestCase):
         evidence = Evidence(10, 10.1, 1, "cal", "cfg")
         self.assertTrue(evidence.fresh(10.2, 1))
         self.assertFalse(replace(evidence, receive_stamp=12).fresh(12, 1))
+        self.assertFalse(replace(evidence, calibration_id=None).fresh(10.2, 1))
 
     def test_repeated_cycle_rescan_and_safe_return(self):
         task = TaskCycles("run", "task")
@@ -216,6 +218,7 @@ class ArchitectureScenarios(unittest.TestCase):
         task.next_cycle(False)
         self.assertFalse(task.returned_safe(False))
         self.assertTrue(task.returned_safe(True))
+        self.assertFalse(task.next_cycle(True))
 
     def test_unload_zone_and_do_mapping(self):
         zone = UnloadSafeZone(0, 5, 0, 5, 1, 3, "map")

@@ -55,6 +55,10 @@ class PermitEvidence:
         return (self.valid is True and self.direction_allowed is True
                 and all(type(v) in (int, float) and math.isfinite(v) for v in stamps)
                 and 0 < self.issued_stamp <= now < self.expire_stamp
+                and type(self.permit_generation) is int and self.permit_generation > 0
+                and type(action.permit_generation) is int
+                and type(self.command_epoch) is int and self.command_epoch > 0
+                and type(action.command_epoch) is int
                 and bool(self.permit_id) and self.permit_id == action.permit_id
                 and self.permit_generation == action.permit_generation
                 and self.evaluated_intent_id == action.intent_id
@@ -202,7 +206,8 @@ class AxisExecutor:
         allowed, reason = self.authority.admit(action, now, permit, axis_ready)
         decision = MotionDecision(reason=reason)
         if allowed and action.direction != 0:
-            if action.axis != self.axis or action.direction not in (-1, 1):
+            if (action.axis != self.axis or type(action.direction) is not int
+                    or action.direction not in (-1, 1)):
                 decision = MotionDecision(reason="AXIS_OR_DIRECTION_MISMATCH")
             elif self.strategy is not None:
                 decision = self.strategy.step(position, action.target, speed=speed, now=now,
