@@ -86,6 +86,7 @@ class TaskCycles:
         if retry_authorized is True:
             self.cycle_index += 1
             self.state = CycleState.SCAN
+        return True
 
     def remote_abort(self):
         self.state = CycleState.ABORTED

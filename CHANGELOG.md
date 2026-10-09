@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased — Phase 0.5 Architecture Freeze
+## Unreleased — Phase 0.5-R1 Architecture Repair
+
+- 修复固定慢速跨命令复位；一次接收的ActiveExecutionContext持续tick及短输出租约。
+- 独立command/actuation序号，拒绝重放、模式接管和过期续跑，STOP序号阻断迟到ON。
+- 严格模式矩阵、Z上下独立证据、CANCELLED/ABORTED、集中轴/动作/方向权限验证。
+- 24DI canonical物理点表派生逻辑视图；CalibrationRef绑定传感器和版本。
+- BREAKING CHANGE：ActuationRequest序号拆分、移除FaultEvent、manifest v2、DI v4；
+  全消费者clean rebuild，不能使用旧消息或双映射配置。
+- CI事件范围替代永久基线SHA，环境包版本进入证据；镜像digest锁定仍OPEN。
+- 实际ROS executor只发OFF，mock拒绝所有ON；租约仅纯软件边界，不冒充物理看门狗。
+
+## Phase 0.5 original freeze (unreleased)
 
 - 新增reported设备资产、24DI物理/逻辑分层、Y/Z独立能力与停止模型。
 - 新增Executor、ActuationRequest、readiness、SystemMode、重复Cycle和typed events。

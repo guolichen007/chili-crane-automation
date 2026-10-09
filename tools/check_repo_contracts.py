@@ -614,13 +614,15 @@ def check_hardware_bench(root: Path, errors: List[str]) -> None:
         errors.append("current baseline must have 24 DI including remote inputs")
     if config.get("devices") != {"adam6052": {"di_count": 8}, "adam6251": {"di_count": 16}}:
         errors.append("ADAM channel inventory must be 8+16")
-    inputs = config.get("digital_inputs", {})
-    for name in ("mode_auto", "safety_ok", "remote_receiver_ready", "remote_y_left", "remote_g_close"):
+    inputs = config.get("essential_signals", [])
+    if "digital_inputs" in config or config.get("contract_version") != 4:
+        errors.append("DI mapping must use canonical physical contract v4")
+    for name in ("mode_auto", "safety_ok", "remote_y_left", "remote_g_close"):
         if name not in inputs:
             errors.append("missing semantic input: " + name)
-    for item in inputs.values():
-        if item != {"device": "NOT_CONFIGURED", "channel": "NOT_CONFIGURED", "invert": "NOT_CONFIGURED"}:
-            errors.append("template must not guess DI device/channel/polarity")
+    for item in config.get("optional_capabilities", {}).values():
+        if item != "NOT_CONFIGURED":
+            errors.append("template must not guess optional capabilities")
     for package in ("chili_crane_core", "chili_crane_control"):
         for path in iter_text_files(root / "src" / package):
             if path.suffix == ".md":
@@ -660,6 +662,8 @@ def check_phase05(root: Path, errors: List[str]) -> None:
             errors.append("physical channel inventory must enumerate all24: " + device)
         if any(item.get("assignment") != "NOT_CONFIGURED" for item in items):
             errors.append("template must not guess physical assignments: " + device)
+        if any(item.get("signal") != "NOT_CONFIGURED" or item.get("invert") != "NOT_CONFIGURED" for item in items):
+            errors.append("template must not guess physical signal/polarity: " + device)
     adapter = (root / "src/chili_crane_hardware/scripts/mock_hardware_adapter.py").read_text(encoding="utf-8")
     if "control/authorized_command" in adapter or "ActuationRequest" not in adapter:
         errors.append("Phase0.5 hardware must consume only ActuationRequest")
@@ -671,7 +675,9 @@ def check_phase05(root: Path, errors: List[str]) -> None:
         errors.append("recording skeleton must default disabled")
     for name in ("AuthorizedCommand", "ActuationRequest"):
         text = (root / ("src/chili_crane_msgs/msg/" + name + ".msg")).read_text(encoding="utf-8")
-        for field in ("string session_id", "uint64 command_epoch", "uint64 sequence"):
+        sequences = ("uint64 sequence",) if name == "AuthorizedCommand" else (
+            "uint64 command_sequence", "uint64 actuation_sequence")
+        for field in ("string session_id", "uint64 command_epoch") + sequences:
             if field not in text:
                 errors.append(name + " missing ownership field: " + field)
     matrix = load_yaml(root / "docs/api/phase05_acceptance.yaml", root, errors) or {}

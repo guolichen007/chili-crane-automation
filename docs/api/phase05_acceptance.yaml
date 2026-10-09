@@ -1,6 +1,8 @@
-contract_version: 1
+contract_version: 2
 scope: PHASE05_INTERFACES_AND_SYNTHETIC_MOCK
-base_sha: 0f8d749085d7d9f9903047eb2522fd4580b57e27
+base_sha: fce3fa0aa49d4278b72a65b350741cd73f85cf4b
+repair_decision: docs/decisions/0005-phase05-r1-execution-lifecycle.md
+repair_regressions: src/chili_crane_control/test/test_architecture.py
 validation_commands:
   - python tools/check_repo_contracts.py
   - python -m unittest discover -s tests_static -p "test_*.py"

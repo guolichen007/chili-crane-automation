@@ -1,38 +1,37 @@
 config_state: NOT_CONFIGURED
-contract_version: 3
+contract_version: 4
 total_di_channels: 24
 devices:
   adam6052: {di_count: 8}
   adam6251: {di_count: 16}
-# Names are a semantic inventory, not an assertion of 25 dedicated channels.
-# Some feedback may be absent or supplied over another interface; freeze the
-# actual 24-channel point table with the manufacturer before declaring VALID.
-digital_inputs:
-  mode_auto: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  safety_ok: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  y_left_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  y_right_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  z_top_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  z_bottom_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  g_open_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  g_close_limit: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  e_stop: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  power_ok: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  y_fault: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  z_fault: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  g_fault: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  z_brake: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  overload: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  remote_receiver_ready: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  remote_x_positive: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  remote_x_negative: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  remote_y_left: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  remote_y_right: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  remote_z_up: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  remote_z_down: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  remote_g_open: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  remote_g_close: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
-  remote_stop: {device: NOT_CONFIGURED, channel: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+# Semantic inventories have no independent device/channel bindings.
+essential_signals:
+  - mode_auto
+  - safety_ok
+  - y_left_limit
+  - y_right_limit
+  - z_top_limit
+  - z_bottom_limit
+  - g_open_limit
+  - g_close_limit
+  - remote_y_left
+  - remote_y_right
+  - remote_z_up
+  - remote_z_down
+  - remote_g_open
+  - remote_g_close
+optional_capabilities:
+  e_stop: NOT_CONFIGURED
+  power_ok: NOT_CONFIGURED
+  y_fault: NOT_CONFIGURED
+  z_fault: NOT_CONFIGURED
+  g_fault: NOT_CONFIGURED
+  z_brake: NOT_CONFIGURED
+  overload: NOT_CONFIGURED
+  remote_receiver_ready: NOT_CONFIGURED
+  remote_x_positive: NOT_CONFIGURED
+  remote_x_negative: NOT_CONFIGURED
+  remote_stop: NOT_CONFIGURED
 digital_outputs:
   y_left: {device: adam6052, channel: 0}
   y_right: {device: adam6052, channel: 1}
@@ -45,32 +44,32 @@ stale_timeout_sec: 1.0
 physical_output_enabled: false
 automatic_control_enabled: false
 
-# Physical assignments are separate from optional logical capabilities.
+# The sole canonical physical mapping; polarity must be confirmed before ASSIGNED.
 assignment_states: [ASSIGNED, RESERVED, NOT_CONFIGURED]
 physical_channels:
   adam6052:
-    - {channel: 0, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 1, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 2, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 3, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 4, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 5, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 6, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 7, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 0, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 1, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 2, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 3, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 4, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 5, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 6, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 7, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
   adam6251:
-    - {channel: 0, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 1, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 2, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 3, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 4, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 5, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 6, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 7, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 8, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 9, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 10, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 11, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 12, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 13, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 14, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
-    - {channel: 15, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED}
+    - {channel: 0, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 1, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 2, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 3, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 4, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 5, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 6, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 7, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 8, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 9, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 10, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 11, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 12, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 13, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 14, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 15, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}

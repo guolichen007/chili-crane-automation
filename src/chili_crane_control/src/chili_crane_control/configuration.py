@@ -26,10 +26,29 @@ def configuration_hash(config):
 
 def manifest_ready(manifest):
     required = ("run_id", "task_id", "cycle_id", "map_id", "grab_geometry_version")
-    return (all(isinstance(manifest.get(k), str) and manifest[k] not in ("", "NOT_CONFIGURED")
-                for k in required)
-            and re.fullmatch("[0-9a-f]{40}", manifest.get("git_sha", "")) is not None
-            and re.fullmatch("[0-9a-f]{64}", manifest.get("config_hash", "")) is not None
-            and bool(manifest.get("sensor_calibration_ids"))
-            and all(isinstance(v, str) and v not in ("", "NOT_CONFIGURED")
-                    for v in manifest["sensor_calibration_ids"]))
+    if not all(isinstance(manifest.get(k), str) and manifest[k] not in ("", "NOT_CONFIGURED")
+               for k in required):
+        return False
+    if (not isinstance(manifest.get("git_sha"), str)
+            or re.fullmatch("[0-9a-f]{40}", manifest["git_sha"]) is None
+            or not isinstance(manifest.get("config_hash"), str)
+            or re.fullmatch("[0-9a-f]{64}", manifest["config_hash"]) is None):
+        return False
+    required_sensors = manifest.get("required_sensor_ids")
+    refs = manifest.get("calibrations")
+    if not isinstance(required_sensors, list) or not required_sensors or not isinstance(refs, list):
+        return False
+    if any(not isinstance(v, str) or v in ("", "NOT_CONFIGURED") for v in required_sensors):
+        return False
+    if len(set(required_sensors)) != len(required_sensors):
+        return False
+    seen = set()
+    for ref in refs:
+        if not isinstance(ref, dict) or any(
+                not isinstance(ref.get(k), str) or ref[k] in ("", "NOT_CONFIGURED")
+                for k in ("sensor_id", "calibration_id", "extrinsic_version", "intrinsic_version")):
+            return False
+        if ref["sensor_id"] in seen:
+            return False
+        seen.add(ref["sensor_id"])
+    return set(required_sensors).issubset(seen)

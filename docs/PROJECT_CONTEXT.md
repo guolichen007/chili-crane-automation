@@ -328,3 +328,13 @@ Y/Z调速能力未确认，分别选择VARIABLE_SPEED或FIXED_SLOW；停车/响�
 验收禁止相应自动运动。控制链新增Executor/ActuationRequest和session/epoch/sequence。
 任务与系统模式分离，重复Cycle每斗重扫；24物理DI与可选逻辑能力分离。
 未实现驱动、NDT、料面、抓斗算法、MES或真实闭环，实机项继续NOT_RUN。
+
+## Phase 0.5-R1 评审修补（2026-10-09）
+
+依据fce3fa0精确SHA的用户评审，只修七项契约/生命周期问题，不扩大框架。
+ADR0005补充ADR0004：固定慢速新命令复位、accept-once/tick与短输出租约、
+轴/动作/方向先验证再消费命令序号、模式转换矩阵、Z上下独立证据、
+CANCELLED/ABORTED与单一SafetyEvent、canonical24DI和带身份标定出处。
+配置未知时仍不接收动作；SAFE_IDLE需物理停止/OFF证据，故障reset不直达自动。
+租约只证明逻辑输出应OFF，不能证明原厂回路/实际继电器已OFF。
+当前ROS运行仍全OFF/mock，真实deadline、WDT/FSV、硬件/bag/现场均未验收。

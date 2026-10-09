@@ -68,7 +68,7 @@ def main():
                 failure.append("mock hardware accepted injected energization")
             received["energize_rejected"] = msg
         if msg.intent_id == "validation-intent":
-            if not msg.accepted or msg.executing or msg.completed or msg.failed:
+            if not msg.accepted or msg.executing or msg.completed or msg.failed or msg.cancelled or msg.aborted:
                 failure.append("STOP must be logically accepted but never physical completion")
             if msg.reason != "stop_received_physical_off_not_verified":
                 failure.append("mock STOP must not claim physical OFF")
@@ -79,6 +79,8 @@ def main():
             return  # Explicit negative test, not an executor output.
         if msg.enable or msg.direction != 0 or msg.speed_command_valid:
             failure.append("mock executor must emit de-energize only")
+        if msg.actuation_sequence <= 0 or not msg.session_id or msg.command_epoch <= 0:
+            failure.append("executor OFF frame lacks R1 ownership/frame sequence")
         received["actuation"] = msg
 
     def mode_callback(msg):

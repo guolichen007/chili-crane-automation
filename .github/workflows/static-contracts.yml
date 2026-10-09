@@ -38,4 +38,4 @@ jobs:
         run: python -m unittest discover -s tests_static -p "test_*.py"
 
       - name: Check reviewable public delivery and new commit titles
-        run: python tools/check_delivery.py --base-sha 0f8d749085d7d9f9903047eb2522fd4580b57e27 --ci
+        run: python tools/check_delivery.py --event-path "$GITHUB_EVENT_PATH" --ci

@@ -10,6 +10,8 @@ uint8 STATE_ACCEPTED=2
 uint8 STATE_EXECUTING=3
 uint8 STATE_COMPLETED=4
 uint8 STATE_FAILED=5
+uint8 STATE_CANCELLED=6
+uint8 STATE_ABORTED=7
 
 std_msgs/Header header
 uint8 validity
@@ -22,6 +24,8 @@ bool accepted
 bool executing
 bool completed
 bool failed
+bool cancelled
+bool aborted
 float64 evidence_age_sec
 string run_id
 string cycle_id

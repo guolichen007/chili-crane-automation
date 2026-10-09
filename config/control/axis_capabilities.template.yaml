@@ -1,8 +1,13 @@
-contract_version: 1
+contract_version: 2
 config_version: NOT_CONFIGURED
 config_state: NOT_CONFIGURED
 physical_output_enabled: false
 automatic_control_enabled: false
+execution_policy:
+  lease_sec: null
+  tick_rate_hz: null
+  adapter_poll_rate_hz: null
+  physical_watchdog_verified: false
 x:
   drive_type: SERVO_POSITION
   verified: false

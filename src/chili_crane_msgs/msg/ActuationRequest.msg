@@ -19,7 +19,8 @@ string task_id
 string cycle_id
 string session_id
 uint64 command_epoch
-uint64 sequence
+uint64 command_sequence
+uint64 actuation_sequence
 builtin_interfaces/Time issued_stamp
 builtin_interfaces/Time expire_stamp
 chili_crane_msgs/EvidenceMetadata evidence

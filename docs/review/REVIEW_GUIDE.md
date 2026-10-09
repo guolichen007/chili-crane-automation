@@ -9,7 +9,7 @@
 ## 阅读顺序
 
 1. README -> PROJECT_CONTEXT（已确认需求/OPEN冲突）。
-2. decisions/0003、0004 -> SYSTEM_ARCHITECTURE_AND_ROADMAP。
+2. decisions/0003、0004、0005 -> SYSTEM_ARCHITECTURE_AND_ROADMAP。
 3. api/PHASE05_CONTRACTS.md -> phase05_acceptance.yaml。
 4. control/contracts.py、execution.py、cycle.py及对应测试。
 5. hardware接口与HARDWARE_BENCH_RUNBOOK，确认感知/安全/执行分层。
@@ -22,6 +22,8 @@
 - Y/Z配置是否独立；停车/响应/安全速度未验收时是否阻断？
 - STOP是否不受过期许可阻挡；它是否仍不产生energize？
 - session/epoch/sequence能否拒绝迟到、重复、重启前命令？
+- 命令是否只接收一次，后续tick复核证据；短输出租约过期是否逻辑OFF？
+- SAFE_IDLE是否需要停止/OFF证据；锁存故障是否只能显式reset到自检/待机？
 - Task/Cycle是否独立SystemMode；每斗及重试是否强制重新扫描？
 - 24物理DI是否与逻辑语义分离；缺失安全反馈是否保持未知？
 - 接收时间/心跳是否伪造测量新鲜度；纯预测是否被误用于下降？
@@ -34,5 +36,5 @@
 ## 精确SHA证据入口
 
 [Phase0.5软件验证记录](../validation/PHASE05_SOFTWARE_470089b.md)记录已实际验证的软件SHA；
-[当前评审分支](https://github.com/guolichen007/chili-crane-automation/tree/codex/architecture-freeze-v1)
+[当前评审分支](https://github.com/guolichen007/chili-crane-automation/tree/codex/architecture-freeze-r1)
 及该分支最新Actions确定最终HEAD。不要把文档归档提交的SHA与历史验证记录混为一谈。

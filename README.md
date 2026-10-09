@@ -1,6 +1,6 @@
 # 辣椒地池行车自动抓取框架
 
-当前版本为 **Phase 0.5 / ROS2 Humble 架构与 mock 策略基线**，不是可运行的无人行车。
+当前版本为 **Phase 0.5-R1 / ROS2 Humble 架构与 mock 策略基线**，不是可运行的无人行车。
 运行基线：Ubuntu 22.04.x、ROS2 Humble、Python 3.10、C++17、GCC 11、ament/colcon。
 ROS1 旧框架已由 ADR 0003 取代；NDT-SLAM-Warehouse 仅为只读算法参考。
 
@@ -24,6 +24,8 @@ Y/Z分别支持可调速与固定低速策略契约，现场能力及停车验�
 
 任务/抓取周期 → 意图 → 安全许可 → 授权 → ActionExecutor → ActuationRequest → 硬件。
 新增会话/epoch/序号拒绝旧命令，STOP始终允许向OFF退化；每斗完成后重新扫描料面。
+R1补充命令只接收一次的执行上下文、短输出租约、模式转换矩阵、独立Z上下 readiness；
+24DI只维护物理点表，标定出处绑定sensor_id。见[ADR0005](docs/decisions/0005-phase05-r1-execution-lifecycle.md)。
 当前仅纯策略/mock，不含真实驱动、NDT、料面或抓斗算法。
 详见[接口契约](docs/api/PHASE05_CONTRACTS.md)与[验收矩阵](docs/api/phase05_acceptance.yaml)。
 

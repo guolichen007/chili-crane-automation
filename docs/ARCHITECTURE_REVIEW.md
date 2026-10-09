@@ -99,6 +99,6 @@ ADAM WDT 会被其他 TCP 客户端刷新，因此 DO 台架要求独占、持�
 ## Phase0.5补充评审
 
 本轮采用ADR0004。原硬件直接接授权接口由Executor/ActuationRequest替代；
-架构基线具备27项纯策略与故障场景，生产readiness仍false。
+架构基线具备纯策略与故障场景，R1补充生命周期/租约回归，生产readiness仍false。
 X/G执行策略、真实Task/Cycle ROS调度、算法与实际安全证据仍是后续工作，
 不得将当前接口桩描述为实机控制完成。

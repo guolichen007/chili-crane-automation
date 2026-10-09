@@ -14,6 +14,7 @@ string cycle_id
 string git_sha
 string config_hash
 string map_id
-string[] sensor_calibration_ids
+string[] required_sensor_ids
+chili_crane_msgs/CalibrationRef[] calibrations
 string grab_geometry_version
 builtin_interfaces/Time started_stamp

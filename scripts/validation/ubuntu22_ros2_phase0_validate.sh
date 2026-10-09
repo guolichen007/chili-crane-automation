@@ -33,6 +33,15 @@ run_dir="$(mktemp -d "$evidence_dir/ros2-$expected_sha-XXXXXX")"
 exec > >(tee "$run_dir/validation.log") 2>&1
 printf 'EVIDENCE_SHA: %s\n' "$expected_sha"
 printf 'EVIDENCE_SCOPE: UBUNTU22_ROS2_SOFTWARE_ONLY\n'
+{
+  printf 'IMAGE_REFERENCE: ros:humble-ros-base-jammy (floating; digest not captured)\n'
+  printf 'ROS_DISTRO: %s\n' "$ROS_DISTRO"
+  lsb_release -a
+  python3 --version
+  gcc --version
+  ros2 pkg xml rclpy
+} > "$run_dir/software-environment.txt" 2>&1
+dpkg-query -W > "$run_dir/apt-package-versions.txt"
 python3 tools/check_repo_contracts.py
 python3 -m unittest discover -s tests_static -p "test_*.py"
 python3 tools/validate_architecture_scenarios.py | tee "$run_dir/architecture-scenarios.json"

@@ -30,7 +30,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CycleStatus.msg"
   "msg/DualLidarReadiness.msg"
   "msg/EvidenceMetadata.msg"
-  "msg/FaultEvent.msg"
+  "msg/CalibrationRef.msg"
   "msg/RunManifest.msg"
   "msg/SafetyEvent.msg"
   "msg/SystemModeStatus.msg"

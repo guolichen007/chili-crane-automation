@@ -129,16 +129,23 @@ class SystemReadiness:
 def evaluate_readiness(configuration_ready=False, hardware_ready=False, dual_lidar=False,
                        localization_ready=False, grab_tracking_ready=False, pit_perception_ready=False,
                        control_ready=False, safety_ready=False, x_verified=False, grab_verified=False,
-                       y=AxisCapability(), z=AxisCapability()):
+                       y=AxisCapability(), z=AxisCapability(), grab_bottom_valid=False,
+                       target_valid=False, wall_clearance_valid=False,
+                       raise_clearance_valid=False, jam_free_verified=False):
     base = all(v is True for v in (configuration_ready, hardware_ready, control_ready, safety_ready))
     y_ready = base and localization_ready is True and y.ready()
-    z_ready = base and dual_lidar is True and grab_tracking_ready is True and z.ready() and z.stop_distance_verified is True
+    z_base = (base and grab_tracking_ready is True and z.ready()
+              and z.stop_distance_verified is True and jam_free_verified is True)
+    # No blind raise. Tracking and a distinct upward-clearance/jam assessment are required.
+    z_raise = z_base and raise_clearance_valid is True
+    z_lower = z_base and all(v is True for v in (
+        dual_lidar, grab_bottom_valid, pit_perception_ready, target_valid, wall_clearance_valid))
     return SystemReadiness(
         configuration_ready is True, hardware_ready is True, dual_lidar is True,
         localization_ready is True, grab_tracking_ready is True, pit_perception_ready is True,
         control_ready is True, safety_ready is True,
         base and localization_ready is True and x_verified is True, y_ready,
-        z_ready, z_ready, base and grab_verified is True)
+        z_raise, z_lower, base and grab_verified is True)
 
 
 def grab_feedback_ready(tracking_state, source, fresh):

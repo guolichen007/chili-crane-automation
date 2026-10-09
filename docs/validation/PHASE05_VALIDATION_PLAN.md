@@ -1,13 +1,15 @@
 # Phase 0.5 验证与交接计划
 
-BASE_SHA: 0f8d749085d7d9f9903047eb2522fd4580b57e27
-BRANCH: codex/architecture-freeze-v1
+BASE_SHA: fce3fa0aa49d4278b72a65b350741cd73f85cf4b
+BRANCH: codex/architecture-freeze-r1
 OUTPUT_SHA: 以分支HEAD及Actions对应的40位SHA为准，不自引用本文件所在提交。
 
-Windows：三项提交前检查、27项synthetic scenarios、check_delivery预推送检查。
+Windows：三项提交前检查、R1新增生命周期/租约等synthetic scenarios、check_delivery预推送检查。
 云端：Python3.10静态、Ubuntu22/Humble容器colcon clean build/test，
 ROS2 mock授权->Executor->OFF请求->硬件逻辑STOP接收，模式/readiness阻断观察。
 新消息消费者必须clean rebuild；按同一OUTPUT_SHA复核日志和CI artifacts。
+新租约策略仅纯函数/mock；真实硬件定时轮询、WDT/FSV和物理OFF反馈仍待验证。
+CI记录apt版本和ROS/工具链元数据；容器tag仍浮动，尚非完全锁定的可复现环境。
 状态及计数以实际日志为准，不能根据此计划推导PASS。
 
 此验证不含生产Executor闭环、真实Task/Cycle调度、实时安全认证或设备接线。

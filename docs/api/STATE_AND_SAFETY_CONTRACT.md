@@ -98,3 +98,7 @@ mode_policy 返回释放自动输出、作废待执行命令、要求新任务�
 Stop/de-energize不因许可过期而拒绝，但没有physical OFF反馈不能宣称动作完成。
 自动energize需要session/epoch/sequence、授权与permit绑定及动作readiness有效。
 新增EvidenceMetadata未知时保持阻断；TaskState不再表示遥控状态。
+R1规定命令只accept一次、tick持续复核证据；输出command_sequence与actuation_sequence
+分开，有限租约到期的逻辑DO必须OFF。状态机禁止启动/故障恢复直跳AUTO_READY。
+取消为CANCELLED，安全/模式中止为ABORTED；仅SafetyEvent按domain表示故障。
+详见ADR0005和PHASE05_CONTRACTS第9节，不能把纯租约测试当作物理看门狗验收。

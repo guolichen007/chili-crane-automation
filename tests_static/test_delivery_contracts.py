@@ -1,6 +1,7 @@
 """Public delivery and asset contracts."""
 import importlib.util
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 import yaml
 
@@ -11,6 +12,18 @@ SPEC.loader.exec_module(DELIVERY)
 
 
 class DeliveryContracts(unittest.TestCase):
+    def test_event_delivery_range_supports_push_pr_and_new_branch(self):
+        sha = "a" * 40
+        self.assertEqual(sha, DELIVERY.event_base({"before": sha}))
+        self.assertEqual(sha, DELIVERY.event_base({"pull_request": {"base": {"sha": sha}}}))
+        with patch.object(DELIVERY, "git", return_value=sha) as query:
+            self.assertEqual(sha, DELIVERY.event_base({
+                "before": "0" * 40, "repository": {"default_branch": "main"}}))
+            query.assert_called_once_with("rev-parse", "HEAD^")
+        for event in ({}, {"before": "bad"}):
+            with self.assertRaises(ValueError):
+                DELIVERY.event_base(event)
+
     def test_conventional_titles_and_sensitive_paths(self):
         self.assertTrue(DELIVERY.title_valid("feat(control)!: 冻结执行接口"))
         self.assertFalse(DELIVERY.title_valid("update everything"))

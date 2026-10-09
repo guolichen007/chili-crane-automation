@@ -10,7 +10,7 @@ from chili_crane_control.qos import state_qos
 from chili_crane_hardware.trolley.pull_wire_driver import PullWireDriver
 from chili_crane_hardware.state import EvidenceTracker
 from chili_crane_msgs.msg import TrolleyState, DigitalInputState
-from chili_crane_hardware.mapping import RawInput, normalize
+from chili_crane_hardware.mapping import RawInput, normalize, derive_logical_inputs
 
 
 class PullWireNode(Node):
@@ -22,7 +22,7 @@ class PullWireNode(Node):
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8")) if path else {}
         map_path = self.get_parameter("mapping_config").value
         mapping_config = yaml.safe_load(Path(map_path).read_text(encoding="utf-8")) if map_path else {}
-        self._mapping = mapping_config.get("digital_inputs", {})
+        self._mapping = derive_logical_inputs(mapping_config)
         self._di_stale = float(mapping_config.get("stale_timeout_sec", 1.0))
         self._di_samples = {}
         self._subscriptions_by_device = [

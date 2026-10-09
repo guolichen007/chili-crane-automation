@@ -8,7 +8,7 @@ from rclpy.node import Node
 from rclpy.clock import Clock, ClockType
 from chili_crane_control.qos import state_qos
 from chili_crane_control.mode_policy import evaluate_mode
-from chili_crane_hardware.mapping import RawInput, normalize
+from chili_crane_hardware.mapping import RawInput, normalize, derive_logical_inputs
 from chili_crane_msgs.msg import (
     DigitalInputState, ControlBoardState, RemoteControlState, GrabIoState, HoistState,
 )
@@ -20,7 +20,7 @@ class IoNormalizerNode(Node):
         self.declare_parameter("mapping_config", "")
         path = self.get_parameter("mapping_config").value
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8")) if path else {}
-        self._mapping = config.get("digital_inputs", {})
+        self._mapping = derive_logical_inputs(config)
         self._stale = float(config.get("stale_timeout_sec", 1.0))
         if not math.isfinite(self._stale) or not 0 < self._stale <= 10:
             raise ValueError("invalid stale_timeout_sec")

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Read-only pre-push checks; not a substitute for human review or secret scanning."""
 import argparse
+import json
 import re
 import subprocess
 from pathlib import Path
@@ -25,11 +26,37 @@ def forbidden_path(path):
             or Path(path).suffix in {".pem", ".key", ".bag", ".db3"})
 
 
+def event_base(event):
+    """Use the reviewed event range, never a permanent historical adoption SHA."""
+    if "pull_request" in event:
+        base = event["pull_request"]["base"]["sha"]
+    elif "before" in event:
+        base = event["before"]
+        if base == "0" * 40:
+            # No prior branch tip exists. Check the tip title and all public paths.
+            # The full first-delivery range is checked locally with an explicit base.
+            base = git("rev-parse", "HEAD^")
+    else:
+        raise ValueError("unsupported delivery event")
+    if not isinstance(base, str) or re.fullmatch("[0-9a-f]{40}", base) is None:
+        raise ValueError("event base must be an exact commit SHA")
+    return base
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-sha", required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--base-sha")
+    source.add_argument("--event-path", type=Path, help="GitHub push/PR event; CI only")
     parser.add_argument("--ci", action="store_true", help="read-only CI review, not a local push")
     args = parser.parse_args()
+    if args.event_path:
+        if not args.ci:
+            parser.error("--event-path is CI-only; local delivery needs an explicit base")
+        try:
+            args.base_sha = event_base(json.loads(args.event_path.read_text(encoding="utf-8")))
+        except (KeyError, ValueError, OSError, subprocess.CalledProcessError) as exc:
+            parser.error("cannot resolve event range: " + str(exc))
     if re.fullmatch("[0-9a-f]{40}", args.base_sha) is None:
         parser.error("base SHA must be an exact 40-character commit")
     errors = []
@@ -55,6 +82,8 @@ def main():
         return 1
     print("PRE_PUSH_STATIC: PASS; remote CI and human data review still required")
     print("BASE_SHA: " + args.base_sha)
+    if args.event_path:
+        print("CI_RANGE: event push/PR base; new branch uses tip parent only")
     print("OUTPUT_SHA: " + git("rev-parse", "HEAD"))
     print("BRANCH: " + branch)
     return 0

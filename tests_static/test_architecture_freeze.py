@@ -11,3 +11,4 @@ SPEC = importlib.util.spec_from_file_location(
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 ArchitectureScenarios = MODULE.ArchitectureScenarios
+R1Regressions = MODULE.R1Regressions

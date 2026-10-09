@@ -35,3 +35,41 @@ def semantic_input(name, mapping, samples, now, stale_timeout_sec):
 def normalize(mapping, samples, now, stale_timeout_sec):
     return {name: semantic_input(name, mapping, samples, now, stale_timeout_sec)
             for name in mapping}
+
+def derive_logical_inputs(config):
+    """Build the only logical view from the complete 24-channel physical table."""
+    if not config:
+        return {}
+    if "digital_inputs" in config or config.get("contract_version") != 4:
+        raise ValueError("legacy/parallel DI mapping is not accepted")
+    essential = config.get("essential_signals", [])
+    optional = config.get("optional_capabilities", {})
+    if (not isinstance(essential, list) or not isinstance(optional, dict)
+            or any(not isinstance(n, str) or not n or n == "NOT_CONFIGURED" for n in essential + list(optional))
+            or len(set(essential)) != len(essential) or set(essential) & set(optional)):
+        raise ValueError("invalid semantic inventory")
+    names = set(essential) | set(optional)
+    mapping = {name: {"device": "NOT_CONFIGURED", "channel": "NOT_CONFIGURED",
+                      "invert": "NOT_CONFIGURED"} for name in names}
+    physical = config.get("physical_channels", {})
+    if not isinstance(physical, dict) or set(physical) != set(DEVICE_CHANNELS):
+        raise ValueError("physical inventory must include exactly two ADAM devices")
+    assigned = set()
+    for device, count in DEVICE_CHANNELS.items():
+        rows = physical[device]
+        if (not isinstance(rows, list) or len(rows) != count
+                or any(not isinstance(row, dict) or type(row.get("channel")) is not int for row in rows)
+                or {row["channel"] for row in rows} != set(range(count))):
+            raise ValueError("physical inventory must contain each channel exactly once")
+        for row in rows:
+            state, signal, invert = row.get("assignment"), row.get("signal"), row.get("invert")
+            if state not in {"ASSIGNED", "RESERVED", "NOT_CONFIGURED"}:
+                raise ValueError("invalid assignment state")
+            if state == "ASSIGNED":
+                if signal not in names or signal in assigned or type(invert) is not bool:
+                    raise ValueError("unknown/duplicate signal or polarity")
+                assigned.add(signal)
+                mapping[signal] = {"device": device, "channel": row["channel"], "invert": invert}
+            elif signal != "NOT_CONFIGURED" or invert != "NOT_CONFIGURED":
+                raise ValueError("unassigned channel must not carry a binding")
+    return mapping

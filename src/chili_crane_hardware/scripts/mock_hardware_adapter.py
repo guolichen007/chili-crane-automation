@@ -34,7 +34,7 @@ class MockHardwareAdapter(Node):
             CommandExecutionState, "control/execution_state", state_qos(depth=10))
         self._command_sub = self.create_subscription(
             ActuationRequest, "control/actuation_request",
-            self._on_authorized_command, command_qos())
+            self._on_actuation_request, command_qos())
         self._steady_clock = Clock(clock_type=ClockType.STEADY_TIME)
         self._timer = self.create_timer(0.1, self._publish, clock=self._steady_clock)
 
@@ -70,7 +70,7 @@ class MockHardwareAdapter(Node):
                 message.io_heartbeat_ok = False
             self._publishers_by_topic[topic].publish(message)
 
-    def _on_authorized_command(self, command):
+    def _on_actuation_request(self, command):
         now = self.get_clock().now().nanoseconds
         issued = stamp_ns(command.issued_stamp)
         expires = stamp_ns(command.expire_stamp)
@@ -80,6 +80,11 @@ class MockHardwareAdapter(Node):
         execution.command_id = command.source_command_id
         execution.task_id = command.task_id
         execution.intent_id = command.intent_id
+        execution.run_id = command.run_id
+        execution.cycle_id = command.cycle_id
+        execution.session_id = command.session_id
+        execution.command_epoch = command.command_epoch
+        execution.sequence = command.command_sequence
         execution.state = CommandExecutionState.STATE_REJECTED
         execution.accepted = False
         execution.executing = False

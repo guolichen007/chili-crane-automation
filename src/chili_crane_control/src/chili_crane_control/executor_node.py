@@ -20,6 +20,7 @@ class ActionExecutorNode(Node):
         path = self.get_parameter("capability_config").value
         self._config = yaml.safe_load(Path(path).read_text(encoding="utf-8")) if path else {}
         self.authority = ControlAuthority()
+        self._actuation_sequence = 0
         self.authority.transition(SystemMode.PROTECTIVE_STOP)
         self._actuation = self.create_publisher(
             ActuationRequest, "control/actuation_request", command_qos())
@@ -53,6 +54,8 @@ class ActionExecutorNode(Node):
         message.speed_command_valid = False
         message.session_id = self.authority.session_id
         message.command_epoch = self.authority.command_epoch
+        self._actuation_sequence += 1
+        message.actuation_sequence = self._actuation_sequence
         message.issued_stamp = message.header.stamp
         message.expire_stamp = message.header.stamp
         if command is not None:
@@ -61,7 +64,7 @@ class ActionExecutorNode(Node):
             message.run_id = command.run_id
             message.task_id = command.task_id
             message.cycle_id = command.cycle_id
-            message.sequence = command.sequence
+            message.command_sequence = command.sequence
         message.evidence.validity = message.evidence.NOT_CONFIGURED
         message.evidence.reason = "NO_PHYSICAL_EVIDENCE"
         self._actuation.publish(message)

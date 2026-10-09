@@ -164,7 +164,7 @@ production 不加载 bench writer。所有未确认设备参数继续 NOT_CONFIG
 
 ## 9. Phase 0.5 / Public delivery
 
-Follow ADR0004 and docs/api/PHASE05_CONTRACTS.md. Hardware consumes ActuationRequest,
+Follow ADR0004/0005 and docs/api/PHASE05_CONTRACTS.md. Hardware consumes ActuationRequest,
 not AuthorizedCommand. Separate SystemMode and Task/Cycle; epoch/session/sequence must
 invalidate stale commands. STOP may only de-energize, never bypass permission to energize.
 Y/Z profiles are independent; unverified stopping/capability blocks automatic actions.
