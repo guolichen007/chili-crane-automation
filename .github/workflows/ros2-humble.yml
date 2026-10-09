@@ -11,6 +11,8 @@ jobs:
   ros2-humble:
     runs-on: ubuntu-22.04
     container: ros:humble-ros-base-jammy
+    env:
+      CHILI_CI_IMAGE_REFERENCE: ros:humble-ros-base-jammy
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4

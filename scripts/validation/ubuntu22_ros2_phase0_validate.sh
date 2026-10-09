@@ -34,7 +34,8 @@ exec > >(tee "$run_dir/validation.log") 2>&1
 printf 'EVIDENCE_SHA: %s\n' "$expected_sha"
 printf 'EVIDENCE_SCOPE: UBUNTU22_ROS2_SOFTWARE_ONLY\n'
 {
-  printf 'IMAGE_REFERENCE: ros:humble-ros-base-jammy (floating; digest not captured)\n'
+  printf 'IMAGE_REFERENCE: %s\n' "${CHILI_CI_IMAGE_REFERENCE:-NOT_REPORTED}"
+  printf 'IMAGE_DIGEST: NOT_CAPTURED (CI tag remains floating)\n'
   printf 'ROS_DISTRO: %s\n' "$ROS_DISTRO"
   lsb_release -a
   python3 --version
