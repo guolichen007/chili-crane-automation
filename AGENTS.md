@@ -43,13 +43,13 @@ Desktop Codex on Windows is responsible for:
 
 Desktop Codex must not claim:
 
-- ROS1/ROS Noetic build success on Windows;
+- ROS 2 Humble build success on Windows;
 - PCL, Sophus, or ndt_omp runtime correctness on Windows;
-- catkin or roslaunch success unless actually run on Ubuntu;
+- colcon or ROS2 launch success unless actually run on Ubuntu;
 - ROS bag acceptance;
 - physical sensor, control-board, or field validation.
 
-Ubuntu validation is responsible for clean catkin builds, C++ tests, roslaunch,
+Ubuntu validation is responsible for clean colcon builds, C++ tests, ROS2 launch,
 bag replay, runtime evidence, and field validation against an exact Git SHA.
 
 ## 4. Cross-platform contract
@@ -58,17 +58,16 @@ The runtime target is Linux/Ubuntu/ROS even when files are edited on Windows.
 
 The accepted Phase 1 runtime baseline is:
 
-- Ubuntu 20.04.6 LTS;
-- ROS Noetic;
-- `catkin_tools`;
-- Python 3.8;
-- C++17 with GCC 9.x;
+- Ubuntu 22.04.x LTS;
+- ROS 2 Humble;
+- ament/colcon;
+- Python 3.10;
+- C++17 with GCC 11.x;
 - native Ubuntu runtime.
 
 Windows is limited to editing, static/interface checks, documentation, and Git
-operations. The repository does not maintain parallel ROS1 and ROS2
-implementations. A future Ubuntu 22.04 requirement needs a separate migration
-or containerization decision.
+operations. ADR 0003 supersedes the ROS1 baseline; the active branch maintains
+only ROS2. The previous ROS1 branch is historical evidence.
 
 - all first-party text files use LF;
 - text is UTF-8 without BOM;
@@ -76,7 +75,7 @@ or containerization decision.
 - shell scripts use POSIX syntax;
 - repository/runtime paths use `/`;
 - runtime code must not assume a Windows drive letter;
-- do not commit generated Visual Studio or catkin build files;
+- do not commit generated Visual Studio or colcon build files;
 - do not copy legacy CRLF exceptions from the NDT repository.
 
 Before every commit run:
@@ -155,3 +154,10 @@ Phase 0 establishes:
 
 Stubs are acceptable while protocols are unknown, but they must remain visibly
 `NOT_CONFIGURED` or `NOT_READY`.
+
+## 8. 当前硬件框架约束
+
+24DI = ADAM-6052 8DI + ADAM-6251 16DI，包含遥控器输入；逐通道来源和
+极性经配置确认。遥控器状态不得直接变成自动授权。厂家协议只进入
+chili_crane_hardware。bench 默认只读，DO 仅允许显式门禁和有限脉冲；
+production 不加载 bench writer。所有未确认设备参数继续 NOT_CONFIGURED。

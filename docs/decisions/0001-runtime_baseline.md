@@ -1,7 +1,9 @@
 # ADR 0001: Runtime Baseline
 
-- Status: `ACCEPTED`
+- Status: `SUPERSEDED`
 - Decision owner: project technical lead
+
+由 [ADR 0003](0003-ros2-humble-hardware-bench.md) 于 2026-10-09 替代。下文仅为 ROS1 历史决策，不是当前运行目标。
 
 ## Context
 
