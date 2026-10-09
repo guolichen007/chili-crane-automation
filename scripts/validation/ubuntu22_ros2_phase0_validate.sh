@@ -35,6 +35,7 @@ printf 'EVIDENCE_SHA: %s\n' "$expected_sha"
 printf 'EVIDENCE_SCOPE: UBUNTU22_ROS2_SOFTWARE_ONLY\n'
 python3 tools/check_repo_contracts.py
 python3 -m unittest discover -s tests_static -p "test_*.py"
+python3 tools/validate_architecture_scenarios.py | tee "$run_dir/architecture-scenarios.json"
 rosdep check --from-paths src --ignore-src --rosdistro humble
 colcon --log-base "$run_dir/log" build --base-paths "$workspace/src" \
   --build-base "$run_dir/build" --install-base "$run_dir/install" \
@@ -67,6 +68,7 @@ ROS2_BUILD_STATUS: PASS
 ROS2_TEST_STATUS: PASS
 ROS2_MOCK_LAUNCH_STATUS: PASS
 MOCK_FAIL_CLOSED_STATUS: PASS
+MOCK_SCENARIO_STATUS: PASS
 ADAM6052_LIVE_STATUS: NOT_RUN
 ADAM6251_LIVE_STATUS: NOT_RUN
 PULL_WIRE_LIVE_STATUS: NOT_RUN

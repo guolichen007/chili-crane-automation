@@ -498,8 +498,8 @@ def check_hardware_authorization_boundary(root: Path, errors: List[str]) -> None
         / "scripts"
         / "mock_hardware_adapter.py"
     ).read_text(encoding="utf-8")
-    if "control/authorized_command" not in adapter:
-        errors.append("hardware adapter must consume authorized_command")
+    if "control/actuation_request" not in adapter:
+        errors.append("hardware adapter must consume actuation_request")
     for forbidden in ("control/intent", "control/requested_intent", "ControlIntent"):
         if forbidden in adapter:
             errors.append(
@@ -639,6 +639,49 @@ def check_hardware_bench(root: Path, errors: List[str]) -> None:
             errors.append("pure hardware module must be ROS independent: " + str(path))
 
 
+def check_phase05(root: Path, errors: List[str]) -> None:
+    required = (
+        "docs/decisions/0004-phase05-architecture-freeze.md",
+        "docs/api/PHASE05_CONTRACTS.md", "docs/api/phase05_acceptance.yaml",
+        "docs/review/REVIEW_GUIDE.md", "CONTRIBUTING.md",
+        ".github/PULL_REQUEST_TEMPLATE.md", "tools/check_delivery.py",
+        "config/hardware/sensor_inventory.yaml", "config/control/axis_capabilities.template.yaml",
+        "config/control/profiles/variable_speed.yaml", "config/control/profiles/fixed_slow.yaml",
+        "config/recording/run_manifest.template.yaml", "config/recording/rosbag2_profile.yaml",
+    )
+    for relative in required:
+        if not (root / relative).is_file():
+            errors.append("Phase0.5 required file missing: " + relative)
+    physical = load_yaml(root / "config/hardware/io_mapping.template.yaml", root, errors) or {}
+    channels = physical.get("physical_channels", {})
+    for device, count in (("adam6052", 8), ("adam6251", 16)):
+        items = channels.get(device, [])
+        if [item.get("channel") for item in items] != list(range(count)):
+            errors.append("physical channel inventory must enumerate all24: " + device)
+        if any(item.get("assignment") != "NOT_CONFIGURED" for item in items):
+            errors.append("template must not guess physical assignments: " + device)
+    adapter = (root / "src/chili_crane_hardware/scripts/mock_hardware_adapter.py").read_text(encoding="utf-8")
+    if "control/authorized_command" in adapter or "ActuationRequest" not in adapter:
+        errors.append("Phase0.5 hardware must consume only ActuationRequest")
+    cmake = (root / "src/chili_crane_control/CMakeLists.txt").read_text(encoding="utf-8")
+    if "ament_add_pytest_test" not in cmake:
+        errors.append("pure executor scenario tests must run in colcon")
+    recording = load_yaml(root / "config/recording/rosbag2_profile.yaml", root, errors) or {}
+    if recording.get("enabled") is not False:
+        errors.append("recording skeleton must default disabled")
+    for name in ("AuthorizedCommand", "ActuationRequest"):
+        text = (root / ("src/chili_crane_msgs/msg/" + name + ".msg")).read_text(encoding="utf-8")
+        for field in ("string session_id", "uint64 command_epoch", "uint64 sequence"):
+            if field not in text:
+                errors.append(name + " missing ownership field: " + field)
+    matrix = load_yaml(root / "docs/api/phase05_acceptance.yaml", root, errors) or {}
+    if len(matrix.get("contracts", [])) != 15:
+        errors.append("Phase0.5 must expose the15 named acceptance contracts")
+    for item in matrix.get("contracts", []):
+        if not (root / item["implementation"]).is_file():
+            errors.append("acceptance implementation path missing: " + item["implementation"])
+
+
 def collect_errors(root: Optional[Path] = None) -> List[str]:
     root = root or repo_root()
     errors: List[str] = []
@@ -668,6 +711,7 @@ def collect_errors(root: Optional[Path] = None) -> List[str]:
     check_runtime_baseline(root, errors)
     check_validation_claims(root, errors)
     check_hardware_bench(root, errors)
+    check_phase05(root, errors)
     return errors
 
 

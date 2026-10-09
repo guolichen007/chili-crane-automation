@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
@@ -34,3 +36,6 @@ jobs:
 
       - name: Run static unit tests
         run: python -m unittest discover -s tests_static -p "test_*.py"
+
+      - name: Check reviewable public delivery and new commit titles
+        run: python tools/check_delivery.py --base-sha 0f8d749085d7d9f9903047eb2522fd4580b57e27 --ci
