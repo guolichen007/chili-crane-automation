@@ -65,6 +65,12 @@ class TaskStateConsistencyTest(unittest.TestCase):
         names = {name for name, _ in expected_states()}
         self.assertTrue({"DONE", "FAULT", "ABORTED"}.issubset(names))
 
+    def test_all_cpp_task_references_exist_in_contract(self):
+        expected = {name for name, _ in expected_states()}
+        for path in (ROOT / "src/chili_crane_core").rglob("*.hpp"):
+            names = set(re.findall(r"TaskState::([A-Z_]+)", path.read_text(encoding="utf-8")))
+            self.assertTrue(names.issubset(expected), str(path))
+
 
 if __name__ == "__main__":
     unittest.main()

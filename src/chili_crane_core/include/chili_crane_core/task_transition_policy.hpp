@@ -53,12 +53,12 @@ inline bool canTransitionTaskState(
         return true;
     }
     if (to == TaskState::FAULT ||
-        to == TaskState::MANUAL_OVERRIDE) {
+        to == TaskState::ABORTED) {
         return from != TaskState::DONE;
     }
     if ((from == TaskState::DONE ||
          from == TaskState::FAULT ||
-         from == TaskState::MANUAL_OVERRIDE) &&
+         from == TaskState::ABORTED) &&
         to == TaskState::IDLE) {
         return true;
     }

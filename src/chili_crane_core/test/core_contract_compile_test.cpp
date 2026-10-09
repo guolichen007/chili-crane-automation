@@ -18,3 +18,14 @@ TEST(CoreContractCompileTest, PublicHeadersInstantiate) {
         chili_crane_core::TaskState::IDLE,
         chili_crane_core::TaskState::TASK_ACCEPTED));
 }
+
+TEST(CoreContractCompileTest, AbortedTaskCannotResumeLowering) {
+    using chili_crane_core::TaskState;
+    EXPECT_TRUE(chili_crane_core::canTransitionTaskState(
+        TaskState::LOWERING, TaskState::ABORTED));
+    EXPECT_TRUE(chili_crane_core::isTerminalTaskState(TaskState::ABORTED));
+    EXPECT_FALSE(chili_crane_core::canTransitionTaskState(
+        TaskState::ABORTED, TaskState::LOWERING));
+    EXPECT_TRUE(chili_crane_core::canTransitionTaskState(
+        TaskState::ABORTED, TaskState::IDLE));
+}
