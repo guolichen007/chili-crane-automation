@@ -24,3 +24,9 @@ bool allow_unload
 bool allow_auto_task
 string[] blocking_reasons
 float64 evidence_age_sec
+string run_id
+string cycle_id
+string session_id
+uint64 command_epoch
+uint64 sequence
+chili_crane_msgs/EvidenceMetadata evidence

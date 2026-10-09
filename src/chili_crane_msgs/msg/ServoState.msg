@@ -22,3 +22,4 @@ int32 fault_code
 uint64 source_counter
 string calibration_id
 float64 evidence_age_sec
+chili_crane_msgs/EvidenceMetadata evidence

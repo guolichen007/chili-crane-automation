@@ -1,0 +1,32 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+
+std_msgs/Header header
+uint8 validity
+string reason
+
+uint8 SCAN=0
+uint8 PLAN_PICK=1
+uint8 POSITION_Y=2
+uint8 WAIT_STABLE=3
+uint8 ENSURE_GRAB_OPEN=4
+uint8 LOWER=5
+uint8 CLOSE=6
+uint8 VERIFY_LOAD=7
+uint8 RAISE=8
+uint8 MOVE_TO_UNLOAD=9
+uint8 VERIFY_CART=10
+uint8 POSITION_UNLOAD=11
+uint8 OPEN_GRAB=12
+uint8 VERIFY_EMPTY=13
+uint8 COMPLETE=14
+uint8 ABORTED=15
+string run_id
+string task_id
+string cycle_id
+uint64 cycle_index
+uint8 state
+bool needs_new_scan

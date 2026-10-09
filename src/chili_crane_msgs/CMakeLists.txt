@@ -25,6 +25,17 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TaskStatus.msg"
   "msg/TrolleyState.msg"
   "msg/UnloadingCartState.msg"
+  "msg/ActuationRequest.msg"
+  "msg/AxisCapability.msg"
+  "msg/CycleStatus.msg"
+  "msg/DualLidarReadiness.msg"
+  "msg/EvidenceMetadata.msg"
+  "msg/FaultEvent.msg"
+  "msg/RunManifest.msg"
+  "msg/SafetyEvent.msg"
+  "msg/SystemModeStatus.msg"
+  "msg/SystemReadiness.msg"
+  "msg/UnloadSafeZone.msg"
   DEPENDENCIES std_msgs geometry_msgs builtin_interfaces
 )
 ament_export_dependencies(rosidl_default_runtime)

@@ -38,3 +38,4 @@ float64 confidence
 float64 evidence_age_sec
 bool fault
 bool motion_stable
+chili_crane_msgs/EvidenceMetadata evidence

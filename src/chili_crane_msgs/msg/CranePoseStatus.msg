@@ -18,3 +18,4 @@ geometry_msgs/Vector3 ndt_correction_m
 bool servo_prior_used
 bool ndt_measurement_used
 bool track_constraint_applied
+chili_crane_msgs/EvidenceMetadata evidence

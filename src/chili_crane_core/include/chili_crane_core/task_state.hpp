@@ -26,11 +26,11 @@ enum class TaskState : std::uint8_t {
     RETURNING_TO_SAFE_WAIT,
     DONE,
     FAULT,
-    MANUAL_OVERRIDE,
+    ABORTED,
 };
 
 inline bool isTerminalTaskState(TaskState state) noexcept {
-    return state == TaskState::DONE || state == TaskState::FAULT;
+    return state == TaskState::DONE || state == TaskState::FAULT || state == TaskState::ABORTED;
 }
 
 }  // namespace chili_crane_core

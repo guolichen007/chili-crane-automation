@@ -1,4 +1,4 @@
-contract_version: 1
+contract_version: 2
 states:
   - {name: IDLE, value: 0}
   - {name: TASK_ACCEPTED, value: 1}
@@ -21,4 +21,4 @@ states:
   - {name: RETURNING_TO_SAFE_WAIT, value: 18}
   - {name: DONE, value: 19}
   - {name: FAULT, value: 20}
-  - {name: MANUAL_OVERRIDE, value: 21}
+  - {name: ABORTED, value: 21}

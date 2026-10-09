@@ -29,7 +29,7 @@ class TaskStateContractTest(unittest.TestCase):
             "UNLOAD_VERIFY",
             "DONE",
             "FAULT",
-            "MANUAL_OVERRIDE",
+            "ABORTED",
         ):
             self.assertIn(required, names)
 

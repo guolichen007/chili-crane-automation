@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>chili_crane_perception</name>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
   <description>辣椒行车 perception 公共合同与纯算法库</description>
   <maintainer email="maintainer@example.invalid">Chili Crane Team</maintainer>
   <license>MIT</license>

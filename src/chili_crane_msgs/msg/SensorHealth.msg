@@ -13,3 +13,4 @@ float64 observed_rate_hz
 uint64 received_count
 uint64 dropped_count
 uint64 fallback_count
+chili_crane_msgs/EvidenceMetadata evidence

@@ -63,7 +63,7 @@ class TaskStateConsistencyTest(unittest.TestCase):
 
     def test_required_terminal_and_override_states_exist(self):
         names = {name for name, _ in expected_states()}
-        self.assertTrue({"DONE", "FAULT", "MANUAL_OVERRIDE"}.issubset(names))
+        self.assertTrue({"DONE", "FAULT", "ABORTED"}.issubset(names))
 
 
 if __name__ == "__main__":

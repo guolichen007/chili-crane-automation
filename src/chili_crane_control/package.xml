@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>chili_crane_control</name>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
   <description>安全许可、一次性授权与模式仲裁</description>
   <maintainer email="maintainer@example.invalid">Chili Crane Team</maintainer>
   <license>MIT</license>
@@ -9,5 +9,6 @@
   <buildtool_depend>ament_cmake_python</buildtool_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>chili_crane_msgs</exec_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
   <export><build_type>ament_cmake</build_type></export>
 </package>

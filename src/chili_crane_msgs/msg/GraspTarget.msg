@@ -17,3 +17,4 @@ float64 wall_clearance_m
 float64 footprint_coverage
 float64 roughness_m
 string reject_reason
+chili_crane_msgs/EvidenceMetadata evidence

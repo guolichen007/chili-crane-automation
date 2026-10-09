@@ -15,3 +15,4 @@ float64 coverage
 float64 robust_min_z_m
 float64 robust_max_z_m
 float64 evidence_age_sec
+chili_crane_msgs/EvidenceMetadata evidence

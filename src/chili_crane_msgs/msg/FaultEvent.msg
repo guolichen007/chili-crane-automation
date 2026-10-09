@@ -1,0 +1,32 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+
+std_msgs/Header header
+uint8 validity
+string reason
+
+uint8 INFO=0
+uint8 WARNING=1
+uint8 ERROR=2
+uint8 CRITICAL=3
+uint8 CYCLE_FAILURE=0
+uint8 PROTECTIVE_STOP=1
+uint8 RECOVERABLE_FAULT=2
+uint8 LATCHED_FAULT=3
+uint8 EMERGENCY_STOP=4
+uint8 severity
+uint8 domain
+string code
+string source
+bool active
+bool latched
+bool recoverable
+string run_id
+string task_id
+string cycle_id
+string command_id
+builtin_interfaces/Time first_seen
+builtin_interfaces/Time last_seen

@@ -25,3 +25,9 @@ float64 target_y_m
 float64 target_grab_bottom_z_m
 float64 speed_scale
 float64 timeout_sec
+string run_id
+string cycle_id
+string session_id
+uint64 command_epoch
+uint64 sequence
+chili_crane_msgs/EvidenceMetadata evidence

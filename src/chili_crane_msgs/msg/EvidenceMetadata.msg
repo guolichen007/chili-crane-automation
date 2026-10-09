@@ -7,12 +7,10 @@ uint8 VALID=4
 std_msgs/Header header
 uint8 validity
 string reason
-float64 position_m
-float64 velocity_mps
-bool left_limit
-bool right_limit
-bool running
-bool fault
-string calibration_id
+
+builtin_interfaces/Time measurement_stamp
+builtin_interfaces/Time receive_stamp
+uint64 source_counter
 float64 evidence_age_sec
-chili_crane_msgs/EvidenceMetadata evidence
+string calibration_id
+string config_version

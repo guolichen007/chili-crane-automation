@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>chili_crane_hardware</name>
-  <version>0.2.0</version>
+  <version>0.3.0</version>
   <description>ADAM 24DI/8DO 与 RS485 拉绳桌面适配</description>
   <maintainer email="maintainer@example.invalid">Chili Crane Team</maintainer>
   <license>MIT</license>

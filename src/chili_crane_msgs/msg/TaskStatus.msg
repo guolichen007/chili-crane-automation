@@ -25,7 +25,7 @@ uint8 UNLOAD_VERIFY=17
 uint8 RETURNING_TO_SAFE_WAIT=18
 uint8 DONE=19
 uint8 FAULT=20
-uint8 MANUAL_OVERRIDE=21
+uint8 ABORTED=21
 
 std_msgs/Header header
 uint8 validity
@@ -37,3 +37,6 @@ uint8 state
 float64 progress
 string alarm_code
 string message
+string run_id
+string cycle_id
+uint64 cycle_index
