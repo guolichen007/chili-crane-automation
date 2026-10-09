@@ -22,8 +22,8 @@ string task_id
 string intent_id
 string permit_id
 uint64 permit_generation
-time issued_stamp
-time expire_stamp
+builtin_interfaces/Time issued_stamp
+builtin_interfaces/Time expire_stamp
 uint8 action
 float64 target_x_m
 float64 target_y_m

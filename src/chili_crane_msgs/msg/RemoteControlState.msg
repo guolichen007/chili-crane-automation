@@ -1,0 +1,29 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+
+# Observation only: no output permission or motor command.
+std_msgs/Header header
+uint8 validity
+string reason
+bool receiver_ready
+bool mode_auto
+bool safety_ok
+bool e_stop_known
+bool e_stop_active
+bool x_positive
+bool x_negative
+bool y_left
+bool y_right
+bool z_up
+bool z_down
+bool g_open
+bool g_close
+bool stop_requested
+bool conflict
+string control_mode
+bool release_automatic_outputs
+bool discard_pending_commands
+float64 evidence_age_sec

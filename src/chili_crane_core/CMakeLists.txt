@@ -1,29 +1,25 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.16)
 project(chili_crane_core)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+find_package(ament_cmake REQUIRED)
 
-find_package(catkin REQUIRED)
+add_library(${PROJECT_NAME} INTERFACE)
+target_include_directories(${PROJECT_NAME} INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
 
-catkin_package(
-  INCLUDE_DIRS include
-)
-
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
-)
-
-if(CATKIN_ENABLE_TESTING)
-  catkin_add_gtest(
-    core_contract_compile_test
-    test/core_contract_compile_test.cpp
-  )
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(core_contract_compile_test test/core_contract_compile_test.cpp)
+  if(TARGET core_contract_compile_test)
+    target_link_libraries(core_contract_compile_test ${PROJECT_NAME})
+  endif()
 endif()
+install(DIRECTORY include/ DESTINATION include)
+install(TARGETS ${PROJECT_NAME} EXPORT export_${PROJECT_NAME})
+ament_export_targets(export_${PROJECT_NAME})
+ament_export_include_directories(include)
 
-install(
-  DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-)
+ament_package()

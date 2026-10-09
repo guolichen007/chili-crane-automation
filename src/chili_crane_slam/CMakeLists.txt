@@ -1,36 +1,26 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.16)
 project(chili_crane_slam)
-
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-find_package(catkin REQUIRED COMPONENTS
-  chili_crane_core
-  chili_crane_msgs
-)
-
-catkin_package(
-  INCLUDE_DIRS include
-  CATKIN_DEPENDS chili_crane_core chili_crane_msgs
-)
-
-include_directories(
-  include
-  ${catkin_INCLUDE_DIRS}
-)
-
-if(CATKIN_ENABLE_TESTING)
-  catkin_add_gtest(
-    slam_contract_compile_test
-    test/slam_contract_compile_test.cpp
-  )
+find_package(ament_cmake REQUIRED)
+find_package(chili_crane_core REQUIRED)
+find_package(chili_crane_msgs REQUIRED)
+add_library(${PROJECT_NAME} INTERFACE)
+target_include_directories(${PROJECT_NAME} INTERFACE
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>)
+target_link_libraries(${PROJECT_NAME} INTERFACE chili_crane_core::chili_crane_core)
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+  ament_add_gtest(slam_contract_compile_test test/slam_contract_compile_test.cpp)
   if(TARGET slam_contract_compile_test)
-    target_link_libraries(slam_contract_compile_test ${catkin_LIBRARIES})
+    target_link_libraries(slam_contract_compile_test ${PROJECT_NAME})
   endif()
 endif()
-
-install(
-  DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-)
+install(DIRECTORY include/ DESTINATION include)
+install(TARGETS ${PROJECT_NAME} EXPORT export_${PROJECT_NAME})
+ament_export_targets(export_${PROJECT_NAME})
+ament_export_include_directories(include)
+ament_export_dependencies(chili_crane_core chili_crane_msgs)
+ament_package()

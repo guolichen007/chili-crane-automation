@@ -7,13 +7,8 @@ uint8 VALID=4
 std_msgs/Header header
 uint8 validity
 string reason
-bool safety_ok
-bool safety_ok_known
-bool e_stop_known
-bool e_stop_active
-bool power_ok
-bool manual_mode
-bool auto_mode
-bool io_heartbeat_ok
-bool fault
+string device_id
+bool[] raw_di
+bool communication_ok
+uint64 source_counter
 float64 evidence_age_sec

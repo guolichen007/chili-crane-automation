@@ -10,8 +10,8 @@ string reason
 string permit_id
 uint64 permit_generation
 string evaluated_intent_id
-time issued_stamp
-time expire_stamp
+builtin_interfaces/Time issued_stamp
+builtin_interfaces/Time expire_stamp
 bool allow_x_positive
 bool allow_x_negative
 bool allow_y_positive
