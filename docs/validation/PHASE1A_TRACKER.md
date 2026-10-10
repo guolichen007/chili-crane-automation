@@ -13,7 +13,7 @@ BASE_SHA: d4b8443d40d0e3bbb7c46d631be4b234667a706b
 | dual lidar health/sync/merge | IMPLEMENTED；纯核心合成测试，实际 ROS2 验证由 CI 执行 |
 | bag/RViz/部署工具 | IMPLEMENTED；缺外参时分别使用两个 raw RViz，不造 TF |
 | Windows static | 已执行；最终精确 SHA/count 见交付报告，1 项 ROS2 依赖测试在 Windows 跳过 |
-| Ubuntu CI | IN_PROGRESS；七包 build/test/mock、synthetic ROS2、vendor compile 独立证据 |
+| Ubuntu CI | 702e1c7 软件验证通过；七包 build/test/mock、synthetic ROS2、vendor compile，见精确 SHA 归档 |
 | Ubuntu 实机验证 | NOT_RUN |
 
 ## 验证范围
@@ -25,7 +25,8 @@ BASE_SHA: d4b8443d40d0e3bbb7c46d631be4b234667a706b
   auto-required 可选 DI 来自另一模拟设备时不应获得 physical readiness 的漏洞。
 - `PHASE05_R2` 指软件边界测试，不代表整机/电气/停车标定通过。
 - 不在 CI 未通过或现场事实未完成时创建 R2 验收 tag。
-- 本文件不自行预填远端 PASS；下载对应 SHA Actions artifact 或查看最终报告核对。
+- 远端验证事实见 [702e1c7 软件证据](PHASE1A_SOFTWARE_702e1c7.md)；
+  后续 SHA 不自动继承 PASS，必须另查对应 Actions。
 - 首次 Ubuntu ROS2 transport 测试捕获 NumPy concatenate 自动压缩结构化 padding，
   导致 merged 声明 32-byte point_step 而实际 27-byte。追加独立修复提交：强制 canonical
   dtype、序列化前校验，并保留 merged buffer 长度/offset/roundtrip 回归测试。
