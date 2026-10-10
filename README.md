@@ -1,7 +1,10 @@
 # 辣椒地池行车自动抓取框架
 
-当前分支为 **Phase 1A / Ubuntu 算法部署基础版**，承接 Phase 0.5-R1，
-提供 R2 安全收口、站点只读采集及双 ER1 规范化/同步/融合，不是可运行的无人行车。
+当前分支为 **Phase 1B / 台架传感器与统一时间基准**，承接 Phase 1A，
+提供双 ER1 每点帧时间、中点配对、PTP 探测、一台海康辅助图像/时间与录包工具。
+只做 timing-only，不做外参、空间融合、NDT、视觉 AI 或无人控制。
+入口：[Ubuntu 交接](docs/deployment/PHASE1B_UBUNTU_BENCH.md)、
+[时间合同](docs/api/PHASE1B_TIMEBASE_CONTRACT.md)、[验收跟踪](docs/validation/PHASE1B_TRACKER.md)。
 运行基线：Ubuntu 22.04.x、ROS2 Humble、Python 3.10、C++17、GCC 11、ament/colcon。
 ROS1 旧框架已由 ADR 0003 取代；NDT-SLAM-Warehouse 仅为只读算法参考。
 
@@ -40,7 +43,7 @@ R1补充命令只接收一次的执行上下文、短输出租约、模式转换
 | chili_crane_slam | 双雷达/轨道定位接口；NDT 待迁移 |
 | chili_crane_perception | 地池表面、抓取目标、抓斗接口；算法待实现 |
 | chili_crane_control | 安全、仲裁、任务与 QoS，不含设备寄存器 |
-| chili_crane_hardware | ADAM、拉绳、标准化状态、mock、隔离台架工具 |
+| chili_crane_hardware | ADAM、拉绳、MVS 相机时间适配、标准化状态、mock、隔离台架工具 |
 | chili_crane_bringup | 安装后的配置与 launch.py 组合 |
 
 ## 检查与启动

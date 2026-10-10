@@ -5,12 +5,12 @@ BASE_SHA: fbe823bb4794d7c7d9cb502312e657ae361614c6
 | 工作项 | 状态 | 验证层级 |
 | --- | --- | --- |
 | 时间合同及安全边界 | 完成 | ADR 0006 |
-| typed 时间证据接口 | TODO | 静态、ROS2 build |
-| 每点帧时间与中点配对 | TODO | synthetic、ROS2 |
-| PTP、网络及时间统计工具 | TODO | 单元、shell syntax |
-| MVS 相机适配与时间证据 | TODO | synthetic、SDK 现场 |
-| Phase 1B 录包与 manifest | TODO | 静态、ROS2 |
-| Ubuntu 交接与 GitHub CI | TODO | 精确 SHA |
+| typed 时间证据接口 | 已实现 | 静态通过；ROS2 CI 待执行 |
+| 每点帧时间与中点配对 | 已实现 | synthetic 静态通过；ROS2 CI 待执行 |
+| PTP、网络及时间统计工具 | 已实现 | 单元与 shell syntax；现场 NOT_RUN |
+| MVS 相机适配与时间证据 | 已实现 | synthetic 通过；官方 SDK 动态绑定及现场 NOT_RUN |
+| Phase 1B 录包与 manifest | 已实现 | 静态；真实录包 NOT_RUN |
+| Ubuntu 交接与 GitHub CI | IN_PROGRESS | 精确 SHA 云端执行后归档 |
 
 ER1_204_LIVE_STATUS=NOT_RUN
 ER1_205_LIVE_STATUS=NOT_RUN

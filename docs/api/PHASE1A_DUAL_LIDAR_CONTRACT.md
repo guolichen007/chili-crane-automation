@@ -1,5 +1,8 @@
 # Phase 1A 双 ER1 数据与证据合同
 
+> 历史合同；当前时间模型、时钟名称及 timing-only 边界由
+> [Phase1B 时间合同](PHASE1B_TIMEBASE_CONTRACT.md)替代。保留本文件作旧基线审查。
+
 ## 层次与来源
 
 官方 rslidar_sdk → vendor PointCloud2 → 本项目规范化 → consume-once 配对 →

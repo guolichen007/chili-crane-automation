@@ -1,5 +1,14 @@
 # Project Context
 
+## Phase 1B 当前补充（2026-10-10）
+
+双 ER1 台架接入与统一时间基准；单台 MV-CS060-10GC 只做基础图像及时间证据。
+时钟显式 SENSOR_PTP / HOST_DERIVED；每点 start/end/mid，MID_SCAN consume-once 配对。
+HOST_DERIVED 只 PROVISIONAL，PTP 与硬件时间戳能力/服务运行分开验证。
+相机 raw device/host/ROS receive 三份证据，单位和 epoch 未证明时 RECEIVE_ESTIMATE。
+current phase 不做空间 merged、外参、NDT、视觉 AI 或运动；camera_control_authority=false。
+既有物理输出/自动控制仍 false。详见 ADR0006 和 Phase1B Ubuntu 交接。
+
 ## 当前版本确认（2026-10-09）
 
 运行基线已切换 Ubuntu 22.04.x / ROS2 Humble / Python 3.10 / GCC 11 / ament/colcon，

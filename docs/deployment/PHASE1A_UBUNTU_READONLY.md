@@ -1,5 +1,8 @@
 # Phase 1A Ubuntu 只读算法部署交接
 
+> 历史 Phase1A 入口。当前 Phase1B 传感器部署以
+> [Phase1B 交接](PHASE1B_UBUNTU_BENCH.md)为准；旧时钟名称及融合启动说明不用于本轮。
+
 ## 范围与硬关闭
 
 本手册面向 Ubuntu 22.04 / ROS2 Humble / Python 3.10 / GCC11。
