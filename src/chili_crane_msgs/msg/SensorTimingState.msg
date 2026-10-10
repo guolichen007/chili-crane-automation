@@ -1,0 +1,32 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+
+std_msgs/Header header
+uint8 validity
+string reason
+
+string sensor_id
+uint8 source_type
+string clock_mode
+string clock_sync_state
+string clock_domain
+string stamp_basis
+builtin_interfaces/Time header_stamp
+builtin_interfaces/Time receive_stamp
+builtin_interfaces/Time frame_start_stamp
+builtin_interfaces/Time frame_end_stamp
+builtin_interfaces/Time frame_mid_stamp
+float64 frame_span_sec
+float64 header_to_first_point_sec
+float64 header_to_last_point_sec
+float64 source_to_host_offset_sec
+float64 frame_period_sec
+float64 jitter_sec
+uint64 clock_regression_count
+uint64 future_stamp_count
+uint64 invalid_timestamp_count
+bool ptp_verified
+chili_crane_msgs/EvidenceMetadata evidence

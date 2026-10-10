@@ -1,0 +1,36 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+
+std_msgs/Header header
+uint8 validity
+string reason
+
+string sensor_id
+string timestamp_mode
+string ptp_status
+uint64 device_timestamp_raw
+int64 host_timestamp_raw
+builtin_interfaces/Time ros_receive_stamp
+float64 device_timestamp_sec
+float64 host_timestamp_sec
+bool device_time_valid
+bool host_time_valid
+float64 device_host_offset_sec
+float64 host_receive_latency_sec
+uint64 frame_number
+uint64 frame_gaps
+uint64 lost_packets
+float64 frame_rate_hz
+float64 exposure_time_raw
+string exposure_unit
+uint32 width
+uint32 height
+string pixel_format
+uint64 timestamp_regression_count
+uint64 timestamp_jump_count
+bool high_precision_time_valid
+bool camera_control_authority
+chili_crane_msgs/EvidenceMetadata evidence
