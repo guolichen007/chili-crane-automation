@@ -25,7 +25,8 @@ from .timebase import ClockContract, bounded
 def cloud_message(cloud):
     validate_points(cloud.points)
     msg = PointCloud2()
-    msg.header.stamp = Time(nanoseconds=int(cloud.stamp * 1e9)).to_msg()
+    msg.header.stamp = Time(nanoseconds=cloud.header_nanoseconds if cloud.header_nanoseconds is not None
+                           else int(cloud.stamp * 1e9)).to_msg()
     msg.header.frame_id = cloud.frame_id
     msg.height, msg.width = 1, len(cloud.points)
     msg.fields = [PointField(name=name, offset=offset, datatype=datatype, count=1)
@@ -151,7 +152,8 @@ class DualLidarNode(Node):
             points = normalize_cloud(msg.data, [(f.name, f.offset, f.datatype, f.count) for f in msg.fields],
                 msg.point_step, msg.row_step, msg.width, msg.height, msg.is_bigendian,
                 0 if sensor == "204" else 1)
-            cloud = Cloud(stamp, monotonic, msg.header.frame_id, points, int(self._source), now)
+            cloud = Cloud(stamp, monotonic, msg.header.frame_id, points, int(self._source), now,
+                          msg.header.stamp.sec * 1000000000 + msg.header.stamp.nanosec)
             if self._future is not None and self._cfg.get("stale_timeout_sec") is not None:
                 cloud.timing.check(now, self._future, self._cfg["stale_timeout_sec"],
                                    self._cfg.get("header_first_point_tolerance_sec"))
@@ -211,6 +213,8 @@ class DualLidarNode(Node):
         for name, value in (("header_stamp", frame.header), ("receive_stamp", cloud.received_source_time),
                             ("frame_start_stamp", frame.start), ("frame_end_stamp", frame.end), ("frame_mid_stamp", frame.mid)):
             setattr(msg, name, stamp(value))
+        if cloud.header_nanoseconds is not None:
+            msg.header_stamp = Time(nanoseconds=cloud.header_nanoseconds).to_msg()
         msg.frame_span_sec = frame.span
         msg.header_to_first_point_sec, msg.header_to_last_point_sec = frame.start - frame.header, frame.end - frame.header
         msg.source_to_host_offset_sec = cloud.received_source_time - frame.mid
@@ -274,6 +278,7 @@ class DualLidarNode(Node):
         timing.evidence.validity, timing.evidence.reason = timing.validity, timing.reason
         if pair:
             fa, fb = [c.timing for c in pair]
+            timing.evidence.measurement_stamp = Time(nanoseconds=int(min(fa.mid, fb.mid) * 1e9)).to_msg()
             timing.a_mid_stamp = Time(nanoseconds=int(fa.mid * 1e9)).to_msg()
             timing.b_mid_stamp = Time(nanoseconds=int(fb.mid * 1e9)).to_msg()
             timing.header_delta_sec, timing.mid_delta_sec = abs(fa.header - fb.header), abs(fa.mid - fb.mid)

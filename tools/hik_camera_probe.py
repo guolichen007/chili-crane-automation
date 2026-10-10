@@ -13,6 +13,27 @@ sys.path.insert(0, str(ROOT / "src/chili_crane_hardware/src"))
 from chili_crane_hardware.hik_mvs import MvsCamera
 
 
+def timestamp_comparison(samples, tick_frequency):
+    """Candidates are evidence to review, never selected as an SDK unit automatically."""
+    import statistics
+    result = {"host_scale_candidates": {}, "device_tick_frequency_hz": tick_frequency,
+              "units_verified": False, "epoch_verified": False}
+    if not samples:
+        return result
+    for unit, scale in (("s", 1), ("ms", .001), ("us", .000001), ("ns", .000000001)):
+        offsets = [s["receive_CLOCK_REALTIME_sec"] - s["nHostTimeStamp"] * scale for s in samples]
+        result["host_scale_candidates"][unit] = {"median_offset_sec": statistics.median(offsets),
+            "offset_range_sec": max(offsets) - min(offsets), "selected": False}
+    if isinstance(tick_frequency, (int, float)) and tick_frequency > 0:
+        offsets = [s["receive_CLOCK_REALTIME_sec"] - ((s["nDevTimeStampHigh"] << 32) | s["nDevTimeStampLow"]) / tick_frequency
+                   for s in samples]
+        result["device_tick_comparison"] = {"median_offset_sec": statistics.median(offsets),
+            "offset_range_sec": max(offsets) - min(offsets)}
+    result["exposure_raw_range"] = [min(s["fExposureTime"] for s in samples), max(s["fExposureTime"] for s in samples)]
+    result["sdk_document_reference"] = "OWNER_REQUIRED"
+    return result
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--config", type=Path, required=True)
@@ -44,6 +65,8 @@ def main():
                                     pixel_encoding=encoding)
                     result["samples"].append(metadata)
         result["features_final"] = camera.probe()
+        result["CLOCK_REALTIME_comparison"] = timestamp_comparison(result["samples"],
+            result["features_final"]["GevTimestampTickFrequency"]["current_value"])
         result["conclusion"] = "MEASUREMENT_ONLY_UNIT_EPOCH_AND_PTP_REQUIRE_REVIEW"
     finally:
         camera.close()

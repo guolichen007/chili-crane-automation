@@ -15,6 +15,7 @@ class Cloud:
     points: np.ndarray
     source_type: int = 0
     received_source_time: float | None = None
+    header_nanoseconds: int | None = None
 
     @property
     def timing(self):

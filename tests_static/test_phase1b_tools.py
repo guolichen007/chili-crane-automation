@@ -23,9 +23,24 @@ PROBE = module("time_probe", "scripts/sensors/dual_er1_timing_probe.py")
 MANIFEST = module("phase1b_manifest", "tools/phase1b_manifest.py")
 RENDER = module("render_er1", "scripts/sensors/render_er1_config.py")
 CAP = module("ptp_cap", "tools/ptp_capabilities.py")
+HIK = module("hik_probe", "tools/hik_camera_probe.py")
 
 
 class Phase1BToolTests(unittest.TestCase):
+    def test_camera_time_probe_candidates_never_verify_units(self):
+        rows = [{"receive_CLOCK_REALTIME_sec": 10.01, "nHostTimeStamp": 10000,
+                 "nDevTimeStampHigh": 0, "nDevTimeStampLow": 10000, "fExposureTime": 120}]
+        result = HIK.timestamp_comparison(rows, 1000)
+        self.assertAlmostEqual(.01, result["host_scale_candidates"]["ms"]["median_offset_sec"])
+        self.assertFalse(result["units_verified"])
+
+    def test_ptp_announce_gm_is_distinct_from_source_clock(self):
+        payload = bytearray(64)
+        payload[0:5] = bytes([11, 2, 0, 64, 0])
+        payload[20:28] = b"12345678"
+        payload[53:61] = b"87654321"
+        result = PTP.ptp_metadata(bytes(12) + b"\x88\xf7" + payload)
+        self.assertNotEqual(result["source_clock_identity"], result["announced_grandmaster_identity"])
     def test_hardware_timestamp_capability_requires_full_evidence(self):
         text = "hardware-transmit hardware-receive hardware-raw-clock\nPTP Hardware Clock: 0"
         self.assertTrue(CAP.parse(text)["hardware_timestamp_supported"])

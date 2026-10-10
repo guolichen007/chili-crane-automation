@@ -21,12 +21,15 @@ def ptp_metadata(packet):
                 return None
             kind, pos = int.from_bytes(packet[pos + 2:pos + 4], "big"), pos + 4
     transport = "L2"
+    limit = len(packet)
     if kind == 0x0800:
         if len(packet) < pos + 20 or packet[pos] >> 4 != 4 or packet[pos + 9] != 17:
             return None
         ihl = (packet[pos] & 15) * 4
-        if ihl < 20 or int.from_bytes(packet[pos + 6:pos + 8], "big") & 0x3FFF:
+        total = int.from_bytes(packet[pos + 2:pos + 4], "big")
+        if ihl < 20 or total < ihl + 8 or pos + total > len(packet) or int.from_bytes(packet[pos + 6:pos + 8], "big") & 0x3FFF:
             return None
+        limit = pos + total
         pos += ihl
         if len(packet) < pos + 8 or not ({int.from_bytes(packet[pos:pos + 2], "big"),
                 int.from_bytes(packet[pos + 2:pos + 4], "big")} & {319, 320}):
@@ -37,18 +40,29 @@ def ptp_metadata(packet):
         if len(packet) < pos + 48 or packet[pos + 6] != 17:
             return None  # no assumption about IPv6 extension header layout
         pos += 40
+        limit = pos + int.from_bytes(packet[pos - 36:pos - 34], "big")
+        if limit > len(packet):
+            return None
         if not ({int.from_bytes(packet[pos:pos + 2], "big"), int.from_bytes(packet[pos + 2:pos + 4], "big")} & {319, 320}):
             return None
         pos += 8
         transport = "UDPv6"
     elif kind != 0x88F7:
         return None
-    data = packet[pos:]
+    if transport.startswith("UDP"):
+        length = int.from_bytes(packet[pos - 4:pos - 2], "big")
+        if length < 8 or pos + length - 8 > limit:
+            return None
+        limit = pos + length - 8
+    data = packet[pos:limit]
     if len(data) < 34 or data[1] & 15 != 2 or not 34 <= int.from_bytes(data[2:4], "big") <= len(data):
         return None
-    return {"message_type": NAMES.get(data[0] & 15, "UNKNOWN"), "domain": data[4],
+    result = {"message_type": NAMES.get(data[0] & 15, "UNKNOWN"), "domain": data[4],
             "transport": transport, "source_clock_identity": data[20:28].hex(),
             "sequence_id": int.from_bytes(data[30:32], "big")}
+    if data[0] & 15 == 11 and int.from_bytes(data[2:4], "big") >= 64:
+        result["announced_grandmaster_identity"] = data[53:61].hex()
+    return result
 
 
 def main():
@@ -62,6 +76,7 @@ def main():
     if not hasattr(socket, "AF_PACKET"):
         raise SystemExit("Linux AF_PACKET required; capture NOT_RUN")
     counts, domains, clocks, transports = Counter(), Counter(), Counter(), Counter()
+    grandmasters = Counter()
     with socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(3)) as sock:
         sock.bind((a.interface, 0))
         sock.settimeout(.2)
@@ -76,8 +91,11 @@ def main():
                 domains[item["domain"]] += 1
                 clocks[item["source_clock_identity"]] += 1
                 transports[item["transport"]] += 1
+                if "announced_grandmaster_identity" in item:
+                    grandmasters[item["announced_grandmaster_identity"]] += 1
     data = {"counts": {name: counts[name] for name in NAMES.values()}, "domains": dict(domains),
             "source_clock_identities": dict(clocks), "transports": dict(transports),
+            "announced_grandmaster_identities": dict(grandmasters),
             "interface": a.interface, "seconds": a.seconds, "clock_sync_state": "PROBING",
             "ptp_verified": False, "delay_mechanism": "NOT_CONFIGURED", "raw_payload_saved": False}
     a.output.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")

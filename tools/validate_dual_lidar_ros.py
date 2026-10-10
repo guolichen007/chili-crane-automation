@@ -57,11 +57,13 @@ def scenario(calibrated, timing_only=False, mixed_domain=False):
             transforms = set()
             subscriptions = []
             publishers = {}
+            header_facts = {sensor: set() for sensor in ("204", "205")}
             for sensor in ("204", "205"):
                 publishers[sensor] = observer.create_publisher(PointCloud2,
                     "/phase1a_synthetic/vendor_" + sensor, qos_profile_sensor_data)
                 def raw(msg, sensor=sensor):
                     assert msg.width == 2 and msg.point_step == 32
+                    assert msg.header.stamp.sec * 1000000000 + msg.header.stamp.nanosec in header_facts[sensor], "header precision changed"
                     counts[sensor] += 1
                 subscriptions.append(observer.create_subscription(PointCloud2,
                     "/phase1a_synthetic/raw_" + sensor, raw, qos_profile_sensor_data))
@@ -104,8 +106,10 @@ def scenario(calibrated, timing_only=False, mixed_domain=False):
                                 times = [stamp - .10, stamp] if sensor == "204" else [stamp - .06, stamp - .04]
                                 points["timestamp"] = times
                                 header = times[0]
+                            ns = int(header * 1e9) + 1  # intentionally not float64 nanosecond-representable
+                            header_facts[sensor].add(ns)
                             publishers[sensor].publish(cloud_message(Cloud(header, time.monotonic(),
-                                "synthetic/er1_" + sensor, points, 4)))
+                                "synthetic/er1_" + sensor, points, 4, None, ns)))
                         next_publish = time.monotonic() + .05
                     executor.spin_once(timeout_sec=.01)
 
