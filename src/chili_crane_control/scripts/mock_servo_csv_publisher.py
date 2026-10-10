@@ -66,6 +66,11 @@ class ServoCsvPublisher(Node):
         message.fault_code = -1 if sample.fault else 0
         message.source_counter = self._index + 1
         message.calibration_id = calibration
+        message.evidence.source_type = message.evidence.SOURCE_REPLAY
+        message.evidence.measurement_stamp = message.header.stamp
+        message.evidence.receive_stamp = self.get_clock().now().to_msg()
+        message.evidence.source_counter = message.source_counter
+        message.evidence.calibration_id = calibration
         if now <= 0.0 or evidence > now:
             message.validity = ServoState.STALE
             message.reason = "csv_ros_clock_unavailable_or_future"

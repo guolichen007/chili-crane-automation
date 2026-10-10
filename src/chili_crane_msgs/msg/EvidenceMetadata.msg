@@ -3,6 +3,11 @@ uint8 NOT_CONFIGURED=1
 uint8 STALE=2
 uint8 DEGRADED=3
 uint8 VALID=4
+uint8 SOURCE_UNKNOWN=0
+uint8 SOURCE_PHYSICAL=1
+uint8 SOURCE_SIMULATED=2
+uint8 SOURCE_REPLAY=3
+uint8 SOURCE_SYNTHETIC=4
 
 std_msgs/Header header
 uint8 validity
@@ -14,3 +19,4 @@ uint64 source_counter
 float64 evidence_age_sec
 string calibration_id
 string config_version
+uint8 source_type

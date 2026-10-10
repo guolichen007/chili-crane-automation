@@ -3,6 +3,7 @@ import math
 from dataclasses import dataclass
 
 DEVICE_CHANNELS = {"adam6052": 8, "adam6251": 16}
+from chili_crane_control.evidence_policy import SourceType
 
 
 @dataclass(frozen=True)
@@ -11,6 +12,20 @@ class RawInput:
     received_monotonic: float
     evidence_age_sec: float
     valid: bool
+    source_type: SourceType = SourceType.UNKNOWN
+
+
+def requirement_status(values, required_for_algorithm, required_for_auto, optional_observation):
+    inventories = (required_for_algorithm, required_for_auto, optional_observation)
+    if any(not isinstance(items, (list, tuple)) or any(not isinstance(n, str) for n in items)
+           for items in inventories):
+        raise ValueError("invalid evidence requirement inventory")
+    return {
+        "algorithm_ready": all(values.get(n) is not None for n in required_for_algorithm),
+        "auto_ready": bool(required_for_auto) and all(values.get(n) is not None for n in required_for_auto),
+        "known": sorted(n for n in set(sum((list(x) for x in inventories), [])) if values.get(n) is not None),
+        "unknown": sorted(n for n in set(sum((list(x) for x in inventories), [])) if values.get(n) is None),
+    }
 
 
 def semantic_input(name, mapping, samples, now, stale_timeout_sec):

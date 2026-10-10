@@ -1,0 +1,10 @@
+mode: production
+physical_output_enabled: false
+automatic_control_enabled: false
+simulated_evidence_allowed: false
+synthetic_evidence_allowed: false
+replay_evidence_allowed: false
+actuation_sink: disabled
+x_auto_ready: false
+z:
+  automatic_lowering_allowed: false

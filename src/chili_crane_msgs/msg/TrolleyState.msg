@@ -16,3 +16,6 @@ bool fault
 string calibration_id
 float64 evidence_age_sec
 chili_crane_msgs/EvidenceMetadata evidence
+string[] known_signals
+string[] unknown_signals
+bool auto_evidence_ready

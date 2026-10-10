@@ -48,6 +48,8 @@ class MockHardwareAdapter(Node):
             message.validity = kind.NOT_CONFIGURED
             message.reason = "mock_hardware_not_configured"
             message.evidence_age_sec = 1.0e9
+            if hasattr(message, "evidence"):
+                message.evidence.source_type = message.evidence.SOURCE_SIMULATED
             if hasattr(message, "calibration_id"):
                 message.calibration_id = "NOT_CONFIGURED"
             if topic == "servo_state":
@@ -87,6 +89,7 @@ class MockHardwareAdapter(Node):
         execution.sequence = command.command_sequence
         execution.command_sequence = command.command_sequence
         execution.actuation_sequence = command.actuation_sequence
+        execution.evidence.source_type = execution.evidence.SOURCE_SIMULATED
         execution.state = CommandExecutionState.STATE_REJECTED
         execution.accepted = False
         execution.executing = False

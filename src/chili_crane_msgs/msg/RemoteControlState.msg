@@ -27,3 +27,7 @@ string control_mode
 bool release_automatic_outputs
 bool discard_pending_commands
 float64 evidence_age_sec
+string[] known_signals
+string[] unknown_signals
+bool auto_evidence_ready
+chili_crane_msgs/EvidenceMetadata evidence

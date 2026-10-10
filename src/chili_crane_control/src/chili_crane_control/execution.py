@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass, replace
 from typing import Protocol, runtime_checkable
 from .contracts import SystemMode, AxisCapability, DriveProfile, StopDistance, SystemReadiness
+from .evidence_policy import RuntimePolicy
 
 
 def finite(*values):
@@ -86,6 +87,8 @@ class PermitEvidence:
     allow_grab_close: bool = False
     allow_auto_task: bool = False
     allow_unload: bool = False
+    runtime_mode: str = "production"
+    evidence_sources: tuple = ()
 
     def authorizes(self, action, now):
         return (self.valid is True and ActionAuthorizationPolicy.authorizes(self, action)
@@ -107,6 +110,8 @@ class ActionAuthorizationPolicy:
     def authorizes(permit, action):
         if action.direction == 0:
             return True
+        if not RuntimePolicy(permit.runtime_mode).sources_allowed(permit.evidence_sources):
+            return False
         if (permit.allow_auto_task is not True
                 or not direction_permission(permit, action.axis, action.direction)):
             return False

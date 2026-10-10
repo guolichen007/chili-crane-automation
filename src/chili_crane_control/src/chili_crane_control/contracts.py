@@ -2,6 +2,7 @@
 import math
 from dataclasses import dataclass
 from enum import IntEnum, Enum
+from .evidence_policy import SourceType
 
 
 class SystemMode(IntEnum):
@@ -31,6 +32,7 @@ class Evidence:
     source_counter: int = 0
     calibration_id: str = "NOT_CONFIGURED"
     config_version: str = "NOT_CONFIGURED"
+    source_type: SourceType = SourceType.UNKNOWN
 
     def fresh(self, now, max_age):
         numbers = (now, max_age, self.measurement_stamp, self.receive_stamp)

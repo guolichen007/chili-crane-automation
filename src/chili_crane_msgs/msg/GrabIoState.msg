@@ -16,3 +16,7 @@ bool auto_mode
 float64 motor_current
 bool motor_current_valid
 float64 evidence_age_sec
+string[] known_signals
+string[] unknown_signals
+bool auto_evidence_ready
+chili_crane_msgs/EvidenceMetadata evidence

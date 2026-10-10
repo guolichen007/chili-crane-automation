@@ -1,0 +1,11 @@
+mode: shadow_control
+physical_output_enabled: false
+automatic_control_enabled: false
+simulated_evidence_allowed: true
+synthetic_evidence_allowed: true
+replay_evidence_allowed: true
+actuation_sink: mock
+simulated_namespace: sim
+x_auto_ready: false
+z:
+  automatic_lowering_allowed: false

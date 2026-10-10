@@ -19,6 +19,7 @@ from chili_crane_hardware.bridge_servo import UnconfiguredBridgeServo
 from chili_crane_hardware.lease import ActuationLeaseGuard
 from chili_crane_hardware.mapping import derive_logical_inputs, RawInput, normalize
 from chili_crane_control.execution import direction_permission, PERMISSION_FIELDS
+from chili_crane_control.evidence_policy import SourceType
 
 VARIABLE = AxisCapability(DriveProfile.VARIABLE_SPEED, True, True, True, True)
 FIXED = AxisCapability(DriveProfile.FIXED_SLOW, True, False, True, True, True)
@@ -53,7 +54,8 @@ def permit(action):
                           allow_x_positive=True, allow_x_negative=True,
                           allow_y_positive=True, allow_y_negative=True,
                           allow_raise=True, allow_lower=True,
-                          allow_grab_open=True, allow_grab_close=True, allow_auto_task=True)
+                          allow_grab_open=True, allow_grab_close=True, allow_auto_task=True,
+                          runtime_mode="synthetic_test", evidence_sources=(SourceType.SYNTHETIC,))
 
 
 def readiness(**overrides):

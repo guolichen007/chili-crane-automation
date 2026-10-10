@@ -10,6 +10,7 @@ from chili_crane_hardware.adam.adam6052_driver import Adam6052Driver
 from chili_crane_hardware.adam.adam6251_driver import Adam6251Driver
 from chili_crane_hardware.adam.modbus_tcp_transport import ModbusTcpTransport, ModbusError
 from chili_crane_hardware.state import EvidenceTracker
+from chili_crane_hardware.evidence import fill_evidence, SourceType
 from chili_crane_msgs.msg import DigitalInputState
 
 
@@ -21,6 +22,7 @@ class AdamNode(Node):
         config = yaml.safe_load(Path(path).read_text(encoding="utf-8")) if path else {}
         self._device = device
         self._tracker = EvidenceTracker()
+        self._measurement_stamp = self.get_clock().now().to_msg()
         self._driver = None
         self._stale = float(config.get("stale_timeout_sec", 1.0))
         rate = float(config.get("poll_rate_hz", 5.0))
@@ -45,6 +47,7 @@ class AdamNode(Node):
         if self._driver is not None:
             try:
                 self._tracker.accept(self._driver.read_di())
+                self._measurement_stamp = self.get_clock().now().to_msg()
             except (ModbusError, OSError, RuntimeError) as exc:
                 self._tracker.failed(exc)
         sample = self._tracker.sample
@@ -57,6 +60,9 @@ class AdamNode(Node):
         message.communication_ok = self._tracker.communication_ok
         message.source_counter = sample.source_counter if sample else 0
         message.evidence_age_sec = sample.age() if sample else 1.0e9
+        fill_evidence(message, SourceType.PHYSICAL, self._measurement_stamp,
+                      self._measurement_stamp, message.source_counter, message.evidence_age_sec,
+                      config_version="site-crane01-20261010")
         self._publisher.publish(message)
 
 

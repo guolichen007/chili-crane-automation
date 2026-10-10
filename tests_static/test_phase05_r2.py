@@ -11,6 +11,7 @@ from chili_crane_control.execution import (
     ExecutionStrategy, FixedSlowStrategy, ControlAuthority, GrabExecutor, BridgeServoExecutor,
 )
 from chili_crane_hardware.lease import ActuationLeaseGuard
+from chili_crane_control.evidence_policy import SourceType, RuntimePolicy
 from tests_static.test_architecture_freeze import MODULE
 
 
@@ -24,7 +25,8 @@ class R2Tests(unittest.TestCase):
 
     def test_unload_and_auto_permission_are_distinct(self):
         action = AuthorizedAction(axis="G", direction=1, cycle_phase="OPEN_GRAB")
-        permit = PermitEvidence(allow_grab_open=True, allow_auto_task=True)
+        permit = PermitEvidence(allow_grab_open=True, allow_auto_task=True,
+                                runtime_mode="synthetic_test", evidence_sources=(SourceType.SYNTHETIC,))
         self.assertFalse(ActionAuthorizationPolicy.authorizes(permit, action))
         self.assertTrue(ActionAuthorizationPolicy.authorizes(replace(permit, allow_unload=True), action))
         self.assertTrue(ActionAuthorizationPolicy.authorizes(
@@ -62,3 +64,12 @@ class R2Tests(unittest.TestCase):
             def begin(self, key): pass
             def step(self, position, target, **evidence): pass
         self.assertIsInstance(ThirdParty(), ExecutionStrategy)
+
+    def test_production_rejects_every_nonphysical_source(self):
+        policy = RuntimePolicy("production", True, True)
+        self.assertTrue(policy.physical_permission((SourceType.PHYSICAL,)))
+        for source in SourceType:
+            if source != SourceType.PHYSICAL:
+                self.assertFalse(policy.physical_permission((SourceType.PHYSICAL, source)))
+        self.assertFalse(policy.physical_permission(()))
+        self.assertFalse(RuntimePolicy("algorithm_dev", True, True).physical_permission((SourceType.PHYSICAL,)))

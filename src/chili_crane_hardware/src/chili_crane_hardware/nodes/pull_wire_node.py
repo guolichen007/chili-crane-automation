@@ -9,6 +9,7 @@ from rclpy.clock import Clock, ClockType
 from chili_crane_control.qos import state_qos
 from chili_crane_hardware.trolley.pull_wire_driver import PullWireDriver
 from chili_crane_hardware.state import EvidenceTracker
+from chili_crane_hardware.evidence import fill_evidence, SourceType
 from chili_crane_msgs.msg import TrolleyState, DigitalInputState
 from chili_crane_hardware.mapping import RawInput, normalize, derive_logical_inputs
 
@@ -32,6 +33,7 @@ class PullWireNode(Node):
             for device in ("adam6052", "adam6251")]
         self._driver = None
         self._tracker = EvidenceTracker()
+        self._measurement_stamp = self.get_clock().now().to_msg()
         self._stale = float(config.get("stale_timeout_sec", 1.0))
         rate = float(config.get("poll_rate_hz", 5.0))
         if not (all(math.isfinite(x) and 0 < x <= 10 for x in (self._stale, self._di_stale))
@@ -63,6 +65,7 @@ class PullWireNode(Node):
                     velocity = (position - previous_pos) / (observed - previous_time)
                 self._previous = (position, observed)
                 self._tracker.accept((raw, position, velocity), observed)
+                self._measurement_stamp = self.get_clock().now().to_msg()
             except (OSError, ValueError, RuntimeError) as exc:
                 self._tracker.failed(exc)
                 self._previous = None
@@ -80,10 +83,14 @@ class PullWireNode(Node):
         msg.left_limit = values.get("y_left_limit") is True
         msg.right_limit = values.get("y_right_limit") is True
         msg.fault = values.get("y_fault") is True
-        if msg.validity == TrolleyState.VALID and any(
-                values.get(name) is None for name in ("y_left_limit", "y_right_limit", "y_fault")):
-            msg.validity = TrolleyState.NOT_CONFIGURED
-            msg.reason = "position_available_but_y_limit_or_fault_evidence_missing"
+        names = ("y_left_limit", "y_right_limit", "y_fault")
+        msg.known_signals = [name for name in names if values.get(name) is not None]
+        msg.unknown_signals = [name for name in names if values.get(name) is None]
+        msg.auto_evidence_ready = (not msg.unknown_signals and self._driver is not None
+                                   and self._driver.calibration.production_ready())
+        fill_evidence(msg, SourceType.PHYSICAL, self._measurement_stamp, self._measurement_stamp,
+                      sample.source_counter if sample else 0, msg.evidence_age_sec,
+                      msg.calibration_id, "site-crane01-20261010")
         self._publisher.publish(msg)
 
 
