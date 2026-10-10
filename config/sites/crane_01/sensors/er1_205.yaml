@@ -1,0 +1,13 @@
+sensor_id: er1_205
+host: 192.168.1.205
+candidate_ports: [6699, 7788]
+physical_side: NOT_CONFIGURED
+port_roles: NOT_CONFIGURED
+msop_port: null
+difop_port: null
+driver_enabled: false
+frame_id: crane_01/er1_205
+raw_topic: /crane_01/lidar/er1_205/vendor_points
+normalized_topic: /crane_01/lidar/er1_205/points
+clock_mode: NOT_CONFIGURED
+lidar_type: RSE1

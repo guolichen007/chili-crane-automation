@@ -1,0 +1,24 @@
+lock_version: 1
+sdk:
+  url: https://github.com/RoboSense-LiDAR/rslidar_sdk.git
+  commit: 8b4b4b7ff910799260347821084c59e1c73d50d5
+  license: BSD-3-Clause
+rs_driver:
+  url: https://github.com/RoboSense-LiDAR/rs_driver.git
+  path: src/rs_driver
+  commit: 897b14d3bdb6186a75df27ba51b65b5bd5557723
+  license: BSD-3-Clause
+rslidar_msg:
+  url: https://github.com/RoboSense-LiDAR/rslidar_msg.git
+  commit: fe8a95cb242bd294cc3d5e3422f2093fb49a56ee
+  license: BSD-3-Clause
+build:
+  point_type: XYZIRT
+  patch: third_party/rslidar_xyzirt.patch
+  platform: Ubuntu-22.04-ROS2-Humble
+  dependencies:
+    yaml_cpp: Ubuntu-jammy-libyaml-cpp-dev
+    libpcap: Ubuntu-jammy-libpcap-dev
+    ros2: Humble
+    compiler: GCC-11-C++17
+  dependency_versions_evidence: vendor-build-environment.txt
