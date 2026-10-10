@@ -1,0 +1,15 @@
+config_state: VERIFIED_DESKTOP_READONLY
+device_id: adam6251
+model: ADAM-6251
+host: 10.0.0.2
+port: 502
+unit_id: 1
+timeout_sec: 0.5
+poll_rate_hz: 5.0
+stale_timeout_sec: 1.0
+physical_output_enabled: false
+automatic_control_enabled: false
+communication_loss: INVALID_NOT_ZERO
+acceptance:
+  scope: DESKTOP_IO_ONLY
+  physical_di_channels_verified: 16

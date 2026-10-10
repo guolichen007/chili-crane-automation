@@ -1,0 +1,70 @@
+config_state: NOT_CONFIGURED
+contract_version: 4
+total_di_channels: 24
+devices:
+  adam6052: {di_count: 8}
+  adam6251: {di_count: 16}
+essential_signals: [mode_auto, safety_ok, y_left_limit, y_right_limit, z_top_limit, z_bottom_limit, g_open_limit, g_close_limit, remote_y_left, remote_y_right, remote_z_up, remote_z_down, remote_g_open, remote_g_close]
+optional_capabilities:
+  e_stop: NOT_CONFIGURED
+  power_ok: NOT_CONFIGURED
+  y_fault: NOT_CONFIGURED
+  z_fault: NOT_CONFIGURED
+  g_fault: NOT_CONFIGURED
+  z_brake: NOT_CONFIGURED
+  overload: NOT_CONFIGURED
+  remote_receiver_ready: NOT_CONFIGURED
+  remote_x_positive: NOT_CONFIGURED
+  remote_x_negative: NOT_CONFIGURED
+  remote_stop: NOT_CONFIGURED
+requirements:
+  ControlBoardState:
+    required_for_algorithm: [mode_auto, safety_ok]
+    required_for_auto: [mode_auto, safety_ok, power_ok, e_stop, overload]
+    optional_observation: [power_ok, e_stop, overload]
+  GrabIoState:
+    required_for_algorithm: [g_open_limit, g_close_limit]
+    required_for_auto: [g_open_limit, g_close_limit, g_fault, mode_auto]
+    optional_observation: [g_fault]
+  HoistState:
+    required_for_algorithm: [z_top_limit, z_bottom_limit]
+    required_for_auto: [z_top_limit, z_bottom_limit, z_fault, z_brake]
+    optional_observation: [z_fault, z_brake]
+physical_channels:
+  adam6052:
+    - {channel: 0, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 1, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 2, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 3, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 4, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 5, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 6, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 7, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+  adam6251:
+    - {channel: 0, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 1, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 2, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 3, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 4, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 5, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 6, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 7, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 8, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 9, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 10, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 11, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 12, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 13, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 14, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+    - {channel: 15, assignment: NOT_CONFIGURED, signal: NOT_CONFIGURED, invert: NOT_CONFIGURED}
+stale_timeout_sec: 1.0
+physical_output_enabled: false
+automatic_control_enabled: false
+do_mapping_state: PLANNED_NOT_FIELD_VERIFIED
+digital_outputs:
+  y_left: {device: adam6052, channel: 0}
+  y_right: {device: adam6052, channel: 1}
+  z_up: {device: adam6052, channel: 2}
+  z_down: {device: adam6052, channel: 3}
+  g_open: {device: adam6052, channel: 4}
+  g_close: {device: adam6052, channel: 5}

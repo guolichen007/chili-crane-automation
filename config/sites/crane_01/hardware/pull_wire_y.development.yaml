@@ -1,0 +1,36 @@
+config_state: DEVELOPMENT_ONLY
+device_id: pull_wire_y
+protocol_config:
+  serial_device: /dev/serial/by-id/usb-WCH.CN_USB_Quad_Serial_BD89B1ABCD-if06
+  baudrate: 9600
+  parity: N
+  stopbits: 1
+  slave_id: 1
+  function_code: 3
+  register_offset: 0
+  data_type: uint32
+  byte_order: big
+  word_order: big
+  timeout_sec: 0.5
+calibration:
+  calibration_id: bench-dev-20261010
+  calibration_class: DEVELOPMENT_ONLY
+  production_approved: false
+  raw_modulus: 409600
+  scale_m_per_unit: 0.000055059
+  offset_m: 0.0
+  direction: 1
+  zero_raw: 409585
+  min_m: -0.1
+  max_m: 7.0
+development_reference:
+  counts_per_mm: 18.162
+  zero_raw_basis: BENCH_RETURN_REFERENCE_NOT_INSTALLATION_ZERO
+  range_basis: DEVELOPMENT_DISPLAY_ONLY
+  modulus_basis: SUPPORTED_BY_DATA
+# Conservative bench discontinuity limit, not a verified crane speed limit.
+max_delta_per_sample: 2000
+poll_rate_hz: 5.0
+stale_timeout_sec: 1.0
+physical_output_enabled: false
+automatic_control_enabled: false

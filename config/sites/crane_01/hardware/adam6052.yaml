@@ -1,0 +1,19 @@
+config_state: VERIFIED_DESKTOP_READONLY
+device_id: adam6052
+model: ADAM-6052
+host: 10.0.0.1
+port: 502
+unit_id: 1
+timeout_sec: 0.5
+poll_rate_hz: 5.0
+stale_timeout_sec: 1.0
+physical_output_enabled: false
+automatic_control_enabled: false
+acceptance:
+  scope: DESKTOP_IO_ONLY
+  electrical_do_channels_verified: [0]
+  host_idle_timeout_sec: 5
+  communication_wdt: ENABLED
+  p2p_gcl_wdt: DISABLED
+  fsv_do0_to_do7: OFF
+  evidence: docs/hardware/20261010_桌面控制硬件联调收口.md

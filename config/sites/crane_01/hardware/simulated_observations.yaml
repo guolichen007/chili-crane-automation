@@ -1,0 +1,11 @@
+config_state: SIMULATED_DEVELOPMENT_ONLY
+source_type: SIMULATED
+x_fixed_m: 0.0
+signals:
+  e_stop: false
+  power_ok: true
+  overload: false
+  y_fault: false
+  z_fault: false
+  g_fault: false
+# Values are an explicitly artificial no-motion scenario on sim/*, never physical DI.
