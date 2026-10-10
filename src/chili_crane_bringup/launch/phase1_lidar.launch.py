@@ -12,7 +12,8 @@ from chili_crane_slam.timebase import ClockContract
 def compose(context):
     site = Path(LaunchConfiguration("config_root").perform(context)) / "sites/crane_01"
     nodes = [Node(package="chili_crane_slam", executable="dual_lidar_node.py", namespace="crane_01",
-                  parameters=[{"site_config": str(site), "use_sim_time": False}], output="screen")]
+                  parameters=[{"site_config": str(site), "use_sim_time": False,
+                  "force_timing_only": LaunchConfiguration("timing_only").perform(context).lower() == "true"}], output="screen")]
     if LaunchConfiguration("start_vendor").perform(context).lower() == "true":
         path = Path(LaunchConfiguration("vendor_config").perform(context))
         vendor = yaml.safe_load(path.read_text())
@@ -48,5 +49,6 @@ def generate_launch_description():
         DeclareLaunchArgument("config_root", default_value=share + "/config"),
         DeclareLaunchArgument("start_vendor", default_value="false"),
         DeclareLaunchArgument("vendor_config", default_value=""),
+        DeclareLaunchArgument("timing_only", default_value="true"),
         OpaqueFunction(function=compose),
     ])

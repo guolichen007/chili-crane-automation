@@ -18,7 +18,7 @@ def config_fingerprint(site):
     return hashlib.sha256(json.dumps(parts, separators=(",", ":")).encode()).hexdigest()
 
 
-def create(site, output, source, scene):
+def create(site, output, source, scene, extra=None):
     output = output.resolve()
     if output == ROOT or ROOT in output.parents or output.exists():
         raise ValueError("new artifact directory outside repository required")
@@ -31,6 +31,10 @@ def create(site, output, source, scene):
                           for sensor in ("er1_204", "er1_205")}}
     data["calibrations"]["pull_wire_y"] = yaml.safe_load(
         (site / "hardware/pull_wire_y.development.yaml").read_text())["calibration"]
+    if extra:
+        if set(extra) & set(data):
+            raise ValueError("extra manifest cannot overwrite provenance")
+        data.update(extra)
     output.mkdir(parents=True)
     (output / "run_manifest.yaml").write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
 
@@ -51,7 +55,7 @@ def finalize(output):
                        "size_bytes": path.stat().st_size})
     info = yaml.safe_load((output / "rosbag2/metadata.yaml").read_text())["rosbag2_bagfile_information"]
     counts = {x["topic_metadata"]["name"]: x["message_count"] for x in info["topics_with_message_count"]}
-    required = ["/crane_01/lidar/er1_204/points", "/crane_01/lidar/er1_205/points", "/crane_01/system/run_manifest"]
+    required = data.get("required_topics", ["/crane_01/lidar/er1_204/points", "/crane_01/lidar/er1_205/points", "/crane_01/system/run_manifest"])
     data.update({"duration_sec": info["duration"]["nanoseconds"] / 1e9,
         "files": hashes, "topic_message_counts": counts,
         "capture_complete": all(counts.get(name, 0) > 0 for name in required),

@@ -13,6 +13,7 @@ string task_id
 string cycle_id
 string git_sha
 string config_hash
+string timebase_json
 string map_id
 string[] required_sensor_ids
 chili_crane_msgs/CalibrationRef[] calibrations

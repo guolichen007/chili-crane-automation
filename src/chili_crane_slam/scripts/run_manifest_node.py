@@ -2,6 +2,7 @@
 """Publish manifest periodically so VOLATILE bag subscribers receive provenance."""
 from pathlib import Path
 import yaml
+import json
 import rclpy
 from rclpy.node import Node
 from chili_crane_control.qos import state_qos
@@ -20,10 +21,11 @@ class ManifestNode(Node):
         msg = RunManifest()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.validity = msg.DEGRADED
-        msg.reason = "PHASE1A_CAPTURE_NOT_PRODUCTION_ACCEPTANCE"
+        msg.reason = "PHASE1" + self._data.get("phase", "A").removeprefix("1") + "_CAPTURE_NOT_PRODUCTION_ACCEPTANCE"
         for field in ("run_id", "git_sha", "config_hash"):
             setattr(msg, field, self._data[field])
-        msg.required_sensor_ids = ["er1_204", "er1_205", "pull_wire_y"]
+        msg.timebase_json = json.dumps(self._data.get("timebase", {}), allow_nan=False)
+        msg.required_sensor_ids = ["er1_204", "er1_205", "hik_01" if self._data.get("phase") == "1B" else "pull_wire_y"]
         for sensor, data in self._data["calibrations"].items():
             ref = CalibrationRef()
             ref.sensor_id = sensor

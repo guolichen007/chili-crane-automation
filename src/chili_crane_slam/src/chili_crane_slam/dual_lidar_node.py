@@ -41,13 +41,14 @@ class DualLidarNode(Node):
     def __init__(self):
         super().__init__("dual_lidar_pipeline")
         self.declare_parameter("site_config", "")
+        self.declare_parameter("force_timing_only", False)
         site = Path(self.get_parameter("site_config").value)
         self._cfg = yaml.safe_load((site / "sensors/dual_lidar.yaml").read_text())
         if (self._cfg.get("consume_once") is not True or self._cfg.get("allow_old_frame_reuse") is not False
                 or self._cfg.get("single_lidar_fallback") is not False):
             raise ValueError("unsafe dual-lidar contract")
         self._source = getattr(SourceType, self._cfg.get("source_type", "UNKNOWN"))
-        self._timing_only = self._cfg.get("timing_only", True)
+        self._timing_only = self.get_parameter("force_timing_only").value or self._cfg.get("timing_only", True)
         self._sensor_configs = {s: yaml.safe_load((site / "sensors" / ("er1_" + s + ".yaml")).read_text())
                                 for s in ("204", "205")}
         self._clocks = {}
