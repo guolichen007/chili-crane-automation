@@ -1,9 +1,11 @@
 # Phase1B Bench R1：台架接入前收口跟踪
 
 BASE_SHA: 8118f993b3b4a69e2933ded5b5730d4b48f5a68f
+EVIDENCE_SHA: 857d6bbc13f6680df7111b9c725310675222d470
 
-分支 codex/phase1b-bench-r1；main 不修改。当前代码软件验证 IN_PROGRESS，
-最终精确 SHA 证据另行归档，不把历史 Phase1B CI 复用为本轮通过证据。
+分支 codex/phase1b-bench-r1；main 不修改。本轮代码软件验证已经通过，
+详见[精确 SHA 验收](Phase1B台架R1软件验收_857d6bb.md)。
+当前文档归档后的最终 HEAD 远端检查独立复核，不把旧 Phase1B CI 复用为本轮证据。
 
 | 项目 | 状态 | 落点 |
 | --- | --- | --- |
@@ -16,9 +18,9 @@ BASE_SHA: 8118f993b3b4a69e2933ded5b5730d4b48f5a68f
 | 废弃 readiness 字段移除 | IMPLEMENTED | DualLidarNode、真实 ROS synthetic 回归 |
 | 帧 span 可选门限及超限失败 | IMPLEMENTED | FrameTime、node、timing probe |
 | 相机最新地址、网络状态、SDK 身份未确认 | IMPLEMENTED | hik_01、sensor_inventory |
-| Windows 静态及负例 | IN_PROGRESS | 全套 unittest、repo contracts |
-| Ubuntu22/Humble 构建、colcon、ROS transport | IN_PROGRESS | exact-SHA GitHub Actions |
-| 远端精确 SHA 全绿 | IN_PROGRESS | static、ROS、固定 SDK 编译 |
+| Windows 静态及负例 | PASS | 215 项：214 通过、1 ROS 不可用跳过 |
+| Ubuntu22/Humble 构建、colcon、ROS transport | PASS | 7 包、149 项 colcon、六场景 |
+| 远端代码精确 SHA 全绿 | PASS | Static 38039834244、ROS/vendor 38039834249 |
 
 ## 冻结边界
 
