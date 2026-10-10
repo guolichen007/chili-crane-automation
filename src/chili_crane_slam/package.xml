@@ -6,6 +6,14 @@
   <maintainer email="maintainer@example.invalid">Chili Crane Team</maintainer>
   <license>MIT</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>chili_crane_control</exec_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
   <depend>chili_crane_core</depend>
   <depend>chili_crane_msgs</depend>
   <test_depend>ament_cmake_gtest</test_depend>

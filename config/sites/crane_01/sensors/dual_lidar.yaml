@@ -1,0 +1,17 @@
+config_state: NOT_CONFIGURED
+consume_once: true
+allow_old_frame_reuse: false
+single_lidar_fallback: false
+maximum_queue_size: 16
+maximum_pair_delta_sec: null
+stale_timeout_sec: null
+clocks_synchronized: false
+coverage_verified: false
+point_timestamp_header_tolerance_sec: null
+source_type: PHYSICAL
+output_frame: crane_01/base
+products:
+  localization/registration_cloud: {config_state: NOT_CONFIGURED, roi_bounds_m: null}
+  perception/pit_cloud: {config_state: NOT_CONFIGURED, roi_bounds_m: null}
+  perception/grab_cloud: {config_state: NOT_CONFIGURED, roi_bounds_m: null}
+  perception/wall_geometry: {config_state: NOT_CONFIGURED, roi_bounds_m: null}

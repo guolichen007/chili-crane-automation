@@ -1,0 +1,7 @@
+config_state: NOT_CONFIGURED
+source_frame: crane_01/er1_204
+target_frame: crane_01/base
+calibration_id: NOT_CONFIGURED
+rotation_matrix: null
+translation_m: null
+production_approved: false
