@@ -10,4 +10,8 @@ frame_id: crane_01/er1_205
 raw_topic: /crane_01/lidar/er1_205/vendor_points
 normalized_topic: /crane_01/lidar/er1_205/points
 clock_mode: NOT_CONFIGURED
+clock_sync_state: NOT_CONFIGURED
+clock_domain: NOT_CONFIGURED
+stamp_basis: FIRST_POINT
+time_evidence_id: NOT_CONFIGURED
 lidar_type: RSE1

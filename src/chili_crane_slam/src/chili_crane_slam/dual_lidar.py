@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import math
 import numpy as np
 from .pointcloud import CANONICAL, validate_points
+from .timebase import FrameTime, bounded
 
 
 @dataclass(frozen=True)
@@ -15,12 +16,17 @@ class Cloud:
     source_type: int = 0
     received_source_time: float | None = None
 
+    @property
+    def timing(self):
+        return FrameTime.from_points(self.stamp, self.points["timestamp"])
+
 
 class DualLidarHealth:
-    def __init__(self, stale_timeout):
+    def __init__(self, stale_timeout, maximum_future_skew=0.0):
         if not math.isfinite(stale_timeout) or stale_timeout <= 0:
             raise ValueError("invalid diagnostic stale timeout")
         self.stale = stale_timeout
+        self.future = maximum_future_skew
         self.latest = {}
         self.arrivals = {"204": deque(maxlen=100), "205": deque(maxlen=100)}
         self.invalid = {"204": 0, "205": 0}
@@ -33,25 +39,30 @@ class DualLidarHealth:
         cloud = self.latest.get(sensor)
         if cloud is None:
             return {"online": False, "fresh": False, "age_sec": None, "source_age_sec": None, "hz": 0.0}
-        age, source_age = monotonic_now - cloud.received_monotonic, source_now - cloud.stamp
+        age, source_age = monotonic_now - cloud.received_monotonic, source_now - cloud.timing.start
         arrivals = [v for v in self.arrivals[sensor] if monotonic_now - v <= self.stale]
         duration = arrivals[-1] - arrivals[0] if len(arrivals) > 1 else 0
         return {"online": 0 <= age <= self.stale,
-                "fresh": 0 <= age <= self.stale and 0 <= source_age <= self.stale,
+                "fresh": 0 <= age <= self.stale and -self.future <= source_age <= self.stale,
                 "age_sec": age, "source_age_sec": source_age,
                 "hz": (len(arrivals) - 1) / duration if duration > 0 else 0.0}
 
 
 class DualLidarSynchronizer:
-    def __init__(self, maximum_pair_delta, stale_timeout, maximum_queue_size=16):
+    def __init__(self, maximum_pair_delta, stale_timeout, maximum_queue_size=16, maximum_future_skew=0.0):
         if (any(type(v) not in (float, int) or not math.isfinite(v) or v <= 0
                 for v in (maximum_pair_delta, stale_timeout))
                 or maximum_pair_delta > stale_timeout
                 or type(maximum_queue_size) is not int or not 1 <= maximum_queue_size <= 128):
             raise ValueError("sync timing/queue NOT_CONFIGURED")
         self.delta, self.stale, self.capacity = maximum_pair_delta, stale_timeout, maximum_queue_size
+        self.future = bounded(maximum_future_skew, "maximum_future_skew_sec", 1.0, True)
         self.queues = {"204": deque(), "205": deque()}
         self.last_stamp = {"204": 0.0, "205": 0.0}
+        self.last_header = {"204": 0.0, "205": 0.0}
+        self.duplicates = {"204": 0, "205": 0}
+        self.regressions = {"204": 0, "205": 0}
+        self.future_count = {"204": 0, "205": 0}
         self.dropped = {"204": 0, "205": 0}
         self.paired_count = 0
         self.pair_delta = None
@@ -61,15 +72,29 @@ class DualLidarSynchronizer:
         if sensor not in self.queues:
             raise ValueError("unknown sensor")
         validate_points(cloud.points)
+        try:
+            timing = cloud.timing
+            timing.check(source_now, self.future, self.stale)
+        except ValueError as exc:
+            if str(exc) == "FUTURE_TIMESTAMP":
+                self.future_count[sensor] += 1
+            self.dropped[sensor] += 1
+            return []
+        duplicate = timing.mid == self.last_stamp[sensor] or cloud.stamp == self.last_header[sensor]
+        regression = timing.mid < self.last_stamp[sensor] or cloud.stamp < self.last_header[sensor]
+        if duplicate:
+            self.duplicates[sensor] += 1
+        if regression:
+            self.regressions[sensor] += 1
         if (not cloud.frame_id or cloud.frame_id == "NOT_CONFIGURED"
                 or any(type(v) not in (int, float) or not math.isfinite(v)
                        for v in (cloud.stamp, source_now, monotonic_now, cloud.received_monotonic))
-                or cloud.stamp <= self.last_stamp[sensor]
-                or not 0 <= source_now - cloud.stamp <= self.stale
+                or duplicate or regression
                 or not 0 <= monotonic_now - cloud.received_monotonic <= self.stale):
             self.dropped[sensor] += 1
             return []
-        self.last_stamp[sensor] = cloud.stamp
+        self.last_stamp[sensor] = timing.mid
+        self.last_header[sensor] = cloud.stamp
         queue = self.queues[sensor]
         if len(queue) == self.capacity:
             queue.popleft()
@@ -79,7 +104,7 @@ class DualLidarSynchronizer:
         pairs = []
         a, b = self.queues["204"], self.queues["205"]
         while a and b:
-            delta = a[0].stamp - b[0].stamp
+            delta = a[0].timing.mid - b[0].timing.mid
             if abs(delta) <= self.delta + 1e-9:
                 first, second = a.popleft(), b.popleft()
                 self.paired_count += 1
@@ -96,7 +121,8 @@ class DualLidarSynchronizer:
 
     def expire(self, source_now, monotonic_now):
         for sensor, queue in self.queues.items():
-            while queue and (not 0 <= source_now - queue[0].stamp <= self.stale
+            while queue and (not -self.future <= source_now - queue[0].timing.start <= self.stale
+                    or queue[0].timing.end > source_now + self.future
                     or not 0 <= monotonic_now - queue[0].received_monotonic <= self.stale):
                 queue.popleft()
                 self.dropped[sensor] += 1

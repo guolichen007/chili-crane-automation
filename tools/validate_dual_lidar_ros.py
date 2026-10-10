@@ -26,10 +26,13 @@ def fixture(site, calibrated):
         "single_lidar_fallback": False, "maximum_pair_delta_sec": .02, "stale_timeout_sec": .35,
         "maximum_queue_size": 4, "clocks_synchronized": True, "coverage_verified": True,
         "point_timestamp_header_tolerance_sec": .1, "source_type": "SYNTHETIC",
+        "pairing_basis": "MID_SCAN", "timing_only": False,
+        "maximum_future_skew_sec": .01, "header_first_point_tolerance_sec": .01,
         "output_frame": "synthetic/base", "products": {}}
     (site / "sensors/dual_lidar.yaml").write_text(yaml.safe_dump(cfg))
     for sensor in ("204", "205"):
         sensor_cfg = {"frame_id": "synthetic/er1_" + sensor,
+            "clock_mode": "HOST_DERIVED", "clock_sync_state": "PROVISIONAL", "clock_domain": "synthetic-host",
             "raw_topic": "/phase1a_synthetic/vendor_" + sensor,
             "normalized_topic": "/phase1a_synthetic/raw_" + sensor}
         (site / "sensors" / ("er1_" + sensor + ".yaml")).write_text(yaml.safe_dump(sensor_cfg))
