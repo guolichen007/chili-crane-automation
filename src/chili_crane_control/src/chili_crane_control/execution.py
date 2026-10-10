@@ -2,6 +2,7 @@
 import math
 import uuid
 from dataclasses import dataclass, replace
+from typing import Protocol, runtime_checkable
 from .contracts import SystemMode, AxisCapability, DriveProfile, StopDistance, SystemReadiness
 
 
@@ -25,6 +26,7 @@ class AuthorizedAction:
     direction: int = 0
     target: float | None = None
     action: int = 0  # AuthorizedCommand ACTION_* enum; unknown never grants motion.
+    cycle_phase: str = ""
 
 
 @dataclass(frozen=True)
@@ -82,9 +84,11 @@ class PermitEvidence:
     allow_raise: bool = False
     allow_grab_open: bool = False
     allow_grab_close: bool = False
+    allow_auto_task: bool = False
+    allow_unload: bool = False
 
     def authorizes(self, action, now):
-        return (self.valid is True and direction_permission(self, action.axis, action.direction)
+        return (self.valid is True and ActionAuthorizationPolicy.authorizes(self, action)
                 and finite(self.issued_stamp, self.expire_stamp, now)
                 and 0 < self.issued_stamp <= now < self.expire_stamp
                 and type(self.permit_generation) is int and self.permit_generation > 0
@@ -96,6 +100,21 @@ class PermitEvidence:
                 and self.evaluated_intent_id == action.intent_id
                 and self.session_id == action.session_id
                 and self.command_epoch == action.command_epoch)
+
+
+class ActionAuthorizationPolicy:
+    @staticmethod
+    def authorizes(permit, action):
+        if action.direction == 0:
+            return True
+        if (permit.allow_auto_task is not True
+                or not direction_permission(permit, action.axis, action.direction)):
+            return False
+        if action.axis == "G" and action.direction > 0:
+            if action.cycle_phase == "OPEN_GRAB":
+                return permit.allow_unload is True
+            return action.cycle_phase == "ENSURE_GRAB_OPEN"
+        return True
 
 
 # Safety exits are explicit for every non-latched state, including startup.
@@ -207,9 +226,23 @@ class MotionDecision:
     reason: str = "NOT_CONFIGURED"
 
 
+@runtime_checkable
+class ExecutionStrategy(Protocol):
+    def configured(self) -> bool: ...
+    def supports_axis(self, axis: str) -> bool: ...
+    def begin(self, execution_key) -> None: ...
+    def step(self, position, target, **evidence) -> MotionDecision: ...
+
+
 class VariableSpeedStrategy:
     def __init__(self, capability=AxisCapability(), bands=()):
         self.capability, self.bands = capability, tuple(bands)
+
+    def supports_axis(self, axis):
+        return axis in {"Y", "Z"}
+
+    def begin(self, execution_key):
+        pass
 
     def configured(self):
         return (self.capability.profile == DriveProfile.VARIABLE_SPEED and self.capability.ready()
@@ -243,6 +276,9 @@ class FixedSlowStrategy:
         self.tolerance, self.settle_sec = tolerance, settle_sec
         self.stopping_since = None
         self.execution_key = None
+
+    def supports_axis(self, axis):
+        return axis in {"Y", "Z"}
 
     def configured(self):
         return (self.capability.profile == DriveProfile.FIXED_SLOW and self.capability.ready()
@@ -314,7 +350,8 @@ class AxisExecutor:
             return False, "AXIS_DIRECTION_TARGET_OR_FEEDBACK_INVALID"
         if (action.target - position) * action.direction < 0:
             return False, "AUTHORIZED_DIRECTION_MISMATCH"
-        if (not isinstance(self.strategy, (FixedSlowStrategy, VariableSpeedStrategy))
+        if (not isinstance(self.strategy, ExecutionStrategy)
+                or not self.strategy.supports_axis(self.axis)
                 or not self.strategy.configured() or not finite(self.lease_sec) or self.lease_sec <= 0):
             return False, "STRATEGY_OR_LEASE_NOT_CONFIGURED"
         if self.context is not None and self.context.state not in TERMINAL_STATES:
@@ -322,8 +359,7 @@ class AxisExecutor:
         allowed, reason = self.authority.admit(action, now, permit, self._ready(readiness, action.direction))
         if allowed:
             self.context = ActiveExecutionContext(action)
-            if isinstance(self.strategy, FixedSlowStrategy):
-                self.strategy.begin((action.session_id, action.command_epoch, action.command_id))
+            self.strategy.begin((action.session_id, action.command_epoch, action.command_id))
         return allowed, reason
 
     def _request(self, now, decision, action=None, permit=None):

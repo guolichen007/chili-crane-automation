@@ -32,4 +32,6 @@ string cycle_id
 string session_id
 uint64 command_epoch
 uint64 sequence
+uint64 command_sequence
+uint64 actuation_sequence
 chili_crane_msgs/EvidenceMetadata evidence

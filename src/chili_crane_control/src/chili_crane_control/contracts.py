@@ -131,15 +131,19 @@ def evaluate_readiness(configuration_ready=False, hardware_ready=False, dual_lid
                        control_ready=False, safety_ready=False, x_verified=False, grab_verified=False,
                        y=AxisCapability(), z=AxisCapability(), grab_bottom_valid=False,
                        target_valid=False, wall_clearance_valid=False,
-                       raise_clearance_valid=False, jam_free_verified=False):
-    base = all(v is True for v in (configuration_ready, hardware_ready, control_ready, safety_ready))
-    y_ready = base and localization_ready is True and y.ready()
+                       raise_clearance_valid=False, jam_free_verified=False,
+                       physical_output_enabled=False, automatic_control_enabled=False,
+                       automatic_lowering_allowed=False, y_calibration_approved=False):
+    base = all(v is True for v in (configuration_ready, hardware_ready, control_ready, safety_ready,
+                                  physical_output_enabled, automatic_control_enabled))
+    y_ready = base and localization_ready is True and y.ready() and y_calibration_approved is True
     z_base = (base and grab_tracking_ready is True and z.ready()
               and z.stop_distance_verified is True and jam_free_verified is True)
     # No blind raise. Tracking and a distinct upward-clearance/jam assessment are required.
     z_raise = z_base and raise_clearance_valid is True
     z_lower = z_base and all(v is True for v in (
-        dual_lidar, grab_bottom_valid, pit_perception_ready, target_valid, wall_clearance_valid))
+        dual_lidar, grab_bottom_valid, pit_perception_ready, target_valid, wall_clearance_valid,
+        automatic_lowering_allowed))
     return SystemReadiness(
         configuration_ready is True, hardware_ready is True, dual_lidar is True,
         localization_ready is True, grab_tracking_ready is True, pit_perception_ready is True,

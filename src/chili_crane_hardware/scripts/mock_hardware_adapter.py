@@ -85,6 +85,8 @@ class MockHardwareAdapter(Node):
         execution.session_id = command.session_id
         execution.command_epoch = command.command_epoch
         execution.sequence = command.command_sequence
+        execution.command_sequence = command.command_sequence
+        execution.actuation_sequence = command.actuation_sequence
         execution.state = CommandExecutionState.STATE_REJECTED
         execution.accepted = False
         execution.executing = False

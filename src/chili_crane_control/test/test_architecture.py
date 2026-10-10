@@ -53,7 +53,7 @@ def permit(action):
                           allow_x_positive=True, allow_x_negative=True,
                           allow_y_positive=True, allow_y_negative=True,
                           allow_raise=True, allow_lower=True,
-                          allow_grab_open=True, allow_grab_close=True)
+                          allow_grab_open=True, allow_grab_close=True, allow_auto_task=True)
 
 
 def readiness(**overrides):
@@ -61,7 +61,9 @@ def readiness(**overrides):
                   localization_ready=True, grab_tracking_ready=True, pit_perception_ready=True,
                   control_ready=True, safety_ready=True, x_verified=True, grab_verified=True,
                   y=FIXED, z=FIXED, grab_bottom_valid=True, target_valid=True,
-                  wall_clearance_valid=True, raise_clearance_valid=True, jam_free_verified=True)
+                  wall_clearance_valid=True, raise_clearance_valid=True, jam_free_verified=True,
+                  physical_output_enabled=True, automatic_control_enabled=True,
+                  automatic_lowering_allowed=True, y_calibration_approved=True)
     values.update(overrides)
     return evaluate_readiness(**values)
 
@@ -413,7 +415,7 @@ class R1Regressions(unittest.TestCase):
         authority, executor, action = self.executor()
         self.start(executor, action)
         request = self.tick(executor, action)
-        guard = ActuationLeaseGuard(authority.session_id, authority.command_epoch, 0.25)
+        guard = ActuationLeaseGuard(authority.session_id, authority.command_epoch, 0.25, clock=lambda: 11)
         self.assertTrue(guard.receive(request, 11))
         self.assertIsNotNone(guard.poll(11.24))
         self.assertIsNone(guard.poll(11.25))  # No request means all outputs OFF.
@@ -429,13 +431,13 @@ class R1Regressions(unittest.TestCase):
                       replace(request, expire_stamp=15), replace(request, direction=True),
                       replace(request, enable=False)]
         for bad in bad_frames:
-            guard = ActuationLeaseGuard(authority.session_id, authority.command_epoch, 0.25)
+            guard = ActuationLeaseGuard(authority.session_id, authority.command_epoch, 0.25, clock=lambda: 11)
             self.assertTrue(guard.receive(request, 11))
             self.assertFalse(guard.receive(bad, 11.1))
             self.assertIsNone(guard.poll(11.1))
-        guard = ActuationLeaseGuard("restarted", authority.command_epoch, 0.25)
+        guard = ActuationLeaseGuard("restarted", authority.command_epoch, 0.25, clock=lambda: 11)
         self.assertFalse(guard.receive(request, 11))
-        guard = ActuationLeaseGuard(authority.session_id, authority.command_epoch, 0.25)
+        guard = ActuationLeaseGuard(authority.session_id, authority.command_epoch, 0.25, clock=lambda: 11)
         guard.receive(request, 11)
         guard.poll(11.1)
         self.assertIsNone(guard.poll(11.05))
@@ -446,7 +448,7 @@ class R1Regressions(unittest.TestCase):
         first = self.tick(executor, action)
         delayed = self.tick(executor, action, 11.05)
         stop = executor.cancel(11.1)
-        guard = ActuationLeaseGuard(authority.session_id, authority.command_epoch, 0.25)
+        guard = ActuationLeaseGuard(authority.session_id, authority.command_epoch, 0.25, clock=lambda: 11)
         self.assertTrue(guard.receive(first, 11))
         self.assertFalse(guard.receive(stop, 11.1))
         self.assertFalse(guard.receive(delayed, 11.11))

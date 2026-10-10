@@ -24,6 +24,15 @@ def configuration_hash(config):
     return hashlib.sha256(canonical).hexdigest()
 
 
+def configured_readiness(config, **evidence):
+    """Runtime flags are executable gates, never inferred from hardware acceptance."""
+    from .contracts import evaluate_readiness
+    return evaluate_readiness(
+        **evidence, physical_output_enabled=config.get("physical_output_enabled") is True,
+        automatic_control_enabled=config.get("automatic_control_enabled") is True,
+        automatic_lowering_allowed=config.get("z", {}).get("automatic_lowering_allowed") is True)
+
+
 def manifest_ready(manifest):
     required = ("run_id", "task_id", "cycle_id", "map_id", "grab_geometry_version")
     if not all(isinstance(manifest.get(k), str) and manifest[k] not in ("", "NOT_CONFIGURED")

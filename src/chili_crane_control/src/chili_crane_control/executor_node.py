@@ -10,6 +10,7 @@ from chili_crane_msgs.msg import (
 )
 from .contracts import SystemMode
 from .execution import ControlAuthority
+from .configuration import configured_readiness
 from .qos import state_qos, command_qos
 
 
@@ -19,6 +20,7 @@ class ActionExecutorNode(Node):
         self.declare_parameter("capability_config", "")
         path = self.get_parameter("capability_config").value
         self._config = yaml.safe_load(Path(path).read_text(encoding="utf-8")) if path else {}
+        self._runtime_readiness = configured_readiness(self._config)
         self.authority = ControlAuthority()
         self._actuation_sequence = 0
         self.authority.transition(SystemMode.PROTECTIVE_STOP)
@@ -91,6 +93,8 @@ class ActionExecutorNode(Node):
         ready.validity = SystemReadiness.NOT_CONFIGURED
         ready.reason = "LIVE_READINESS_NOT_CONFIGURED"
         ready.blocking_reasons = ["HARDWARE_NOT_CONFIGURED", "ALGORITHMS_NOT_IMPLEMENTED"]
+        for field, value in self._runtime_readiness.__dict__.items():
+            setattr(ready, field, value)
         ready.evidence.validity = ready.evidence.NOT_CONFIGURED
         self._ready_pub.publish(ready)
         event = SafetyEvent()

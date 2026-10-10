@@ -1,6 +1,12 @@
 """Pure logical DO mapping; not a writer and not a physical permission gate."""
 
 
+def direction_only_supported(request):
+    return (request.enable is not True or (
+        request.speed_command_valid is False and request.axis in {"Y", "Z", "G"}
+        and type(request.direction) is int and request.direction in (-1, 1)))
+
+
 def request_to_do(request):
     outputs = [False] * 8
     if request.enable is not True:
