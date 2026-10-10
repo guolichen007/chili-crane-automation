@@ -19,5 +19,7 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(hardware_protocol_contracts test/test_protocols.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_control/src)
+  ament_add_pytest_test(phase1b_camera ../../tests_static/test_phase1b_camera.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
 endif()
 ament_package()

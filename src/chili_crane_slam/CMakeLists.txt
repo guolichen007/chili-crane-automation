@@ -18,6 +18,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(dual_lidar_synthetic test/test_dual_lidar.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
+  ament_add_pytest_test(phase1b_timebase ../../tests_static/test_phase1b_timebase.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(slam_contract_compile_test test/slam_contract_compile_test.cpp)
   if(TARGET slam_contract_compile_test)

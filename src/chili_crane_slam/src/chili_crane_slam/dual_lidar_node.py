@@ -53,9 +53,11 @@ class DualLidarNode(Node):
                                 for s in ("204", "205")}
         self._clocks = {}
         self._future = self._cfg.get("maximum_future_skew_sec")
+        if self._future is not None:
+            bounded(self._future, "maximum_future_skew_sec", 1.0, True)
         tolerance = self._cfg.get("header_first_point_tolerance_sec")
         if tolerance is not None and (type(tolerance) not in (float, int)
-                or not math.isfinite(tolerance) or tolerance <= 0):
+                or not math.isfinite(tolerance) or tolerance < 0):
             raise ValueError("invalid point timestamp tolerance")
         if self.get_parameter("use_sim_time").value:
             self._source = SourceType.REPLAY
@@ -260,11 +262,11 @@ class DualLidarNode(Node):
         timing = DualLidarTimingState()
         timing.header = message.header
         timing.pairing_valid = timing.timing_ready = pairing
-        timing.reason = "TEMPORAL_PAIR_VALID" if pairing else self._error
+        timing.reason = "TEMPORAL_PAIR_VALID" if pairing else ("PAIR_STALE" if pair else self._error)
         timing.validity = timing.VALID if pairing else timing.DEGRADED
         timing.extrinsic_valid = message.extrinsic_valid
         timing.spatial_merge_ready = timing.dual_lidar_full_ready = message.dual_lidar_ready
-        timing.ptp_verified = bool(self._clocks and all(c.ptp_verified for c in self._clocks.values()))
+        timing.ptp_verified = bool(self._sync and self._clocks and all(c.ptp_verified for c in self._clocks.values()))
         timing.paired_count = self._sync.paired_count if self._sync else 0
         timing.dropped_a = self._sync.dropped["204"] if self._sync else 0
         timing.dropped_b = self._sync.dropped["205"] if self._sync else 0
