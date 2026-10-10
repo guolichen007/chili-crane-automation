@@ -13,6 +13,7 @@ class Cloud:
     frame_id: str
     points: np.ndarray
     source_type: int = 0
+    received_source_time: float | None = None
 
 
 class DualLidarHealth:
@@ -153,4 +154,6 @@ class DualLidarMerger:
         points = np.concatenate((self.a.transform(first), self.b.transform(second)), dtype=CANONICAL)
         validate_points(points)
         return Cloud(max(first.stamp, second.stamp), max(first.received_monotonic, second.received_monotonic),
-                     self.a.target_frame, points, first.source_type)
+                     self.a.target_frame, points, first.source_type,
+                     max(first.received_source_time, second.received_source_time)
+                     if first.received_source_time is not None and second.received_source_time is not None else None)

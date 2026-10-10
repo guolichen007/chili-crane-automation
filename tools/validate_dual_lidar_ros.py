@@ -103,9 +103,11 @@ def scenario(calibrated):
                 assert counts["merged"] >= 3 and latest["ready"].dual_lidar_ready, counts
                 assert {"synthetic/er1_204", "synthetic/er1_205"} <= transforms, transforms
                 pump(.2, ())  # Drain transport before measuring no-old-frame reuse.
+                receive_stamp = latest["ready"].evidence.receive_stamp
                 previous = counts["merged"]
                 pump(.8, ("204",))
                 assert counts["merged"] == previous, "old 205 frame reused"
+                assert latest["ready"].evidence.receive_stamp == receive_stamp, "timer refreshed receive evidence"
                 assert not latest["ready"].dual_lidar_ready and not latest["ready"].b_fresh
             else:
                 assert counts["merged"] == 0 and not latest["ready"].dual_lidar_ready

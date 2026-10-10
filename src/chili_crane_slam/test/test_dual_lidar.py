@@ -89,6 +89,13 @@ class SynchronizerTests(unittest.TestCase):
 
 
 class MergerTests(unittest.TestCase):
+    def test_receive_time_is_original_fact_not_publication_time(self):
+        pair = (replace(cloud(), received_source_time=10.02),
+                replace(cloud(sensor="205"), received_source_time=10.03))
+        merged = DualLidarMerger(extrinsic(), extrinsic("205")).merge(pair)
+        self.assertEqual(10.03, merged.received_source_time)
+        self.assertEqual(10, merged.stamp)
+
     def test_merged_buffer_preserves_declared_point_step_and_offsets(self):
         merged = DualLidarMerger(extrinsic(), extrinsic("205")).merge((cloud(), cloud(sensor="205")))
         self.assertEqual(CANONICAL, merged.points.dtype)

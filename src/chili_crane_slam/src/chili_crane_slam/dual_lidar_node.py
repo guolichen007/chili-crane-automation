@@ -130,7 +130,7 @@ class DualLidarNode(Node):
             if tolerance is not None and (not isinstance(tolerance, (float, int)) or tolerance <= 0
                     or (abs(points["timestamp"] - stamp) > tolerance).any()):
                 raise ValueError("point timestamp clock/units mismatch")
-            cloud = Cloud(stamp, monotonic, msg.header.frame_id, points, int(self._source))
+            cloud = Cloud(stamp, monotonic, msg.header.frame_id, points, int(self._source), now)
             self._frame_valid[sensor] = True
             self._health.accepted(sensor, cloud)
             self._raw_pubs[sensor].publish(cloud_message(cloud))
@@ -187,7 +187,7 @@ class DualLidarNode(Node):
         message.evidence.reason = message.reason
         if pair:
             message.evidence.measurement_stamp = Time(nanoseconds=int(min(c.stamp for c in pair) * 1e9)).to_msg()
-            message.evidence.receive_stamp = message.header.stamp
+            message.evidence.receive_stamp = Time(nanoseconds=int(max(c.received_source_time for c in pair) * 1e9)).to_msg()
             message.evidence.source_counter = self._sync.paired_count
             message.evidence.evidence_age_sec = max(now - c.stamp for c in pair)
         self._ready.publish(message)

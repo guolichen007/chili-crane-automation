@@ -30,6 +30,8 @@ BASE_SHA: d4b8443d40d0e3bbb7c46d631be4b234667a706b
   导致 merged 声明 32-byte point_step 而实际 27-byte。追加独立修复提交：强制 canonical
   dtype、序列化前校验，并保留 merged buffer 长度/offset/roundtrip 回归测试。
   首次失败日志不删除，最终状态以修复 SHA 的重新执行为准。
+- readiness 的 receive_stamp 保留配对时实际接收事实，不随 10Hz 发布计时器刷新；
+  合成 ROS2 transport 断一路后同时验证零复用、降级与 receive_stamp 不变。
 
 ## 必须保留
 
