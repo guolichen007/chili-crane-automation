@@ -13,6 +13,7 @@ install(PROGRAMS
   scripts/adam_di_test.py
   scripts/adam_do_test.py
   scripts/pull_wire_probe.py
+  scripts/hik_camera_node.py
   DESTINATION lib/${PROJECT_NAME})
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
