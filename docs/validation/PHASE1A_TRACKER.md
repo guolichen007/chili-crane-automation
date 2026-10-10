@@ -26,6 +26,10 @@ BASE_SHA: d4b8443d40d0e3bbb7c46d631be4b234667a706b
 - `PHASE05_R2` 指软件边界测试，不代表整机/电气/停车标定通过。
 - 不在 CI 未通过或现场事实未完成时创建 R2 验收 tag。
 - 本文件不自行预填远端 PASS；下载对应 SHA Actions artifact 或查看最终报告核对。
+- 首次 Ubuntu ROS2 transport 测试捕获 NumPy concatenate 自动压缩结构化 padding，
+  导致 merged 声明 32-byte point_step 而实际 27-byte。追加独立修复提交：强制 canonical
+  dtype、序列化前校验，并保留 merged buffer 长度/offset/roundtrip 回归测试。
+  首次失败日志不删除，最终状态以修复 SHA 的重新执行为准。
 
 ## 必须保留
 

@@ -149,6 +149,8 @@ class DualLidarMerger:
         first, second = pair
         if first.source_type != second.source_type or first.source_type not in (1, 2, 3, 4):
             raise ValueError("mixed/unknown pointcloud provenance")
-        points = np.concatenate((self.a.transform(first), self.b.transform(second)))
+        # NumPy otherwise repacks structured fields, silently dropping canonical padding.
+        points = np.concatenate((self.a.transform(first), self.b.transform(second)), dtype=CANONICAL)
+        validate_points(points)
         return Cloud(max(first.stamp, second.stamp), max(first.received_monotonic, second.received_monotonic),
                      self.a.target_frame, points, first.source_type)

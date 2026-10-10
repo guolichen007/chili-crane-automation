@@ -16,12 +16,13 @@ from tf2_ros import StaticTransformBroadcaster
 from chili_crane_control.qos import state_qos
 from chili_crane_control.evidence_policy import SourceType
 from chili_crane_msgs.msg import DualLidarReadiness
-from .pointcloud import normalize_cloud, crop, CANONICAL
+from .pointcloud import normalize_cloud, crop, validate_points
 from .dual_lidar import Cloud, DualLidarHealth, DualLidarSynchronizer, Extrinsic, DualLidarMerger
 from .rotation import quaternion
 
 
 def cloud_message(cloud):
+    validate_points(cloud.points)
     msg = PointCloud2()
     msg.header.stamp = Time(nanoseconds=int(cloud.stamp * 1e9)).to_msg()
     msg.header.frame_id = cloud.frame_id

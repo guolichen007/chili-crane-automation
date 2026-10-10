@@ -89,6 +89,16 @@ class SynchronizerTests(unittest.TestCase):
 
 
 class MergerTests(unittest.TestCase):
+    def test_merged_buffer_preserves_declared_point_step_and_offsets(self):
+        merged = DualLidarMerger(extrinsic(), extrinsic("205")).merge((cloud(), cloud(sensor="205")))
+        self.assertEqual(CANONICAL, merged.points.dtype)
+        self.assertEqual(32 * 4, len(merged.points.tobytes()))
+        self.assertEqual(24, merged.points.dtype.fields["timestamp"][1])
+        fields = [("x", 0, 7, 1), ("y", 4, 7, 1), ("z", 8, 7, 1),
+                  ("intensity", 12, 7, 1), ("ring", 16, 4, 1), ("sensor_id", 18, 2, 1), ("timestamp", 24, 8, 1)]
+        decoded = normalize_cloud(merged.points.tobytes(), fields, 32, 128, 4, 1)
+        np.testing.assert_array_equal(merged.points["timestamp"], decoded["timestamp"])
+
     def test_preserves_intensity_ring_and_timestamp(self):
         a = cloud()
         a.points["intensity"] = [3, 4]
