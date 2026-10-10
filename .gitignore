@@ -23,6 +23,9 @@ Thumbs.db
 /maps/*/*.pcd
 *.bag
 *.db3
+*.mcap
+*.pcap
+*.pcapng
 .env
 
 # Desktop Codex working memory (local-only; never commit)

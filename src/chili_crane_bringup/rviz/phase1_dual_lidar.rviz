@@ -1,0 +1,35 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Fixed Frame: crane_01/base
+    Background Color: 40; 40; 40
+  Displays:
+    - Class: rviz_default_plugins/PointCloud2
+      Name: ER1 204 (蓝)
+      Enabled: true
+      Topic: {Value: /crane_01/lidar/er1_204/points, Reliability Policy: Best Effort, Durability Policy: Volatile}
+      Color Transformer: FlatColor
+      Color: 65; 145; 230
+      Size (m): 0.02
+    - Class: rviz_default_plugins/PointCloud2
+      Name: ER1 205 (橙)
+      Enabled: true
+      Topic: {Value: /crane_01/lidar/er1_205/points, Reliability Policy: Best Effort, Durability Policy: Volatile}
+      Color Transformer: FlatColor
+      Color: 240; 170; 70
+      Size (m): 0.02
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Calibrated merged
+      Enabled: false
+      Topic: {Value: /crane_01/lidar/merged_points, Reliability Policy: Best Effort, Durability Policy: Volatile}
+      Color Transformer: Intensity
+      Size (m): 0.02
+    - Class: rviz_default_plugins/TF
+      Name: Verified TF only
+      Enabled: true
+  Views:
+    Current: {Class: rviz_default_plugins/Orbit, Distance: 15}
+Window Geometry: {Width: 1280, Height: 800}

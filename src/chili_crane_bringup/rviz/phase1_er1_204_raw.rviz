@@ -1,0 +1,19 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Fixed Frame: crane_01/er1_204
+    Background Color: 40; 40; 40
+  Displays:
+    - Class: rviz_default_plugins/PointCloud2
+      Name: ER1 204 独立原始坐标系（非外参验收）
+      Enabled: true
+      Topic: {Value: /crane_01/lidar/er1_204/points, Reliability Policy: Best Effort, Durability Policy: Volatile}
+      Color Transformer: FlatColor
+      Color: 65; 145; 230
+      Size (m): 0.02
+  Views:
+    Current: {Class: rviz_default_plugins/Orbit, Distance: 15}
+Window Geometry: {Width: 1280, Height: 800}

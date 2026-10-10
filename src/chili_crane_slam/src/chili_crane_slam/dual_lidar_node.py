@@ -11,11 +11,14 @@ from rclpy.time import Time
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import PointCloud2, PointField
 from std_msgs.msg import String
+from geometry_msgs.msg import TransformStamped
+from tf2_ros import StaticTransformBroadcaster
 from chili_crane_control.qos import state_qos
 from chili_crane_control.evidence_policy import SourceType
 from chili_crane_msgs.msg import DualLidarReadiness
 from .pointcloud import normalize_cloud, crop, CANONICAL
 from .dual_lidar import Cloud, DualLidarHealth, DualLidarSynchronizer, Extrinsic, DualLidarMerger
+from .rotation import quaternion
 
 
 def cloud_message(cloud):
@@ -66,6 +69,22 @@ class DualLidarNode(Node):
             self._merger = DualLidarMerger(a, b)
         except (TypeError, ValueError, KeyError) as exc:
             self.get_logger().warning(str(exc))
+        if self._merger is not None:
+            self._tf = StaticTransformBroadcaster(self)
+            transforms = []
+            for calibration in (self._merger.a, self._merger.b):
+                transform = TransformStamped()
+                transform.header.stamp = self.get_clock().now().to_msg()
+                transform.header.frame_id = calibration.target_frame
+                transform.child_frame_id = calibration.source_frame
+                transform.transform.translation.x = float(calibration.translation[0])
+                transform.transform.translation.y = float(calibration.translation[1])
+                transform.transform.translation.z = float(calibration.translation[2])
+                q = quaternion(calibration.rotation)
+                transform.transform.rotation.x, transform.transform.rotation.y = float(q[0]), float(q[1])
+                transform.transform.rotation.z, transform.transform.rotation.w = float(q[2]), float(q[3])
+                transforms.append(transform)
+            self._tf.sendTransform(transforms)
         self._frames = {}
         self._frame_valid = {"204": False, "205": False}
         self._raw_pubs, self._subscriptions = {}, []

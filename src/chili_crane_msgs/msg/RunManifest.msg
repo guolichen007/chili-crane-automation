@@ -18,3 +18,4 @@ string[] required_sensor_ids
 chili_crane_msgs/CalibrationRef[] calibrations
 string grab_geometry_version
 builtin_interfaces/Time started_stamp
+chili_crane_msgs/EvidenceMetadata evidence
