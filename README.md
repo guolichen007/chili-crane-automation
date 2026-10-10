@@ -1,6 +1,7 @@
 # 辣椒地池行车自动抓取框架
 
-当前版本为 **Phase 0.5-R1 / ROS2 Humble 架构与 mock 策略基线**，不是可运行的无人行车。
+当前分支为 **Phase 1A / Ubuntu 算法部署基础版**，承接 Phase 0.5-R1，
+提供 R2 安全收口、站点只读采集及双 ER1 规范化/同步/融合，不是可运行的无人行车。
 运行基线：Ubuntu 22.04.x、ROS2 Humble、Python 3.10、C++17、GCC 11、ament/colcon。
 ROS1 旧框架已由 ADR 0003 取代；NDT-SLAM-Warehouse 仅为只读算法参考。
 
@@ -26,7 +27,8 @@ Y/Z分别支持可调速与固定低速策略契约，现场能力及停车验�
 新增会话/epoch/序号拒绝旧命令，STOP始终允许向OFF退化；每斗完成后重新扫描料面。
 R1补充命令只接收一次的执行上下文、短输出租约、模式转换矩阵、独立Z上下 readiness；
 24DI只维护物理点表，标定出处绑定sensor_id。见[ADR0005](docs/decisions/0005-phase05-r1-execution-lifecycle.md)。
-当前仅纯策略/mock，不含真实驱动、NDT、料面或抓斗算法。
+当前包含 ADAM/拉绳只读适配、固定 SHA 的官方 ER1 驱动安装入口和双雷达核心；
+不含 NDT、料面识别或抓斗跟踪算法，也未执行现场动作。
 详见[接口契约](docs/api/PHASE05_CONTRACTS.md)与[验收矩阵](docs/api/phase05_acceptance.yaml)。
 
 ## 七包边界
@@ -77,3 +79,16 @@ GitHub Actions 提供 Python 3.10 静态检查与 Humble 容器 build/test/mock�
 所有 LIVE_* 在未连接设备前保持 NOT_RUN。
 Humble 支持窗口至 2027-05，后续升级需要独立 ADR。
 本机维护的 LOCAL_PROJECT_CONTEXT.md 已被忽略，不上传 GitHub。
+
+## Phase 1A 现场数据部署
+
+先读[Ubuntu 只读部署交接](docs/deployment/PHASE1A_UBUNTU_READONLY.md)、
+[双雷达数据合同](docs/api/PHASE1A_DUAL_LIDAR_CONTRACT.md)、
+[实施和验证跟踪](docs/validation/PHASE1A_TRACKER.md)。
+
+`config/sites/crane_01` 保存脱敏的实测设备参数，原始 `*.template.yaml` 不变。
+三种运行入口为 `algorithm_dev.launch.py`、`shadow_control.launch.py` 和
+`phase1_production.launch.py`；均保持 physical/automatic 输出关闭。
+旧 `production.launch.py` 仍是历史 fail-closed mock，不能当作现场入口。
+端口角色、外参、时钟/覆盖均未配置：允许 raw/health，禁止有效融合/ready。
+禁止把软件 CI、合成消息或操作者声明的 bag source 当作现场验收。

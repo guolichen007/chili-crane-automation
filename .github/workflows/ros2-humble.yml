@@ -13,6 +13,7 @@ jobs:
     container: ros:humble-ros-base-jammy
     env:
       CHILI_CI_IMAGE_REFERENCE: ros:humble-ros-base-jammy
+      ROS_DOMAIN_ID: 42
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -38,4 +39,40 @@ jobs:
         with:
           name: ros2-humble-software-evidence
           path: /tmp/chili-ros2-evidence
+          if-no-files-found: warn
+  rslidar-vendor-wrapper:
+    runs-on: ubuntu-22.04
+    container: ros:humble-ros-base-jammy
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compiler dependencies (no device execution)
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y git gcc g++ python3-pip python3-colcon-common-extensions libyaml-cpp-dev libpcap-dev
+          python3 -m pip install -r requirements-dev.txt
+      - name: Build exact-SHA official XYZIRT wrapper
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          sh scripts/setup/install_rslidar_sdk.sh --workspace /tmp/chili-vendor
+          colcon --log-base /tmp/chili-vendor/log build --base-paths /tmp/chili-vendor/src \
+            --packages-select rslidar_msg rslidar_sdk --build-base /tmp/chili-vendor/build \
+            --install-base /tmp/chili-vendor/install --executor sequential \
+            --cmake-args -DCMAKE_BUILD_TYPE=Release
+          test -x /tmp/chili-vendor/install/rslidar_sdk/lib/rslidar_sdk/rslidar_sdk_node
+          git -C /tmp/chili-vendor/src/sdk diff -- CMakeLists.txt > /tmp/chili-vendor/vendor-reviewed.patch
+          printf 'EVIDENCE_SHA=%s\nSCOPE=SOFTWARE_COMPILE_ONLY\nLIVE_ER1_STATUS=NOT_RUN\n' "$GITHUB_SHA" > /tmp/chili-vendor/result.txt
+      - name: Archive vendor compile provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rslidar-vendor-compile-evidence
+          path: |
+            /tmp/chili-vendor/log
+            /tmp/chili-vendor/vendor-build-environment.txt
+            /tmp/chili-vendor/vendor-provenance.sha256
+            /tmp/chili-vendor/vendor-reviewed.patch
+            /tmp/chili-vendor/result.txt
           if-no-files-found: warn

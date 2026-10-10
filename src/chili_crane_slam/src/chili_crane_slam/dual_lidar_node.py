@@ -87,12 +87,12 @@ class DualLidarNode(Node):
             self._tf.sendTransform(transforms)
         self._frames = {}
         self._frame_valid = {"204": False, "205": False}
-        self._raw_pubs, self._subscriptions = {}, []
+        self._raw_pubs, self._cloud_subscriptions = {}, []
         for sensor in ("204", "205"):
             cfg = yaml.safe_load((site / "sensors" / ("er1_" + sensor + ".yaml")).read_text())
             self._frames[sensor] = cfg["frame_id"]
             self._raw_pubs[sensor] = self.create_publisher(PointCloud2, cfg["normalized_topic"], qos_profile_sensor_data)
-            self._subscriptions.append(self.create_subscription(PointCloud2, cfg["raw_topic"],
+            self._cloud_subscriptions.append(self.create_subscription(PointCloud2, cfg["raw_topic"],
                 lambda msg, sensor=sensor: self._receive(sensor, msg), qos_profile_sensor_data))
         self._merged = self.create_publisher(PointCloud2, "lidar/merged_points", qos_profile_sensor_data)
         self._products = {name: self.create_publisher(PointCloud2, name, qos_profile_sensor_data)

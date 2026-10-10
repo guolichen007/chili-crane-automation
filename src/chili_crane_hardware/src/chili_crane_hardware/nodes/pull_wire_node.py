@@ -11,7 +11,7 @@ from chili_crane_hardware.trolley.pull_wire_driver import PullWireDriver
 from chili_crane_hardware.state import EvidenceTracker
 from chili_crane_hardware.evidence import fill_evidence, SourceType
 from chili_crane_msgs.msg import TrolleyState, DigitalInputState
-from chili_crane_hardware.mapping import RawInput, normalize, derive_logical_inputs
+from chili_crane_hardware.mapping import RawInput, normalize, derive_logical_inputs, auto_sources_physical
 
 
 class PullWireNode(Node):
@@ -52,7 +52,9 @@ class PullWireNode(Node):
         self._di_samples[device] = RawInput(
             tuple(message.raw_di), time.monotonic(), message.evidence_age_sec,
             message.device_id == device and message.validity == DigitalInputState.VALID
-            and message.communication_ok)
+            and message.communication_ok,
+            SourceType(message.evidence.source_type) if message.evidence.source_type in range(5)
+            else SourceType.UNKNOWN)
 
     def _poll(self):
         velocity = 0.0
@@ -87,7 +89,9 @@ class PullWireNode(Node):
         msg.known_signals = [name for name in names if values.get(name) is not None]
         msg.unknown_signals = [name for name in names if values.get(name) is None]
         msg.auto_evidence_ready = (not msg.unknown_signals and self._driver is not None
-                                   and self._driver.calibration.production_ready())
+                                   and self._driver.calibration.production_ready()
+                                   and msg.validity == TrolleyState.VALID
+                                   and auto_sources_physical(self._mapping, self._di_samples, names))
         fill_evidence(msg, SourceType.PHYSICAL, self._measurement_stamp, self._measurement_stamp,
                       sample.source_counter if sample else 0, msg.evidence_age_sec,
                       msg.calibration_id, "site-crane01-20261010")

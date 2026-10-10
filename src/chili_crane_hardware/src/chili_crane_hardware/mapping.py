@@ -28,6 +28,14 @@ def requirement_status(values, required_for_algorithm, required_for_auto, option
     }
 
 
+def auto_sources_physical(mapping, samples, signals):
+    """Every auto-required input must have physical provenance, including optional DI."""
+    return bool(signals) and all(
+        mapping.get(name, {}).get("device") in samples
+        and samples[mapping[name]["device"]].source_type == SourceType.PHYSICAL
+        for name in signals)
+
+
 def semantic_input(name, mapping, samples, now, stale_timeout_sec):
     item = mapping.get(name, {})
     device, channel, invert = item.get("device"), item.get("channel"), item.get("invert")

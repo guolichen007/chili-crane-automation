@@ -9,7 +9,7 @@ from rclpy.clock import Clock, ClockType
 from chili_crane_control.qos import state_qos
 from chili_crane_control.mode_policy import evaluate_mode
 from chili_crane_hardware.mapping import RawInput, normalize, derive_logical_inputs
-from chili_crane_hardware.mapping import requirement_status
+from chili_crane_hardware.mapping import requirement_status, auto_sources_physical
 from chili_crane_hardware.evidence import fill_evidence, SourceType
 from chili_crane_msgs.msg import (
     DigitalInputState, ControlBoardState, RemoteControlState, GrabIoState, HoistState,
@@ -92,7 +92,8 @@ class IoNormalizerNode(Node):
             message.unknown_signals = status["unknown"]
             sources = {self._samples[d].source_type for d in referenced if d in self._samples}
             source = next(iter(sources)) if len(sources) == 1 else SourceType.UNKNOWN
-            message.auto_evidence_ready = status["auto_ready"] and source == SourceType.PHYSICAL
+            message.auto_evidence_ready = status["auto_ready"] and auto_sources_physical(
+                self._mapping, self._samples, auto_required)
             metadata = [self._metadata[d] for d in referenced if d in self._metadata]
             oldest = min(metadata, key=lambda x: (x[0].sec, x[0].nanosec)) if metadata else None
             fill_evidence(message, source,
@@ -148,6 +149,9 @@ class IoNormalizerNode(Node):
         if remote.conflict:
             remote.validity = RemoteControlState.DEGRADED
             remote.reason = "opposing_remote_inputs"
+        remote.evidence.validity, remote.evidence.reason = remote.validity, remote.reason
+        if remote.validity != RemoteControlState.VALID:
+            remote.auto_evidence_ready = False
         self._publishers_by_topic["remote_control_state"].publish(remote)
 
         grab = base(GrabIoState, ("g_open_limit", "g_close_limit", "mode_auto"),
@@ -163,6 +167,9 @@ class IoNormalizerNode(Node):
         if grab.open_limit and grab.closed_limit:
             grab.validity = GrabIoState.DEGRADED
             grab.reason = "grab_limit_conflict"
+        grab.evidence.validity, grab.evidence.reason = grab.validity, grab.reason
+        if grab.validity != GrabIoState.VALID:
+            grab.auto_evidence_ready = False
         self._publishers_by_topic["grab_io_state"].publish(grab)
 
         hoist = base(HoistState, ("z_top_limit", "z_bottom_limit"),
@@ -178,6 +185,9 @@ class IoNormalizerNode(Node):
             hoist.validity = HoistState.DEGRADED
             hoist.reason = "hoist_limit_conflict"
         hoist.motion = HoistState.MOTION_UNKNOWN
+        hoist.evidence.validity, hoist.evidence.reason = hoist.validity, hoist.reason
+        if hoist.validity != HoistState.VALID:
+            hoist.auto_evidence_ready = False
         self._publishers_by_topic["hoist_state"].publish(hoist)
 
 

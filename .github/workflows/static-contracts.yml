@@ -37,5 +37,8 @@ jobs:
       - name: Run static unit tests
         run: python -m unittest discover -s tests_static -p "test_*.py"
 
+      - name: Scan public hardware facts for sensitive content
+        run: python tools/check_public_secrets.py
+
       - name: Check reviewable public delivery and new commit titles
         run: python tools/check_delivery.py --event-path "$GITHUB_EVENT_PATH" --ci

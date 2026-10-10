@@ -57,6 +57,7 @@ colcon test-result --test-result-base "$run_dir/build" --verbose
 set +u
 . "$run_dir/install/setup.bash"
 set -u
+timeout 35s python3 tools/validate_dual_lidar_ros.py | tee "$run_dir/dual-lidar-synthetic-ros.json"
 ros2 launch chili_crane_bringup mock_system.launch.py > "$run_dir/mock-launch.log" 2>&1 &
 launch_pid=$!
 cleanup() {
@@ -76,6 +77,7 @@ cat > "$run_dir/result.yaml" <<EOF
 EVIDENCE_SHA: $expected_sha
 ROS2_BUILD_STATUS: PASS
 ROS2_TEST_STATUS: PASS
+DUAL_LIDAR_SYNTHETIC_ROS_STATUS: PASS
 ROS2_MOCK_LAUNCH_STATUS: PASS
 MOCK_FAIL_CLOSED_STATUS: PASS
 MOCK_SCENARIO_STATUS: PASS

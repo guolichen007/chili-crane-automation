@@ -274,6 +274,36 @@ class VariableSpeedStrategy:
                               selected[2], "POSITION_FEEDBACK")
 
 
+class BridgeServoStrategy:
+    """Reserved X vendor adapter contract; no guessed position/direction implementation."""
+    def supports_axis(self, axis):
+        return axis == "X"
+
+    def configured(self):
+        return False
+
+    def begin(self, execution_key):
+        pass
+
+    def step(self, position, target, **evidence):
+        return MotionDecision(reason="X_VENDOR_CONTRACT_NOT_CONFIGURED")
+
+
+class GrabLimitStrategy:
+    """Reserved G limit strategy; never reuse the Y/Z fixed-position controller."""
+    def supports_axis(self, axis):
+        return axis == "G"
+
+    def configured(self):
+        return False
+
+    def begin(self, execution_key):
+        pass
+
+    def step(self, position, target, **evidence):
+        return MotionDecision(reason="G_LIMIT_EXECUTION_NOT_CONFIGURED")
+
+
 class FixedSlowStrategy:
     def __init__(self, capability=AxisCapability(), stop_model=StopDistance(),
                  tolerance=None, settle_sec=None):

@@ -37,6 +37,7 @@ else
   git -C "$sdk" apply --check "$patch"
   git -C "$sdk" apply "$patch"
 fi
+python3 "$repo/tools/check_vendor_checkout.py" "$workspace"
 printf '%s\n' 'SDK pinned; XYZIRT patch applied; NO_DO_WRITE; driver NOT started'
 git -C "$sdk" rev-parse HEAD
 git -C "$sdk/src/rs_driver" rev-parse HEAD
