@@ -53,6 +53,9 @@ class DualLidarNode(Node):
         self._sensor_configs = {s: yaml.safe_load((site / "sensors" / ("er1_" + s + ".yaml")).read_text())
                                 for s in ("204", "205")}
         self._clocks = {}
+        self._maximum_span = self._cfg.get("maximum_frame_span_sec")
+        if self._maximum_span is not None:
+            bounded(self._maximum_span, "maximum_frame_span_sec")
         self._future = self._cfg.get("maximum_future_skew_sec")
         if self._future is not None:
             bounded(self._future, "maximum_future_skew_sec", 1.0, True)
@@ -73,6 +76,8 @@ class DualLidarNode(Node):
             self._clocks = {s: ClockContract.from_config(c) for s, c in self._sensor_configs.items()}
             if not self._clocks["204"].compatible(self._clocks["205"]):
                 raise ValueError("MIXED_CLOCK_MODE_OR_DOMAIN")
+            if not all(c.pairing_ready for c in self._clocks.values()):
+                raise ValueError("PTP_PROBING_NOT_TIMING_READY")
             self._sync = DualLidarSynchronizer(self._cfg["maximum_pair_delta_sec"],
                 self._cfg["stale_timeout_sec"], self._cfg["maximum_queue_size"], self._future)
         except (TypeError, ValueError, KeyError) as exc:
@@ -154,9 +159,13 @@ class DualLidarNode(Node):
                 0 if sensor == "204" else 1)
             cloud = Cloud(stamp, monotonic, msg.header.frame_id, points, int(self._source), now,
                           msg.header.stamp.sec * 1000000000 + msg.header.stamp.nanosec)
-            if self._future is not None and self._cfg.get("stale_timeout_sec") is not None:
+            cloud.timing.check_span(self._maximum_span)
+            probing = (self._sensor_configs[sensor].get("clock_mode") == "SENSOR_PTP"
+                       and self._sensor_configs[sensor].get("clock_sync_state") == "PROBING")
+            # Unrelated epochs are measurable diagnostics during PROBING, never ready.
+            if not probing and self._future is not None and self._cfg.get("stale_timeout_sec") is not None:
                 cloud.timing.check(now, self._future, self._cfg["stale_timeout_sec"],
-                                   self._cfg.get("header_first_point_tolerance_sec"))
+                                   self._cfg.get("header_first_point_tolerance_sec"), self._maximum_span)
             prior = self._previous_mid[sensor]
             if prior is not None and cloud.timing.mid <= prior:
                 if cloud.timing.mid < prior:
@@ -252,7 +261,7 @@ class DualLidarNode(Node):
         message.dual_lidar_ready = (not self._clock_fault and message.a_frame_valid and message.b_frame_valid
             and a["fresh"] and b["fresh"] and pairing
             and message.extrinsic_valid and message.coverage_valid
-            and self._cfg.get("point_timestamp_header_tolerance_sec") is not None)
+            and self._sync is not None and all(c.pairing_ready for c in self._clocks.values()))
         message.validity = message.VALID if message.dual_lidar_ready else message.DEGRADED
         message.evidence.source_type = int(self._source)
         message.evidence.validity = message.validity
@@ -295,6 +304,9 @@ class DualLidarNode(Node):
             "coverage_valid": message.coverage_valid, "dual_lidar_ready": message.dual_lidar_ready,
             "timing_ready": pairing, "spatial_reason": "SPATIAL_FUSION_NOT_CONFIGURED" if not self._merger else "CALIBRATED",
             "ptp_verified": timing.ptp_verified,
+            "host_clock_relation": {s: c.get("host_clock_relation", "NOT_CONFIGURED")
+                                    for s, c in self._sensor_configs.items()},
+            "maximum_frame_span_sec": self._maximum_span,
             "invalid_timestamps": self._sensor_counts,
             "reused_old_frame": False, "source_type": self._source.name, "reason": self._error}
         self._diagnostics.publish(String(data=json.dumps(diagnostics, allow_nan=False)))

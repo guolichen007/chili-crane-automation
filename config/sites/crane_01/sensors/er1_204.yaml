@@ -1,5 +1,14 @@
 sensor_id: er1_204
 host: 192.168.1.204
+transport_mode: UNICAST
+destination_address: 192.168.1.102
+host_address: 192.168.1.102
+group_address: null
+network_state: BENCH_VERIFIED
+network_evidence_id: USER_REPORTED_S3_FINAL_20261010
+observed_streams:
+  - {destination_port: 7799, payload_length: 1200, reported_role: MSOP, signature_verified: false}
+  - {destination_port: 6688, payload_length: 256, reported_role: DIFOP, signature_verified: false}
 candidate_ports: [7799, 6688]
 physical_side: NOT_CONFIGURED
 port_roles: NOT_CONFIGURED
@@ -14,4 +23,7 @@ clock_sync_state: NOT_CONFIGURED
 clock_domain: NOT_CONFIGURED
 stamp_basis: FIRST_POINT
 time_evidence_id: NOT_CONFIGURED
+host_clock_relation: NOT_CONFIGURED
+host_clock_relation_evidence_id: NOT_CONFIGURED
+host_clock_domain: NOT_CONFIGURED
 lidar_type: RSE1

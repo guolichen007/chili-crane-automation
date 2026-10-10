@@ -8,7 +8,14 @@ clock_sync_state：NOT_CONFIGURED / PROBING / PROVISIONAL / VALID / DEGRADED。
 stamp_basis：FIRST_POINT / LAST_POINT / MID_SCAN / HOST_RECEIVE / CAMERA_DEVICE / CAMERA_HOST。
 当前 ER1 adapter 使用 FIRST_POINT header，MID_SCAN 配对。
 VALID 不能由系统服务、收到包或设备在线推断；SENSOR_PTP 需明确同一 domain、
-已验证时间证据 ID；HOST_DERIVED 只允许 PROVISIONAL，不标 PTP_VERIFIED。
+已验证时间证据 ID、host_clock_relation=VALID、host_clock_relation_evidence_id，
+且 host_clock_domain 与两雷达 clock_domain 一致。
+HOST_DERIVED 只允许 PROVISIONAL，不标 PTP_VERIFIED。
+SENSOR_PTP/PROBING 可 render use_lidar_clock=true 采集诊断；domain 尚未确认可保留
+NOT_CONFIGURED，但永不 timing_ready/ptp_verified/full_ready。
+PROBING 不拿未证实同域的 Ubuntu now 拒绝全部源时间；原始时间及 receive 对照保留，
+帧结构/有限正时间/单调性和配置后的 span 上限仍校验。VALID 才使用已确认 host relation
+执行 source future/stale 检查。两雷达模式不得混用。
 参数 null 保持未配置；实验 CLI 参数不自动成为生产配置。
 
 ## 每点时间
@@ -19,6 +26,10 @@ Canonical XYZIRT：x/y/z/intensity float32、ring uint16、sensor_id uint8、tim
 FIRST_POINT 校验 abs(header-start)，不校验整帧所有点距 header。
 maximum_future_skew_sec 同时约束 header、end；正偏差可接受但上限有限，默认 null。
 stale 同时检查最早帧时间及服务器 monotonic receive。理论 RSE1 0.1s 仅参考。
+maximum_frame_span_sec 默认 null，先统计；设置后超过上限报 FRAME_SPAN_EXCEEDED。
+废弃 point_timestamp_header_tolerance_sec 和 clocks_synchronized；
+完整 readiness 只依赖实际 FIRST_POINT/future/stale 配对验证、ClockContract 及空间证据，
+不再受废弃字段影响。null 门限不自动转成生产常量。
 默认 MID_SCAN 差小于明确 maximum_pair_delta_sec 才配对；每帧只消费一次，队列有界，
 不用旧帧补单雷达。区间 overlap 为交集时长，ratio=交集/并集，零跨度同点 ratio=1。
 零 overlap 仍作为诊断事实记录；中点门限不等价于空间/运动补偿。
@@ -70,3 +81,17 @@ SlaveOnly 强制失败仅记 SLAVE_ONLY_FORCE_UNSUPPORTED；不推断 CAMERA_CAN
 PHYSICAL/SYNTHETIC/REPLAY 由 EvidenceMetadata 明确区分。CI synthetic 时间测试
 不是 ER1 或相机实测。PTP Capabilities 只证明网卡能力；packet probe 只证明报文存在；
 两者都不能单独证明 sensor 与系统时钟同源。生产验收 DEFERRED_TO_FIELD。
+
+## ER1 网络合同（R1）
+
+transport_mode：NOT_CONFIGURED / UNICAST / MULTICAST / BROADCAST。
+host_address 为本机接口 IPv4；destination_address 为设备实际发送目的地。
+UNICAST 要求两者一致；MULTICAST 必须指定 group_address，且等于组播目的地；
+renderer 和 launch 均验证，禁止手写 vendor config 绕过。
+按 pinned SDK 输出 host_address、group_address；非组播 group 为 0.0.0.0。
+当前 S3-FINAL 为双单播 .102，不再采用 S1 .10/组播建议。
+网络 observation 不提升 port_roles；只读 probe 必须以 length+最小 ID 判定角色：
+1200B + 55 AA 5A A5 为 CONFIRMED_MSOP；
+256B + A5 FF 00 5A 11 11 55 55 为 CONFIRMED_DIFOP，其他 UNKNOWN。
+两设备两角色的目的地址/端口需人工复核，才可在现场副本设置 port_roles=VALID。
+不保存 payload、不改设备或 site config。

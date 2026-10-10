@@ -75,9 +75,11 @@ sh scripts/network/check_lidar_network.sh
 sudo sh scripts/validation/phase1_er1_packet_probe.sh
 ```
 
-dry-run 只打印建议，绝不自动改 NetworkManager。现场人员独立审批后配置 enp3s0 的
-SENSOR-LIDAR 192.168.1.10/24，无 gateway/DNS、never-default。不得改 eno1/enp4s0。
-抓包需要 Linux CAP_NET_RAW，仅 enp3s0，只统计 IP/端口/长度/计数，不保存 payload。
+dry-run 只打印建议，绝不自动改 NetworkManager；已有 profile 返回 NO_CHANGE_REQUIRED
+或 PROFILE_REVIEW_REQUIRED，绝不建议重复创建。当前配置从 site 读取：
+enp3s0 / SENSOR-NET / 192.168.1.102/24，无 gateway/DNS、never-default。
+旧 .10 / SENSOR-LIDAR 已被 S3-FINAL 取代。不得改 eno1/enp4s0。
+抓包需要 Linux CAP_NET_RAW，仅 enp3s0，只保存 IP/端口/长度/计数和最小签名判定，不保存 payload。
 204=[7799,6688]、205=[6699,7788]；不能凭默认示例认定 MSOP/DIFOP。
 资产 physical_side、端口角色、设备目标 IP 均须现场记录，未经确认 driver_enabled=false。
 

@@ -7,6 +7,7 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_share_directory
 from chili_crane_slam.timebase import ClockContract
+from chili_crane_hardware.er1_transport import driver_transport
 
 
 def compose(context):
@@ -24,6 +25,8 @@ def compose(context):
         for sensor, driver in zip(("er1_204", "er1_205"), vendor["lidar"]):
             cfg = yaml.safe_load((site / "sensors" / (sensor + ".yaml")).read_text())
             clocks.append(ClockContract.from_config(cfg))
+            if any(driver["driver"].get(k) != v for k, v in driver_transport(cfg).items()):
+                raise ValueError("vendor/site transport contract mismatch")
             if (cfg.get("driver_enabled") is not True or cfg.get("port_roles") != "VALID"
                     or cfg.get("clock_mode") not in {"SENSOR_PTP", "HOST_DERIVED"}
                     or driver["driver"].get("lidar_type") != "RSE1"

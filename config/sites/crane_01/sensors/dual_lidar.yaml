@@ -5,14 +5,13 @@ single_lidar_fallback: false
 maximum_queue_size: 16
 maximum_pair_delta_sec: null
 stale_timeout_sec: null
-clocks_synchronized: false
 timing_only: true
 pairing_basis: MID_SCAN
 maximum_future_skew_sec: null
 header_first_point_tolerance_sec: null
 reference_frame_duration_sec: 0.1
+maximum_frame_span_sec: null
 coverage_verified: false
-point_timestamp_header_tolerance_sec: null
 source_type: PHYSICAL
 output_frame: crane_01/base
 products:

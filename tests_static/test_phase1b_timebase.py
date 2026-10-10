@@ -91,6 +91,8 @@ class TimebaseTests(unittest.TestCase):
         cfg = {"clock_mode": "SENSOR_PTP", "clock_sync_state": "VALID", "clock_domain": "ptp-0"}
         with self.assertRaises(ValueError):
             ClockContract.from_config(cfg)
-        ptp = ClockContract.from_config(dict(cfg, time_evidence_id="synthetic-only"))
+        ptp = ClockContract.from_config(dict(cfg, time_evidence_id="synthetic-only",
+            host_clock_relation="VALID", host_clock_relation_evidence_id="synthetic-host-proof",
+            host_clock_domain="ptp-0"))
         self.assertTrue(ptp.ptp_verified)
         self.assertFalse(ptp.compatible(ClockContract("HOST_DERIVED", "PROVISIONAL", "ptp-0")))

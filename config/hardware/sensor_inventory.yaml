@@ -27,8 +27,11 @@ sensors:
     driver_enabled: false
   camera_a:
     vendor: Hikrobot
-    reported_ip: "192.168.180"
-    network_config_state: NEEDS_CONFIRMATION
+    reported_ip: "192.168.1.180"
+    network_config_state: BENCH_REACHABLE
+    network_evidence_id: USER_REPORTED_S3_FINAL_20261010
+    requested_model: MV-CS060-10GC
+    model_confirmation_state: SDK_NOT_RUN
     physical_side: NOT_CONFIGURED
     driver_enabled: false
     enabled_for_control: false

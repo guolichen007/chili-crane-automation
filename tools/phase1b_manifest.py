@@ -19,7 +19,9 @@ def timebase(site, ptp_snapshot=None, camera_snapshot=None):
     lidar = {}
     for sensor in ("er1_204", "er1_205"):
         cfg = yaml.safe_load((site / "sensors" / (sensor + ".yaml")).read_text())
-        lidar[sensor] = {k: cfg.get(k) for k in ("clock_mode", "clock_sync_state", "clock_domain", "time_evidence_id", "stamp_basis")}
+        lidar[sensor] = {k: cfg.get(k) for k in ("clock_mode", "clock_sync_state", "clock_domain",
+            "time_evidence_id", "stamp_basis", "host_clock_relation", "host_clock_relation_evidence_id",
+            "host_clock_domain", "transport_mode", "destination_address", "host_address", "group_address")}
         lidar[sensor]["use_lidar_clock"] = (True if cfg["clock_mode"] == "SENSOR_PTP" else
                                              False if cfg["clock_mode"] == "HOST_DERIVED" else None)
     cfg = yaml.safe_load((site / "sensors/hik_01.yaml").read_text())
@@ -27,6 +29,8 @@ def timebase(site, ptp_snapshot=None, camera_snapshot=None):
         "transport": "NOT_CONFIGURED", "delay_mechanism": "NOT_CONFIGURED", "domain": None,
         "gm_identity": "NOT_CONFIGURED", "state": "NOT_CONFIGURED", "ptp_verified": False}
     camera = {"requested_timestamp_mode": cfg["timestamp_mode"], "actual_timestamp_mode": "NOT_RUN",
+        "expected_ip": cfg["expected_ip"], "expected_serial": cfg["expected_serial"],
+        "network_state": cfg.get("network_state", "NOT_CONFIGURED"),
         "ptp_state": "NOT_RUN", "exposure": None, "fps": None, "pixel_format": "NOT_RUN",
         "shutter_type": cfg["shutter_type"], "timing_model": cfg["timing_model"], "camera_control_authority": False}
     return {"lidars": lidar, "ptp": ptp, "camera": camera,

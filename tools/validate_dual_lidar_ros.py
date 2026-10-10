@@ -19,15 +19,16 @@ from chili_crane_slam.dual_lidar import Cloud
 from chili_crane_slam.pointcloud import CANONICAL
 
 
-def fixture(site, calibrated, timing_only=False, mixed_domain=False):
+def fixture(site, calibrated, timing_only=False, mixed_domain=False, ptp_probing=False, span_violation=False):
     for folder in ("sensors", "calibration"):
         (site / folder).mkdir()
     cfg = {"config_state": "VALID", "consume_once": True, "allow_old_frame_reuse": False,
         "single_lidar_fallback": False, "maximum_pair_delta_sec": .02, "stale_timeout_sec": .35,
         "maximum_queue_size": 4, "clocks_synchronized": True, "coverage_verified": True,
-        "point_timestamp_header_tolerance_sec": .1, "source_type": "SYNTHETIC",
+        "source_type": "SYNTHETIC",
         "pairing_basis": "MID_SCAN", "timing_only": timing_only,
         "maximum_future_skew_sec": .01, "header_first_point_tolerance_sec": .01,
+        "maximum_frame_span_sec": .005 if span_violation else None,
         "output_frame": "synthetic/base", "products": {}}
     (site / "sensors/dual_lidar.yaml").write_text(yaml.safe_dump(cfg))
     for sensor in ("204", "205"):
@@ -37,6 +38,8 @@ def fixture(site, calibrated, timing_only=False, mixed_domain=False):
             "normalized_topic": "/phase1a_synthetic/raw_" + sensor}
         if mixed_domain and sensor == "205":
             sensor_cfg["clock_domain"] = "synthetic-other-host"
+        if ptp_probing:
+            sensor_cfg.update(clock_mode="SENSOR_PTP", clock_sync_state="PROBING")
         (site / "sensors" / ("er1_" + sensor + ".yaml")).write_text(yaml.safe_dump(sensor_cfg))
         extrinsic = {"config_state": "VALID" if calibrated else "NOT_CONFIGURED",
             "calibration_id": "synthetic-only", "source_frame": sensor_cfg["frame_id"],
@@ -45,9 +48,9 @@ def fixture(site, calibrated, timing_only=False, mixed_domain=False):
         (site / "calibration" / ("er1_" + sensor + "_to_base.yaml")).write_text(yaml.safe_dump(extrinsic))
 
 
-def scenario(calibrated, timing_only=False, mixed_domain=False):
+def scenario(calibrated, timing_only=False, mixed_domain=False, ptp_probing=False, span_violation=False):
     with tempfile.TemporaryDirectory(prefix="chili-ros-synthetic-") as tmp:
-        fixture(Path(tmp), calibrated, timing_only, mixed_domain)
+        fixture(Path(tmp), calibrated, timing_only, mixed_domain, ptp_probing, span_violation)
         rclpy.init(args=["--ros-args", "-p", "site_config:=" + tmp, "-r", "__ns:=/phase1a_synthetic"])
         pipeline = observer = executor = None
         try:
@@ -97,6 +100,8 @@ def scenario(calibrated, timing_only=False, mixed_domain=False):
                 while time.monotonic() < end:
                     if time.monotonic() >= next_publish:
                         stamp = observer.get_clock().now().nanoseconds / 1e9 - .02
+                        if ptp_probing:
+                            stamp += 3600  # Unproven sensor epoch must remain measurable, not ready.
                         for sensor in sensors:
                             points = np.zeros(2, dtype=CANONICAL)
                             points["x"], points["timestamp"] = [1, 2], stamp
@@ -114,13 +119,20 @@ def scenario(calibrated, timing_only=False, mixed_domain=False):
                     executor.spin_once(timeout_sec=.01)
 
             pump(2.0, ("204", "205"))
+            if span_violation:
+                assert counts["204"] == counts["205"] == counts["merged"] == 0, counts
+                assert not latest["timing"].timing_ready and not latest["ready"].dual_lidar_ready
+                assert latest["ready"].reason == "FRAME_SPAN_EXCEEDED"
+                return {"frame_span_violation": True, "result": "PASS", "scope": "SYNTHETIC_ROS2_TRANSPORT_ONLY"}
             assert min(counts["204"], counts["205"]) >= 3, counts
             assert latest["ready"] is not None
             assert latest["ready"].evidence.source_type == 4
             assert latest.get("timing") is not None
-            if mixed_domain:
+            if mixed_domain or ptp_probing:
                 assert not latest["timing"].timing_ready and counts["merged"] == 0 and not transforms
-                return {"mixed_clock_domain": True, "result": "PASS", "scope": "SYNTHETIC_ROS2_TRANSPORT_ONLY"}
+                assert not latest["timing"].ptp_verified and not latest["ready"].dual_lidar_ready
+                return {"mixed_clock_domain": mixed_domain, "ptp_probing": ptp_probing,
+                        "result": "PASS", "scope": "SYNTHETIC_ROS2_TRANSPORT_ONLY"}
             assert latest["timing"].timing_ready
             if timing_only:
                 assert latest["timing"].header_delta_sec > .03
@@ -159,4 +171,5 @@ def scenario(calibrated, timing_only=False, mixed_domain=False):
 
 if __name__ == "__main__":
     print(json.dumps({"scenarios": [scenario(True), scenario(False), scenario(True, True),
-        scenario(False, True, True)], "LIVE_ER1_STATUS": "NOT_RUN"}))
+        scenario(False, True, True), scenario(False, True, ptp_probing=True),
+        scenario(False, True, span_violation=True)], "LIVE_ER1_STATUS": "NOT_RUN"}))

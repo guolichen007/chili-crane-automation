@@ -97,6 +97,8 @@ class Phase1BToolTests(unittest.TestCase):
             for i, s in enumerate(("204", "205")):
                 cfg = {"driver_enabled": True, "port_roles": "VALID", "clock_mode": "HOST_DERIVED",
                     "clock_sync_state": "PROVISIONAL", "clock_domain": "host-one",
+                    "transport_mode": "UNICAST", "host_address": "192.168.1.102",
+                    "destination_address": "192.168.1.102", "group_address": None,
                     "msop_port": 10000 + 2 * i, "difop_port": 10001 + 2 * i,
                     "frame_id": "sensor_" + s, "raw_topic": "/vendor_" + s}
                 configs.append(cfg)

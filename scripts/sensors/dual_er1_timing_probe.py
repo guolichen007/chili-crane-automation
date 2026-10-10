@@ -12,6 +12,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src/chili_crane_slam/src"))
 from chili_crane_slam.dual_lidar import Cloud, DualLidarSynchronizer
 from chili_crane_slam.pointcloud import normalize_cloud, CANONICAL
+from chili_crane_slam.timebase import bounded
 
 
 def quantiles(values, extra="max"):
@@ -23,7 +24,10 @@ def quantiles(values, extra="max"):
 
 
 class TimingProbe:
-    def __init__(self, pair_delta, future, stale):
+    def __init__(self, pair_delta, future, stale, maximum_frame_span=None):
+        if maximum_frame_span is not None:
+            bounded(maximum_frame_span, "maximum_frame_span_sec")
+        self.maximum_frame_span = maximum_frame_span
         self.sync = DualLidarSynchronizer(pair_delta, stale, 16, future)
         self.rows, self.pairs = [], []
         self.counts = {s: 0 for s in ("204", "205")}
@@ -42,6 +46,7 @@ class TimingProbe:
             "mid": f.mid, "span": f.span, "header_to_first": f.start - f.header,
             "header_to_last": f.end - f.header, "receive": now,
             "receive_latency": now - f.end, "hz": 1 / period if period and period > 0 else None})
+        f.check_span(self.maximum_frame_span)
         # Keep only time endpoints in bounded pairing queues, not large clouds.
         points = np.zeros(2, dtype=CANONICAL)
         points["timestamp"] = [f.start, f.end]
@@ -59,6 +64,7 @@ class TimingProbe:
             "duplicate_timestamp": self.sync.duplicates, "clock_regression": self.sync.regressions,
             "future_timestamp": self.sync.future_count, "invalid_timestamp": self.invalid,
             "ptp_verified": False, "site_config_modified": False}
+        result["maximum_frame_span_sec"] = self.maximum_frame_span
         for sensor in self.counts:
             rows = [r for r in self.rows if r["sensor"] == sensor]
             result[sensor] = {k: quantiles([r[k] for r in rows if r[k] is not None])
@@ -74,9 +80,10 @@ def main():
     p.add_argument("--pair-delta", type=float, required=True)
     p.add_argument("--future-skew", type=float, required=True)
     p.add_argument("--stale", type=float, required=True)
+    p.add_argument("--maximum-frame-span", type=float)
     p.add_argument("--output-dir", type=Path, required=True)
     a = p.parse_args()
-    probe = TimingProbe(a.pair_delta, a.future_skew, a.stale)
+    probe = TimingProbe(a.pair_delta, a.future_skew, a.stale, a.maximum_frame_span)
     if a.output_dir.exists():
         p.error("new output directory required")
     import rclpy

@@ -1,6 +1,12 @@
 # 辣椒地池行车自动抓取框架
 
-当前分支为 **Phase 1B / 台架传感器与统一时间基准**，承接 Phase 1A，
+当前分支为 **Phase 1B Bench R1 / 台架接入前补丁**，基线为 8118f993。
+网络配置以[传感器网络 S3-FINAL 收口](docs/hardware/20261010_传感器网络接入收口.md)为准：
+SENSOR-NET、enp3s0、192.168.1.102/24，双 ER1 单播到本机；
+相机地址 192.168.1.180。这些是用户回传网络证据，不是本轮实机采集。
+入口：[R1 跟踪](docs/validation/PHASE1B_BENCH_R1_TRACKER.md)。
+
+Phase 1B 承接 Phase 1A，
 提供双 ER1 每点帧时间、中点配对、PTP 探测、一台海康辅助图像/时间与录包工具。
 只做 timing-only，不做外参、空间融合、NDT、视觉 AI 或无人控制。
 入口：[Ubuntu 交接](docs/deployment/PHASE1B_UBUNTU_BENCH.md)、
@@ -72,7 +78,8 @@ production 当前也只是 fail-closed mock；bench_io 为只读采集，不启�
 
 对外/GPT审查先读[审查指南](docs/review/REVIEW_GUIDE.md)，贡献与推送遵循
 [CONTRIBUTING](CONTRIBUTING.md)，已接受决策与OPEN项分开记录。
-设备资产地址不自动映射左右或端口角色；相机地址未补全，不进入控制闭环。
+设备资产地址不自动映射左右或端口角色；相机地址已确认网络可达，
+但 SDK 型号/serial/出图仍未确认，不进入控制闭环。
 
 先读 [项目上下文](docs/PROJECT_CONTEXT.md)、[架构](docs/SYSTEM_ARCHITECTURE_AND_ROADMAP.md)、
 [台架手册](docs/hardware/HARDWARE_BENCH_RUNBOOK.md)、

@@ -39,8 +39,10 @@ class DeliveryContracts(unittest.TestCase):
             self.assertEqual("NOT_CONFIGURED", sensors[identity]["physical_side"])
             self.assertEqual("NOT_CONFIGURED", sensors[identity]["port_roles"])
             self.assertFalse(sensors[identity]["driver_enabled"])
-        self.assertEqual("192.168.180", sensors["camera_a"]["reported_ip"])
-        self.assertEqual("NEEDS_CONFIRMATION", sensors["camera_a"]["network_config_state"])
+        self.assertEqual("192.168.1.180", sensors["camera_a"]["reported_ip"])
+        self.assertEqual("BENCH_REACHABLE", sensors["camera_a"]["network_config_state"])
+        self.assertEqual("SDK_NOT_RUN", sensors["camera_a"]["model_confirmation_state"])
+        self.assertFalse(sensors["camera_a"]["driver_enabled"])
         self.assertFalse(sensors["camera_a"]["enabled_for_control"])
 
     def test_24_physical_channels_unassigned(self):

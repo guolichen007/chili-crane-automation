@@ -32,7 +32,15 @@ class FrameTime:
     def span(self):
         return self.end - self.start
 
-    def check(self, now, maximum_future_skew, stale, first_point_tolerance=None):
+    def check_span(self, maximum_frame_span):
+        if maximum_frame_span is not None:
+            maximum = bounded(maximum_frame_span, "maximum_frame_span_sec")
+            if self.span > maximum + 1e-9:
+                raise ValueError("FRAME_SPAN_EXCEEDED")
+
+    def check(self, now, maximum_future_skew, stale, first_point_tolerance=None,
+              maximum_frame_span=None):
+        self.check_span(maximum_frame_span)
         future = bounded(maximum_future_skew, "maximum_future_skew_sec", 1.0, True)
         bounded(stale, "stale_timeout_sec")
         if not math.isfinite(now) or now <= 0:
@@ -59,23 +67,48 @@ class ClockContract:
     state: str
     domain: str
     evidence_id: str = ""
+    host_relation: str = "NOT_CONFIGURED"
+    host_evidence_id: str = ""
+    host_domain: str = "NOT_CONFIGURED"
 
     @classmethod
     def from_config(cls, cfg):
         mode, state, domain = (cfg.get(k, "NOT_CONFIGURED")
                                for k in ("clock_mode", "clock_sync_state", "clock_domain"))
-        if mode not in {"SENSOR_PTP", "HOST_DERIVED"} or not isinstance(domain, str) or domain in {"", "NOT_CONFIGURED"}:
+        if mode not in {"SENSOR_PTP", "HOST_DERIVED"} or not isinstance(domain, str):
             raise ValueError("CLOCK_DOMAIN_NOT_CONFIGURED")
-        evidence = cfg.get("time_evidence_id") or ""
+        def evidence_value(key):
+            value = cfg.get(key)
+            return value if isinstance(value, str) and value.strip() and value != "NOT_CONFIGURED" else ""
+        evidence = evidence_value("time_evidence_id")
+        relation = cfg.get("host_clock_relation", "NOT_CONFIGURED")
+        host_evidence = evidence_value("host_clock_relation_evidence_id")
+        host_domain = cfg.get("host_clock_domain", "NOT_CONFIGURED")
+        if relation not in {"NOT_CONFIGURED", "PROBING", "VALID", "DEGRADED"}:
+            raise ValueError("HOST_CLOCK_RELATION_INVALID")
         if mode == "HOST_DERIVED" and state != "PROVISIONAL":
             raise ValueError("HOST_DERIVED_MUST_BE_PROVISIONAL")
-        if mode == "SENSOR_PTP" and (state != "VALID" or not evidence or evidence == "NOT_CONFIGURED"):
+        if not domain or domain == "NOT_CONFIGURED":
+            if not (mode == "SENSOR_PTP" and state == "PROBING"):
+                raise ValueError("CLOCK_DOMAIN_NOT_CONFIGURED")
+        if mode == "SENSOR_PTP" and state not in {"PROBING", "VALID"}:
             raise ValueError("PTP_EVIDENCE_NOT_VERIFIED")
-        return cls(mode, state, domain, evidence)
+        result = cls(mode, state, domain, evidence, relation, host_evidence, host_domain)
+        if mode == "SENSOR_PTP" and state == "VALID" and not result.ptp_verified:
+            raise ValueError("PTP_HOST_RELATION_OR_TIME_EVIDENCE_NOT_VERIFIED")
+        return result
 
     @property
     def ptp_verified(self):
-        return self.mode == "SENSOR_PTP" and self.state == "VALID" and bool(self.evidence_id)
+        return (self.mode == "SENSOR_PTP" and self.state == "VALID"
+                and self.domain not in {"", "NOT_CONFIGURED"} and bool(self.evidence_id)
+                and self.host_relation == "VALID" and bool(self.host_evidence_id)
+                and self.host_domain == self.domain)
+
+    @property
+    def pairing_ready(self):
+        return (self.mode == "HOST_DERIVED" and self.state == "PROVISIONAL"
+                and self.domain not in {"", "NOT_CONFIGURED"}) or self.ptp_verified
 
     def compatible(self, other):
         return self.mode == other.mode and self.domain == other.domain

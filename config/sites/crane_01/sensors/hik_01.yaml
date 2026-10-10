@@ -3,7 +3,10 @@ model: MV-CS060-10GC
 driver_enabled: false
 camera_control_authority: false
 expected_serial: NOT_CONFIGURED
-expected_ip: NOT_CONFIGURED
+expected_ip: 192.168.1.180
+network_state: BENCH_REACHABLE
+network_evidence_id: USER_REPORTED_S3_FINAL_20261010
+model_confirmation_state: SDK_NOT_RUN
 frame_id: crane_01/hik_01
 shutter_type: ROLLING
 timing_model: FRAME_TIMESTAMP_PLUS_ROLLING_SHUTTER

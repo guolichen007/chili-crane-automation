@@ -1,4 +1,5 @@
-office: {interface: eno1, modification_allowed: false}
+evidence_id: USER_REPORTED_S3_FINAL_20261010
+office: {interface: eno1, address: 192.168.110.102/24, gateway: 192.168.110.1, modification_allowed: false}
 control:
   interface: enp4s0
   profile: ADAM-CONTROL
@@ -7,11 +8,16 @@ control:
   dns: []
   never_default: true
   modification_allowed: false
+  observed_link_state: LOWER_UP
 lidar:
-  config_state: PROPOSED_NOT_APPLIED
+  config_state: BENCH_VERIFIED
   interface: enp3s0
-  profile: SENSOR-LIDAR
-  address: 192.168.1.10/24
+  profile: SENSOR-NET
+  address: 192.168.1.102/24
   gateway: null
   dns: []
   never_default: true
+  ipv6_method: disabled
+  modification_allowed: false
+  switch_model: TL-SG1005P
+  switch_ports: {P1: er1_204, P2: er1_205, P3: hik_01, P4: RESERVED, P5: enp3s0}

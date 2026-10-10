@@ -3,7 +3,7 @@
 ## 1. 边界与前置条件
 
 原生 Ubuntu22.04 / ROS2 Humble / Python3.10 / GCC11。按精确 SHA checkout
-`codex/phase1b-sensor-timebase-v1`；不修改 main，不把台架当生产验收。
+`codex/phase1b-bench-r1`；不修改 main，不把台架当生产验收。
 physical_output_enabled=false、automatic_control_enabled=false、camera_control_authority=false。
 不接 DO，不做运动、NDT、外参、视觉 AI。外参保持 NOT_CONFIGURED。
 Phase1B 启动强制 timing-only，即使错误提供 VALID 外参也不发 TF/merged。
@@ -20,6 +20,19 @@ sh scripts/setup/install_rslidar_sdk.sh --workspace /absolute/isolated-vendor-wo
 Windows 只能静态；GitHub Ubuntu 容器软件 build/test 仍不是本机硬件验收。
 
 ## 2. 先只读测网络与 PTP
+
+当前网络见[最新 S3-FINAL](../hardware/20261010_传感器网络接入收口.md)：
+SENSOR-NET / enp3s0 / 192.168.1.102/24；双 ER1 单播。
+ADAM 独立报告，断线不会让 sensor-only 检查失败。
+
+```sh
+sh scripts/network/create_lidar_profile.sh --dry-run
+sh scripts/network/check_lidar_network.sh --check-adam
+python3 scripts/sensors/er1_udp_probe.py --interface enp3s0 --duration 30
+```
+
+已有 SENSOR-NET 只读核对；本轮不执行 NetworkManager/雷达/时间服务变更。
+role probe 输出必须人工审核，不由上报的端口名称直接升级 VALID。
 
 ```sh
 sh scripts/time/check_ptp_capabilities.sh enp3s0
@@ -43,11 +56,19 @@ linuxptp 候选命令只打印，不运行；owner 评审 chrony/timesyncd/PTP �
 ## 3. 配置两种时间模式（独立的现场 config 副本）
 
 双 ER1 必须同模式/domain；port_roles、msop/difop、frame/topic 仍需现场确认。
-SENSOR_PTP：use_lidar_clock=true，VALID + 真实证据 ID。
+SENSOR_PTP 初次采证：clock_sync_state=PROBING，use_lidar_clock=true，
+允许记录尚未对齐的时间域；timing_ready/ptp_verified/full_ready 恒 false。
+PROBING 时 domain 可未知，但不能据此推断相同已验证时间域。
+SENSOR_PTP 完成采证：VALID + 真实 time_evidence_id + 两雷达共同 clock_domain，
+host_clock_relation=VALID + host_clock_relation_evidence_id + 同域 host_clock_domain。
+需证明 Ubuntu source_now 与该域的关系，不能凭 ptp4l/报文在线确认。
 HOST_DERIVED：use_lidar_clock=false，PROVISIONAL，PTP_VERIFIED=false，domain 指向同一台主机时钟。
 不要混用。不复用过去 SENSOR_SYNCHRONIZED/HOST_RECEIVE 名称。
 dual_lidar.yaml 明确 config_state=VALID、MID_SCAN、配对差、stale、future、FIRST_POINT 门限；
-这些门限当前 null，需测量，不从理论 100ms 填生产常量。clocks_synchronized 旧 bool 不再足够。
+这些门限当前 null，需测量，不从理论 100ms 填生产常量。
+maximum_frame_span_sec 先统计再配置；clocks_synchronized 和
+point_timestamp_header_tolerance_sec 已废弃。配置 UNICAST host_address/destination_address=.102；
+若现场另改 MULTICAST，必须同时配置 host_address/group_address，禁止缺 group 启动。
 
 ```sh
 python3 scripts/sensors/render_er1_config.py --site /absolute/config/sites/crane_01 --output /absolute/artifacts/er1-driver.yaml
@@ -63,6 +84,8 @@ python3 scripts/sensors/dual_er1_timing_probe.py --seconds 120 --pair-delta "${P
 
 现场从官方安装 MVS SDK，设置 MVS_PYTHON_PATH 到官方 `MvImport`，不向仓库复制 SDK。
 运行身份必须精确匹配型号 MV-CS060-10GC 以及 serial/IP，禁止首次设备自动绑定。
+expected_ip=192.168.1.180；网络 BENCH_REACHABLE 只代表 ping，
+型号仍是 requested，必须 SDK 枚举确认型号、填写 serial 后再人工启用现场副本。
 保留 camera_control_authority=false；driver_enabled 默认 false。
 
 ```sh
