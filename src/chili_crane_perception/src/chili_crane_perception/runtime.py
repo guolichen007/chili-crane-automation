@@ -55,6 +55,7 @@ class GrabPerceptionNode(Node):
                     or self.config.get("extrinsic_calibration_id") in (None, "", "NOT_CONFIGURED")
                     or self.config.get("time_domain") not in ("HOST_UTC","ROS_TIME")
                     or self.config.get("source_type") == "PHYSICAL" and self.config.get("time_domain") != "HOST_UTC"
+                    or self.config.get("source_type") == "PHYSICAL" and self.get_parameter("use_sim_time").value
                     or self.config.get("config_version") in (None, "", "NOT_CONFIGURED")):
                 raise ValueError("SOURCE_FRAME_CALIBRATION_NOT_CONFIGURED")
             covariance(self.config["extrinsic_covariance"], 6)

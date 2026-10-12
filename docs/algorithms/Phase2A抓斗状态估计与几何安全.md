@@ -111,6 +111,7 @@ Ubuntu命令：
 config/perception/phase2a_grab.template.yaml保持NOT_CONFIGURED。
 owner副本须CAD采样/安全顶点、政策、source/extrinsic ID/common frame及semantic map路径。
 time_domain必须明确HOST_UTC或ROS_TIME；PHYSICAL只能HOST_UTC，replay/simulation需明确ROS时钟。
+回放/模拟可显式use_sim_time:=true并提供/clock；PHYSICAL拒绝sim clock，不能混淆时域。
 验证源时钟age与monotonic receive age共同阻止DDS处理前积压刷新“新鲜”。
 input=/crane_01/perception/grab_input（common-frame canonical XYZIRT、MID_SCAN header），
 同帧grab_input_evidence（calibration/config/source/counter/measurement stamp），
