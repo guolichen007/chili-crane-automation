@@ -1,8 +1,11 @@
 # Phase1B PTP TimeScale R2 跟踪
 
 BASE_SHA: 48674999d07c5df24e8b3e36ded55b8b779794a2
+EVIDENCE_SHA: 64d00a3a3dc4e434fe449d214bbe67c5ef335e92
 
 分支 codex/phase1b-ptp-timescale-r2，main 不修改。
+软件证据见[精确 SHA 验收](Phase1B时间尺度R2软件验收_64d00a3.md)。
+归档文档的最终 HEAD 远端 CI 单独复核，不复用旧 SHA 冒充通过。
 
 | 项目 | 状态 | 验证 |
 | --- | --- | --- |
@@ -13,9 +16,9 @@ BASE_SHA: 48674999d07c5df24e8b3e36ded55b8b779794a2
 | 持续 DIFOP/MSOP、TTL、重复证据与降级 | IMPLEMENTED | 纯 parser/tracker 与 ROS transport |
 | clock / scan phase 独立 | IMPLEMENTED | FrameSync0/1，status0/1/2 |
 | LOCAL 台架与 VALID 生产门禁 | IMPLEMENTED | 分别验证，禁止字符串越级 |
-| Windows 静态 | IN_PROGRESS | 全套 tests_static、repo checks |
-| Ubuntu22/Humble clean build/test | IN_PROGRESS | exact-SHA CI |
-| 远端精确 SHA 全绿 | IN_PROGRESS | Static、ROS、vendor jobs |
+| Windows 静态 | PASS | 240：239 通过、1 ROS 环境缺失跳过；repo checks |
+| Ubuntu22/Humble clean build/test | PASS | 七包；175 项 colcon；14 个 transport 场景 |
+| 远端代码精确 SHA 全绿 | PASS | Static 38206321552、ROS/vendor 38206321572 |
 
 本轮 Codex 未现场采集，S13/S14 回传不被软件 CI 重新升级。
 driver disabled，physical_output_enabled=false，automatic_control_enabled=false，
