@@ -1,0 +1,29 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+
+std_msgs/Header header
+uint8 validity
+string reason
+
+string pit_id
+float64 raw_horizontal_clearance_m
+float64 conservative_clearance_m
+bool inside_pit
+bool inside_safe_polygon
+bool vertical_wall_overlap
+bool wall_collision_relevant
+bool wall_collision_risk
+int32 nearest_boundary_index
+float64 grab_bottom_nominal_m
+float64 grab_bottom_lower_bound_m
+float64 grab_top_upper_bound_m
+float64 pose_uncertainty_margin_m
+float64 geometry_uncertainty_margin_m
+float64 motion_smear_margin_m
+bool valid_for_control
+float64 confidence
+float64 evidence_age_sec
+chili_crane_msgs/EvidenceMetadata evidence
