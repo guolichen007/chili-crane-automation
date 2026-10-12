@@ -60,7 +60,11 @@ class InstallationPreview(Node):
             ttl = sensor_cfg.get("preview_cloud_timeout_sec")
             stamp = msg.header.stamp.sec + msg.header.stamp.nanosec / 1e9
             source_age = self.get_clock().now().nanoseconds / 1e9 - stamp
-            report["sensor"][s]["source_age_sec"] = source_age
+            relation = sensor_cfg.get("time_scale_relation", {})
+            time_domain_verified = (relation.get("target_scale") == "HOST_UTC"
+                and relation.get("relation_state") in ("VALID","LOCAL_VERIFIED")
+                and not self.get_parameter("use_sim_time").value)
+            report["sensor"][s]["source_age_sec"] = source_age if time_domain_verified else None
             report["sensor"][s]["source_age_domain"] = sensor_cfg.get("time_scale_relation", {}).get("target_scale", "UNKNOWN")
             if not receive_fresh(time.monotonic(), arrival, ttl):
                 report["sensor"][s]["state"] = "STALE"

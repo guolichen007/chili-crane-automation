@@ -3,6 +3,7 @@
   "config_state": "NOT_CONFIGURED",
   "config_version": "NOT_CONFIGURED",
   "source_type": "NOT_CONFIGURED",
+  "time_domain": "NOT_CONFIGURED",
   "common_frame": "NOT_CONFIGURED",
   "extrinsic_calibration_id": "NOT_CONFIGURED",
   "extrinsic_state": "NOT_CONFIGURED",

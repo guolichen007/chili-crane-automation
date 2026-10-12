@@ -151,7 +151,12 @@ class GrabModelRegistration:
         normals = model_normals[ids[keep]] @ pose[:3, :3].T
         residual = np.einsum("ij,ij->i", normals, transform(mp, pose) - observed[keep])
         weights = np.minimum(1, cfg["huber_m"] / np.maximum(np.abs(residual), 1e-12))
-        j = np.hstack([normals, np.cross(mp, normals @ pose[:3, :3])])
+        # Observability comes from OBSERVED surface normals, not invisible CAD faces.
+        # Native fine source already has its own normal/covariance preprocessing.
+        source_xyz, source_normals = source.points()[:,:3], source.normals()[:,:3]
+        _, source_ids = cKDTree(source_xyz).query(observed[keep])
+        observed_normals = source_normals[source_ids]
+        j = np.hstack([observed_normals, np.cross(mp, observed_normals @ pose[:3, :3])])
         h = j.T @ (weights[:, None] * j)
         eigenvalues, eigenvectors = np.linalg.eigh((h + h.T) / 2)
         floor = max(eigenvalues.max() * cfg["information_eigen_ratio"], 1e-12)

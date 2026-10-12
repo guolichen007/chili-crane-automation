@@ -53,6 +53,8 @@ class GrabPerceptionNode(Node):
             if (self.config.get("config_state") != "VALID" or self.config.get("source_type") not in SOURCE_NAMES.values()
                     or self.config.get("common_frame") in (None, "", "NOT_CONFIGURED")
                     or self.config.get("extrinsic_calibration_id") in (None, "", "NOT_CONFIGURED")
+                    or self.config.get("time_domain") not in ("HOST_UTC","ROS_TIME")
+                    or self.config.get("source_type") == "PHYSICAL" and self.config.get("time_domain") != "HOST_UTC"
                     or self.config.get("config_version") in (None, "", "NOT_CONFIGURED")):
                 raise ValueError("SOURCE_FRAME_CALIBRATION_NOT_CONFIGURED")
             covariance(self.config["extrinsic_covariance"], 6)
@@ -114,6 +116,9 @@ class GrabPerceptionNode(Node):
             meta, meta_arrival = meta_tuple
             io, io_arrival = io_tuple
             frame_stamp = seconds(cloud.header.stamp)
+            source_now = time.time() if self.config["time_domain"] == "HOST_UTC" else self.get_clock().now().nanoseconds/1e9
+            if not 0 <= source_now-frame_stamp <= ttl:
+                raise ValueError("SOURCE_TIME_DOMAIN_FRESHNESS_GATE")
             if seconds(meta.measurement_stamp) != frame_stamp:
                 if seconds(meta.measurement_stamp) < frame_stamp and now-arrival <= ttl:
                     self.slot.restore_if_empty(item)
@@ -157,7 +162,8 @@ class GrabPerceptionNode(Node):
                                            self.config["extrinsic_covariance"], prior)
             self.last_counter, self.last_arrival = meta.source_counter, arrival
             age = max(time.monotonic() - arrival,
-                      time.monotonic() - meta_arrival + meta.evidence_age_sec)
+                      time.monotonic() - meta_arrival + meta.evidence_age_sec,
+                      (time.time() if self.config["time_domain"] == "HOST_UTC" else self.get_clock().now().nanoseconds/1e9)-frame_stamp)
             if age > ttl:
                 raise ValueError("PROCESSING_DEADLINE_EXCEEDED")
             state, geometry = GrabState(), GrabGeometrySafetyState()

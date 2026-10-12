@@ -41,7 +41,7 @@ def main():
         config = fixture()
         semantic = tmp / "semantic.yaml"
         semantic.write_text(yaml.safe_dump({"config_state":"VALID","frame_id":"map","pits":[pit()]}), encoding="utf-8")
-        config.update(config_state="VALID",config_version="synthetic-ci-v1",extrinsic_calibration_id="synthetic-extrinsic",
+        config.update(config_state="VALID",time_domain="ROS_TIME",config_version="synthetic-ci-v1",extrinsic_calibration_id="synthetic-extrinsic",
             physical_output_enabled=False,automatic_control_enabled=False,camera_control_authority=False,
             semantic_map_file=str(semantic),pit_id="SYNTHETIC_PIT")
         file = tmp / "shadow.yaml"
