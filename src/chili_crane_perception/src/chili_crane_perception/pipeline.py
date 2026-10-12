@@ -78,6 +78,17 @@ class GrabPerceptionPipeline:
         self.stability = SwingStability(self.policy)
         self.config = config
 
+    def smear_bounds(self, span):
+        state, policy = self.tracker, self.policy
+        if state.pose is None or state.confirmations < 2:
+            speed, angular = policy["maximum_linear_speed_mps"], policy["maximum_angular_speed_radps"]
+        else:
+            speed = np.linalg.norm(state.velocity) + policy["uncertainty_sigma"] * np.sqrt(
+                max(np.linalg.eigvalsh(state.covariance[6:9,6:9]).max(),0))
+            angular = np.linalg.norm(state.omega) + policy["uncertainty_sigma"] * np.sqrt(
+                max(np.linalg.eigvalsh(state.covariance[9:12,9:12]).max(),0))
+        return float(speed*span/2), float(angular*span/2)
+
     def process(self, points, stamp, opening, source_type, extrinsic_covariance, suspension=None):
         if source_type not in {"PHYSICAL", "REPLAY", "SIMULATED", "SYNTHETIC"}:
             raise ValueError("SOURCE_UNKNOWN")
@@ -92,6 +103,7 @@ class GrabPerceptionPipeline:
         stages["candidate"] = time.perf_counter() - start
         predicted = self.tracker.pose.copy() if self.tracker.pose is not None else None
         observations, rejected = [], []
+        registration_seconds, validation_seconds = 0.0, 0.0
         start = time.perf_counter()
         openings = [opening] if opening in self.model.shapes else list(self.model.shapes)
         for candidate in candidates:
@@ -111,9 +123,13 @@ class GrabPerceptionPipeline:
                     seed = base.copy()
                     seed[:3, :3] = seed[:3, :3] @ Rotation.from_rotvec([0, 0, yaw]).as_matrix()
                     try:
+                        registration_start = time.perf_counter()
                         measured = self.registration.register(candidate, seed, geometry_opening)
+                        registration_seconds += time.perf_counter()-registration_start
+                        validation_start = time.perf_counter()
                         status, reasons, canonical_pose = self.validator.evaluate(
                             measured, predicted, dt if dt > 0 else None, opening, self.model, self.policy, suspension)
+                        validation_seconds += time.perf_counter()-validation_start
                         if status == "ACCEPTED":
                             observations.append((measured.p95, measured, canonical_pose))
                         else:
@@ -121,6 +137,7 @@ class GrabPerceptionPipeline:
                     except (ValueError, RuntimeError) as exc:
                         rejected.append(str(exc))
         stages["registration_validation"] = time.perf_counter() - start
+        stages["registration"], stages["validation"] = registration_seconds, validation_seconds
         start = time.perf_counter()
         accepted = min(observations, key=lambda o: o[0]) if observations else None
         if accepted is not None and any(np.linalg.norm(o[2][:3, 3] - accepted[2][:3, 3])
@@ -134,9 +151,10 @@ class GrabPerceptionPipeline:
             measurement_cov = basis @ measurement_cov @ basis.T
             span = float(np.ptp(points["timestamp"]))
             radius = float(np.linalg.norm(self.model.safety(opening), axis=1).max())
-            smear = np.linalg.norm(self.tracker.velocity) * span / 2 + radius * np.linalg.norm(self.tracker.omega) * span / 2
+            translation_smear, rotation_smear = self.smear_bounds(span)
+            smear = translation_smear + radius*rotation_smear
             measurement_cov[:3, :3] += np.eye(3) * smear**2
-            measurement_cov[3:,3:] += np.eye(3) * (np.linalg.norm(self.tracker.omega)*span/2)**2
+            measurement_cov[3:,3:] += np.eye(3) * rotation_smear**2
             self.tracker.update(accepted[2], measurement_cov, self.model)
         else:
             self.tracker.missing(stamp)
@@ -147,9 +165,26 @@ class GrabPerceptionPipeline:
                       accepted=accepted is not None, envelope=None, swing={"valid": False, "motion_stable": False})
         if self.tracker.pose is not None and opening in {"OPEN", "CLOSED", "TRANSITION"}:
             start = time.perf_counter()
+            span = float(np.ptp(points["timestamp"]))
+            translation_smear, rotation_smear = self.smear_bounds(span)
+            result["motion_smear_translation_margin_m"] = translation_smear
+            result["motion_smear_rotation_margin_rad"] = rotation_smear
             result["envelope"] = envelope(self.model, self.tracker.pose, self.tracker.covariance[:6, :6],
                 opening, extrinsic_covariance, self.tracker.velocity, self.tracker.omega,
-                float(np.ptp(points["timestamp"])), self.policy["uncertainty_sigma"])
+                0, self.policy["uncertainty_sigma"])
+            # Smear is an independent bounded displacement, not a fake new pose measurement.
+            from dataclasses import replace
+            radius = float(np.linalg.norm(self.model.safety(opening),axis=1).max())
+            smear = translation_smear + radius*rotation_smear
+            state_env = result["envelope"]
+            from .geometry import convex_xy
+            angles = np.arange(32)*2*np.pi/32
+            disk = np.column_stack([np.cos(angles),np.sin(angles)])*smear/np.cos(np.pi/32)
+            expanded = (state_env.conservative_footprint[:,None,:]+disk[None,:,:]).reshape(-1,2)
+            result["envelope"] = replace(state_env, conservative_footprint=convex_xy(np.c_[expanded,np.zeros(len(expanded))]),
+                bottom_lower_bound=state_env.bottom_lower_bound-smear,
+                bottom_upper_bound=state_env.bottom_upper_bound+smear,
+                top_upper_bound=state_env.top_upper_bound+smear, smear_margin=smear)
             attachment = self.model.shapes[opening if opening in self.model.shapes else "OPEN"].suspension_reference
             result["swing"] = self.stability.update(self.tracker, suspension, attachment)
             stages["geometry"] = time.perf_counter() - start

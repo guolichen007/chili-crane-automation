@@ -98,6 +98,20 @@ class GeometryTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.env(cov=-np.eye(6))
 
+    def test_swing_window_hysteresis_and_missing_prior(self):
+        from types import SimpleNamespace
+        stable = SwingStability(self.config["policy"])
+        state = SimpleNamespace(pose=self.pose,source="FILTERED",tracking="TRACKED",velocity=np.zeros(3),innovation=0.)
+        prior = SuspensionPrior(np.array([0.,0.,6.]),10,"synthetic")
+        for stamp in (10.,10.1,10.2,10.31,10.4):
+            state.stamp = stamp
+            result = stable.update(state,prior,np.array([0,0,.6]))
+        self.assertTrue(result["motion_stable"])
+        state.stamp = 10.5
+        state.velocity[0] = .2
+        self.assertFalse(stable.update(state,prior,np.array([0,0,.6]))["motion_stable"])
+        self.assertFalse(stable.update(state,None,np.array([0,0,.6]))["valid"])
+
 
 class NativeGrabTests(unittest.TestCase):
     @classmethod
@@ -143,7 +157,7 @@ class NativeGrabTests(unittest.TestCase):
         observed = self.registration.register(points, pose, "CLOSED")
         for bad in (replace(observed, sectors=1), replace(observed, inlier_ratio=.1),
                     replace(observed, eigenvalues=np.zeros(6)), replace(observed, converged=False)):
-            self.assertEqual("REJECTED", GrabObservationValidator().evaluate(
+            self.assertNotEqual("ACCEPTED", GrabObservationValidator().evaluate(
                 bad, pose, .1, "CLOSED", self.model, self.config["policy"])[0])
 
     def test_tracker_confirmation_loss_and_reacquisition(self):
@@ -190,3 +204,42 @@ class NativeGrabTests(unittest.TestCase):
         self.assertFalse(result["valid_for_control"])
         with self.assertRaisesRegex(ValueError, "SYNTHETIC_MODEL_ON_PHYSICAL"):
             pipeline.process(points, 11, "CLOSED", "PHYSICAL", np.eye(6)*1e-6)
+
+    def test_open_and_transition_never_assume_mid_opening(self):
+        pipeline = GrabPerceptionPipeline(self.config)
+        pose, _ = self.points()
+        for i in range(3):
+            points = scene(self.config["model"],pose,10+i*.1,opening="OPEN")
+            result = pipeline.process(points,10+i*.1,"OPEN","SYNTHETIC",np.eye(6)*1e-6)
+        self.assertEqual("TRACKED",result["tracking"],result["reasons"])
+        points = scene(self.config["model"],pose,10.3,opening="TRANSITION")
+        result = pipeline.process(points,10.3,"TRANSITION","SYNTHETIC",np.eye(6)*1e-6)
+        self.assertEqual("PREDICTED",result["source"])
+        self.assertFalse(result["accepted"])
+        self.assertIsNotNone(result["envelope"])
+
+    def test_ambiguous_two_grabs_are_not_silently_locked(self):
+        pipeline = GrabPerceptionPipeline(self.config)
+        pose, _ = self.points()
+        other = pose.copy()
+        other[0,3] += 4
+        from chili_crane_slam.pointcloud import CANONICAL
+        for i in range(3):
+            first, second = scene(self.config["model"],pose,10+i*.1), scene(self.config["model"],other,10+i*.1)
+            points = np.empty(len(first)+len(second),dtype=CANONICAL)
+            points[:len(first)],points[len(first):] = first,second
+            result = pipeline.process(points,10+i*.1,"CLOSED","SYNTHETIC",np.eye(6)*1e-6)
+        self.assertNotEqual("TRACKED",result["tracking"])
+        self.assertIn("AMBIGUOUS_MODEL_ASSOCIATION",result["reasons"])
+
+    def test_initial_pose_error_sweep_and_single_side_support(self):
+        pose, points = self.points()
+        for error in (.02,.08,.18):
+            seed = pose.copy()
+            seed[0,3] += error
+            observation = self.registration.register(points,seed,"CLOSED")
+            self.assertLess(np.linalg.norm(observation.pose[:3,3]-pose[:3,3]),.03)
+        partial = points[points["x"] > pose[0,3]]
+        observation = self.registration.register(partial,pose,"CLOSED")
+        self.assertTrue(np.isfinite(observation.covariance).all())
+        self.assertLessEqual(observation.sectors,4)

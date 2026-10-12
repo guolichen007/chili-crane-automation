@@ -23,6 +23,8 @@ float64 pose_uncertainty_margin_m
 float64 geometry_uncertainty_margin_m
 float64 extrinsic_uncertainty_margin_m
 float64 motion_smear_margin_m
+float64 motion_smear_translation_margin_m
+float64 motion_smear_rotation_margin_rad
 float64 frame_span_sec
 geometry_msgs/Vector3 linear_velocity
 geometry_msgs/Vector3 angular_velocity

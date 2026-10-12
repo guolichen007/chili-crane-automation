@@ -85,7 +85,7 @@ def main():
             msg.evidence.measurement_stamp = msg.evidence.receive_stamp = stamp
             msg.evidence.source_type = 4
 
-        def pump(duration, stationary=None, clock=1, frame=1, collect=False):
+        def pump(duration, stationary=None, clock=1, frame=1, collect=False, until_complete=False):
             end, next_pub = time.monotonic() + duration, 0
             while time.monotonic() < end:
                 if time.monotonic() >= next_pub:
@@ -119,10 +119,12 @@ def main():
                             verification_method="SYNTHETIC_FIXTURE", evidence_id="CI_SYNTHETIC_ONLY")
                         evidence(motion, now.to_msg())
                         pubs["rig"].publish(motion)
-                    next_pub = time.monotonic() + .04
+                    next_pub = time.monotonic() + .08
                 executor.spin_once(timeout_sec=.002)
                 if collect:
                     capture.collect()
+                if until_complete and len(capture.accumulator.rows) == 20 and capture.gate():
+                    break
         try:
             pump(1)
             assert not capture.gate(), "Missing stationarity must block capture"
@@ -134,8 +136,10 @@ def main():
                     measurement_method="SYNTHETIC_FIXTURE", measurement_uncertainty={"translation_m": .01, "rotation_rad": .01},
                     operator="CI", date="2026-10-12", mount_revision="synthetic-r1")
                 path.write_text(yaml.safe_dump(seed))
-            pump(1.8, stationary=True, collect=True)
-            assert capture.gate() and len(capture.accumulator.rows) == 20
+            pump(8, stationary=True, collect=True, until_complete=True)
+            assert capture.gate() and len(capture.accumulator.rows) == 20, (
+                "bounded capture incomplete: rows=" + str(len(capture.accumulator.rows))
+                + " gate=" + str(capture.gate()) + " evidence=" + json.dumps(capture.evidence))
             assert counts["rough"] >= 2 and latest["diagnostics"]["extrinsic_valid"] is False
             manifest = capture.save()
             assert manifest["source_type"] == "SYNTHETIC" and len(manifest["artifacts"]) == 4

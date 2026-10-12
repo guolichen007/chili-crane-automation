@@ -16,6 +16,7 @@ from chili_crane_perception.pipeline import GrabPerceptionPipeline
 from chili_crane_perception.geometry import PitBoundaryModel, convex_xy
 from chili_crane_perception.registration import equivalent_pose
 from chili_crane_slam.calibration_geometry import transform
+from chili_crane_perception.tracker import SuspensionPrior
 
 
 def run():
@@ -28,13 +29,18 @@ def run():
         pipeline = GrabPerceptionPipeline(config)
         truth = np.eye(4)
         truth[:3,3] = [0.1 if index%3 == 0 else 3.05 if index%3 == 1 else 4.1, -.1, 2]
-        truth[:3,:3] = Rotation.from_euler("xyz", [.03, -.04, .12]).as_matrix()
+        truth[:3,:3] = Rotation.from_euler("xyz", [.03*(index%3), -.02*(index%4), .12]).as_matrix()
+        base_z = truth[2,3]
+        velocity = (0,0,.2 if index%2 else 0)
         result = None
         for frame in range(4):
             stamp = 10 + frame * .1
+            truth[2,3] = base_z + velocity[2]*frame*.1
             points = scene(config["model"], truth, stamp, noise=noise, occlusion=occlusion,
-                           outliers=20, one_sensor=single, span=span, seed=index*10+frame)
-            result = pipeline.process(points, stamp, "CLOSED", "SYNTHETIC", np.eye(6)*1e-5)
+                           outliers=20, one_sensor=single, span=span, velocity=velocity, seed=index*10+frame)
+            # Correlated pose/extrinsic perturbation is bounded, never treated as identity fallback.
+            prior = SuspensionPrior(np.array([0.,0.,6.]),stamp,"SYNTHETIC_SUSPENSION")
+            result = pipeline.process(points, stamp, "CLOSED", "SYNTHETIC", np.eye(6)*(1e-5*(1+index%3)),prior)
             if result["envelope"] is not None:
                 start = time.perf_counter()
                 clearance = boundary.clearance(result["envelope"])
@@ -58,6 +64,7 @@ def run():
                 true_clearance_m=true_clearance, conservative_clearance_m=estimate)
             unsafe += int(estimate > true_clearance + 1e-6)
             bottom_violations += int(result["envelope"].bottom_lower_bound > true_vertices[:,2].min() + 1e-6)
+            row["swing"] = result["swing"]
         rows.append(row)
     # A wall-shaped false object must not become TRACKED simply because ICP converges.
     pipeline = GrabPerceptionPipeline(config)

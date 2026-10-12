@@ -180,6 +180,8 @@ class GrabPerceptionNode(Node):
             geometry.total_runtime_sec = result["total_seconds"]
             geometry.dropped_frames = self.slot.dropped
             geometry.frame_span_sec = float(np.ptp(points["timestamp"]))
+            geometry.motion_smear_translation_margin_m = result.get("motion_smear_translation_margin_m",0.)
+            geometry.motion_smear_rotation_margin_rad = result.get("motion_smear_rotation_margin_rad",0.)
             env = result["envelope"]
             if tracker.pose is not None:
                 state.pose.pose.position.x, state.pose.pose.position.y, state.pose.pose.position.z = map(float, tracker.pose[:3,3])

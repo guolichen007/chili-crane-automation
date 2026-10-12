@@ -202,4 +202,7 @@ class GrabObservationValidator:
             offset = transform(model.shapes[observation.opening].suspension_reference[None], pose)[0] - suspension.point
             if np.linalg.norm(offset[:2]) > policy["maximum_swing_radius_m"] or offset[2] >= 0:
                 reasons.append("SUSPENSION_CORRIDOR_GATE")
-        return ("REJECTED" if reasons else "ACCEPTED"), reasons, pose
+        status = "ACCEPTED"
+        if reasons:
+            status = "DEGRADED" if set(reasons) <= {"WEAK_OBSERVABILITY", "INSUFFICIENT_SPATIAL_SUPPORT"} else "REJECTED"
+        return status, reasons, pose
