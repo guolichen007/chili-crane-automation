@@ -242,4 +242,5 @@ class TimescaleR2Tests(unittest.TestCase):
             self.assertEqual("LOCAL_VERIFIED", contract.relation.relation_state)
             self.assertFalse(contract.production_ready)
             self.assertFalse(cfg["driver_enabled"])
-            self.assertIsNone(cfg["runtime_status_timeout_sec"])
+            self.assertEqual(.2, cfg["runtime_status_timeout_sec"])
+            self.assertEqual("BENCH_ONLY_S15", cfg["runtime_timeout_scope"])

@@ -11,9 +11,10 @@ observed_streams:
   - {destination_port: 7788, payload_length: 256, reported_role: DIFOP, signature_verified: false}
 candidate_ports: [6699, 7788]
 physical_side: NOT_CONFIGURED
-port_roles: NOT_CONFIGURED
-msop_port: null
-difop_port: null
+port_roles: VALID
+role_evidence_id: USER_REPORTED_S13_S15
+msop_port: 6699
+difop_port: 7788
 driver_enabled: false
 frame_id: crane_01/er1_205
 raw_topic: /crane_01/lidar/er1_205/vendor_points
@@ -24,7 +25,8 @@ clock_domain: ptp-domain-0
 raw_time_scale: PTP_TIMESCALE
 stamp_basis: FIRST_POINT
 time_evidence_id: USER_REPORTED_S13_S14
-runtime_status_timeout_sec: null
+runtime_status_timeout_sec: 0.2
+runtime_timeout_scope: BENCH_ONLY_S15
 time_scale_relation:
   source_scale: PTP_TIMESCALE
   target_scale: HOST_UTC

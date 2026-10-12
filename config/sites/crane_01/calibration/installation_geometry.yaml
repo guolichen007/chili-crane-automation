@@ -1,0 +1,12 @@
+coordinate_frame: crane_01/sensor_rig
+roi_bounds_m: null
+coverage_cell_size_m: null
+maximum_coverage_cells: 1000000
+static_structure_rois: []
+dynamic_masks:
+  - {class: grab, state: NOT_CONFIGURED, bounds_m: null}
+  - {class: rope, state: NOT_CONFIGURED, bounds_m: null}
+  - {class: person, state: NOT_CONFIGURED, bounds_m: null}
+  - {class: vehicle, state: NOT_CONFIGURED, bounds_m: null}
+  - {class: moving_trolley_structure, state: NOT_CONFIGURED, bounds_m: null}
+  - {class: dynamic_material, state: NOT_CONFIGURED, bounds_m: null}

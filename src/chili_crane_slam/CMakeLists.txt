@@ -6,7 +6,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 ament_python_install_package(${PROJECT_NAME} PACKAGE_DIR src/${PROJECT_NAME})
-install(PROGRAMS scripts/dual_lidar_node.py scripts/run_manifest_node.py DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS scripts/dual_lidar_node.py scripts/run_manifest_node.py scripts/installation_preview_node.py
+  scripts/capture_lidar_calibration_scene.py DESTINATION lib/${PROJECT_NAME})
 find_package(chili_crane_core REQUIRED)
 find_package(chili_crane_msgs REQUIRED)
 add_library(${PROJECT_NAME} INTERFACE)
@@ -19,6 +20,8 @@ if(BUILD_TESTING)
   ament_add_pytest_test(dual_lidar_synthetic test/test_dual_lidar.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
   ament_add_pytest_test(phase1b_timebase ../../tests_static/test_phase1b_timebase.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
+  ament_add_pytest_test(phase1c_calibration ../../tests_static/test_phase1c_calibration.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(slam_contract_compile_test test/slam_contract_compile_test.cpp)

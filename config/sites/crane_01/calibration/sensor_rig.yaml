@@ -1,0 +1,9 @@
+base_frame: crane_01/base
+rig_frame: crane_01/sensor_rig
+parent_mode: NOT_CONFIGURED
+parent_modes: [STATIC_PARENT, DYNAMIC_PARENT, NOT_CONFIGURED]
+parent_transform: null
+mount_revision: NOT_CONFIGURED
+parent_evidence_id: NOT_CONFIGURED
+publish_static_tf: false
+stationarity_topic: /crane_01/sensor_rig/stationarity

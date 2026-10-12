@@ -1,0 +1,11 @@
+profile: installation_preview
+explicit_selection_required: true
+enable_er1_drivers: true
+enable_clock_observer: true
+enable_normalizer: true
+enable_rviz: true
+camera_preview_optional: true
+physical_output_enabled: false
+automatic_control_enabled: false
+camera_control_authority: false
+spatial_production_merger_enabled: false

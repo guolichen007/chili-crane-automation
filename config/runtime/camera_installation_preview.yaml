@@ -1,0 +1,10 @@
+profile: camera_installation_preview
+driver_enabled: false
+camera_control_authority: false
+maximum_publish_fps: 5.0
+maximum_device_fps: 5.0
+requested_pixel_format: BayerRG8
+timestamp_mode: CAMERA_RECEIVE_ESTIMATE
+require_ptp_disabled: true
+configure_camera: false
+note: Read GevIEEE1588=false before acquisition; never write camera PTP.

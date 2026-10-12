@@ -8,7 +8,12 @@ sensors:
     model: ER1
     ip: 192.168.1.204
     udp_ports: [7799, 6688]
-    port_roles: NOT_CONFIGURED
+    port_roles: VALID
+    role_evidence_id: USER_REPORTED_S13_S15
+    transport: UNICAST
+    destination: 192.168.1.102
+    msop_port: 7799
+    difop_port: 6688
     physical_side: NOT_CONFIGURED
     source_frame: NOT_CONFIGURED
     calibration_id: NOT_CONFIGURED
@@ -19,7 +24,12 @@ sensors:
     model: ER1
     ip: 192.168.1.205
     udp_ports: [6699, 7788]
-    port_roles: NOT_CONFIGURED
+    port_roles: VALID
+    role_evidence_id: USER_REPORTED_S13_S15
+    transport: UNICAST
+    destination: 192.168.1.102
+    msop_port: 6699
+    difop_port: 7788
     physical_side: NOT_CONFIGURED
     source_frame: NOT_CONFIGURED
     calibration_id: NOT_CONFIGURED

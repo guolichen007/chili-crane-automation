@@ -1,0 +1,13 @@
+profile: calibration_capture
+explicit_selection_required: true
+enable_er1_drivers: true
+enable_clock_observer: true
+enable_normalizer: true
+enable_rviz: true
+physical_output_enabled: false
+automatic_control_enabled: false
+camera_control_authority: false
+spatial_production_merger_enabled: false
+require_fresh_ptp: true
+require_frame_sync: true
+require_rig_stationary: true

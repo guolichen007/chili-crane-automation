@@ -1,5 +1,14 @@
 # Project Context
 
+## Phase1C 当前补充（2026-10-12）
+
+基线 72019e0d 的 S15 时间链已由 owner 回传 FROZEN；本轮不修改 PTP 主链或生产 UTC 级别。
+只增加双 ER1 sensor-only 安装/机械 seed/静态采集/离线 GICP+VGICP、
+多场景和独立验证/候选 overlay、相机只读安装预览；不做生产空间合并、NDT、Pit、Grab或运动。
+未知 rig parent、机械测量、ROI、验收门限保持未配置；动态 rig 禁止静态 base TF。
+所有控制输出保持 false，现场四项状态保持 NOT_RUN。
+此前 Phase1B 不做外参是阶段历史边界，现由 ADR0008 仅扩展离线外参工具，不扩展自动授权。
+
 ## Phase 1B 当前补充（2026-10-10）
 
 双 ER1 台架接入与统一时间基准；单台 MV-CS060-10GC 只做基础图像及时间证据。

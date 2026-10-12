@@ -1,6 +1,15 @@
 # 辣椒地池行车自动抓取框架
 
-当前分支为 **Phase 1B PTP TimeScale R2 / 时间尺度收口**，基线为 48674999。
+当前分支为 **Phase1C 双 ER1 安装观察与离线外参标定工具**，基线为 72019e0d。
+入口：[安装与外参标定手册](docs/deployment/双ER1现场安装与外参标定手册.md)、
+[Phase1C 跟踪](docs/validation/PHASE1C安装标定跟踪.md)、
+[S15 时间链封板事实](docs/hardware/20261012_S15时间链封板事实.md)、
+[安装/标定 ADR](docs/decisions/0008-phase1c-installation-calibration.md)。
+时间主链冻结；只增加显式 sensor-only 安装 profile、机械 seed、静态采集、
+GICP/VGICP、多场景/holdout、候选 overlay 与相机只读预览。
+现场安装/外参/相机外参/真实控制全部 NOT_RUN；main 不修改。
+
+此前 **Phase 1B PTP TimeScale R2 / 时间尺度收口**，基线为 48674999。
 原始 vendor PTP 时间保持不变；canonical header 和每点时间按显式关系一起减 UTC offset。
 S14 的 37 秒关系只达 LOCAL_VERIFIED，不等于生产可追溯 VALID。
 入口：[R2 合同](docs/api/PHASE1B_TIMESCALE_R2.md)、

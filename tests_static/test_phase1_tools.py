@@ -46,7 +46,7 @@ class ToolTests(unittest.TestCase):
         self.assertNotIn("\nnmcli ", text)
 
     def test_calibration_placeholders_never_identity(self):
-        for path in (ROOT / "config/sites/crane_01/calibration").glob("*.yaml"):
+        for path in (ROOT / "config/sites/crane_01/calibration").glob("*_to_base.yaml"):
             config = yaml.safe_load(path.read_text())
             self.assertEqual("NOT_CONFIGURED", config["config_state"])
             self.assertIsNone(config["rotation_matrix"])

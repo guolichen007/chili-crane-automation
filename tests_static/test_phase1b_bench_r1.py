@@ -240,5 +240,5 @@ class BenchR1Tests(unittest.TestCase):
         for sensor in ("204", "205"):
             cfg = yaml.safe_load((SITE / ("sensors/er1_" + sensor + ".yaml")).read_text())
             self.assertEqual("UNICAST", cfg["transport_mode"])
-            self.assertEqual("NOT_CONFIGURED", cfg["port_roles"])
+            self.assertEqual("VALID", cfg["port_roles"])
             self.assertFalse(cfg["driver_enabled"])

@@ -1,0 +1,13 @@
+status: MECHANICAL_SEED
+calibration_state: NOT_CALIBRATED
+source_frame: crane_01/er1_204
+target_frame: crane_01/sensor_rig
+translation_m: null
+roll_pitch_yaw_rad: null
+measurement_method: NOT_CONFIGURED
+measurement_uncertainty: null
+operator: NOT_CONFIGURED
+date: NOT_CONFIGURED
+mount_revision: NOT_CONFIGURED
+extrinsic_valid: false
+dual_lidar_ready: false

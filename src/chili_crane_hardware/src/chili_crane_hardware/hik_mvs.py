@@ -142,6 +142,13 @@ class MvsCamera:
             self.check(self.cam.MV_CC_SetFloatValue("ExposureTime", exposure), "exposure")
 
     def start(self):
+        if self.cfg.get("require_ptp_disabled") is True:
+            if self.feature("GevIEEE1588", "bool")["current_value"] is not False:
+                raise RuntimeError("CAMERA_PTP_NOT_CONFIRMED_DISABLED_NO_WRITE")
+            fmt = self.feature("PixelFormat", "enum")["current_value"]
+            expected = getattr(self.sdk, "PixelType_Gvsp_BayerRG8", None)
+            if fmt != "BayerRG8" and (expected is None or fmt != expected):
+                raise RuntimeError("CAMERA_BAYERRG8_NOT_CONFIRMED_NO_WRITE")
         self.configure()
         self.check(self.cam.MV_CC_StartGrabbing(), "start grabbing")
         self.grabbing = True

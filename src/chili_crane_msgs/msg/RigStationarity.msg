@@ -1,0 +1,14 @@
+uint8 UNKNOWN=0
+uint8 NOT_CONFIGURED=1
+uint8 STALE=2
+uint8 DEGRADED=3
+uint8 VALID=4
+std_msgs/Header header
+uint8 validity
+string reason
+uint8 source_type
+string mount_revision
+bool stationary
+string verification_method
+string evidence_id
+chili_crane_msgs/EvidenceMetadata evidence

@@ -59,6 +59,8 @@ set +u
 set -u
 timeout 35s python3 tools/validate_dual_lidar_ros.py | tee "$run_dir/dual-lidar-synthetic-ros.json"
 timeout 35s python3 tools/validate_ptp_timescale_ros.py | tee "$run_dir/ptp-timescale-synthetic-ros.json"
+timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-dir "$run_dir/phase1c" | tee "$run_dir/installation-capture-synthetic-ros.json"
+bash scripts/validation/rviz_installation_smoke.sh "$workspace" "$run_dir/rviz" | tee "$run_dir/rviz-smoke-result.txt"
 ros2 launch chili_crane_bringup mock_system.launch.py > "$run_dir/mock-launch.log" 2>&1 &
 launch_pid=$!
 cleanup() {
@@ -80,6 +82,8 @@ ROS2_BUILD_STATUS: PASS
 ROS2_TEST_STATUS: PASS
 DUAL_LIDAR_SYNTHETIC_ROS_STATUS: PASS
 PTP_TIMESCALE_SYNTHETIC_ROS_STATUS: PASS
+INSTALLATION_CAPTURE_TRANSPORT_STATUS: PASS
+RVIZ_CONFIGURATION_LOAD_STATUS: PASS
 ROS2_MOCK_LAUNCH_STATUS: PASS
 MOCK_FAIL_CLOSED_STATUS: PASS
 MOCK_SCENARIO_STATUS: PASS

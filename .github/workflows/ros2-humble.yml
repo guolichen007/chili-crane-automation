@@ -21,8 +21,10 @@ jobs:
         shell: bash
         run: |
           apt-get update
-          apt-get install -y git gcc g++ python3-pip python3-colcon-common-extensions python3-rosdep lsb-release
+          apt-get install -y git gcc g++ python3-pip python3-colcon-common-extensions python3-rosdep lsb-release xvfb xauth libgl1-mesa-dri
           python3 -m pip install -r requirements-dev.txt
+          python3 -m pip install -r requirements-calibration.txt
+          python3 -m pip install --no-deps --require-hashes -r third_party/small_gicp.requirements.txt
           rosdep update --rosdistro humble
           rosdep install --from-paths src --ignore-src --rosdistro humble -r -y
       - name: Build, test and inspect fail-closed mock

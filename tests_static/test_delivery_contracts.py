@@ -37,7 +37,8 @@ class DeliveryContracts(unittest.TestCase):
         self.assertEqual([6699, 7788], sensors["er1_205"]["udp_ports"])
         for identity in ("er1_204", "er1_205"):
             self.assertEqual("NOT_CONFIGURED", sensors[identity]["physical_side"])
-            self.assertEqual("NOT_CONFIGURED", sensors[identity]["port_roles"])
+            self.assertEqual("VALID", sensors[identity]["port_roles"])
+            self.assertEqual("USER_REPORTED_S13_S15", sensors[identity]["role_evidence_id"])
             self.assertFalse(sensors[identity]["driver_enabled"])
         self.assertEqual("192.168.1.180", sensors["camera_a"]["reported_ip"])
         self.assertEqual("BENCH_REACHABLE", sensors["camera_a"]["network_config_state"])

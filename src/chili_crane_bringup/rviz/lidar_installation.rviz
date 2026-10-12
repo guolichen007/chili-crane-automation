@@ -1,0 +1,18 @@
+# Installation view catalog. Start with a single sensor, never invented identity TF.
+# 204 only: lidar_installation_204_only.rviz
+# 205 only: lidar_installation_205_only.rviz
+# MECHANICAL_SEED rough overlay: lidar_installation_rough.rviz
+Panels:
+  - {Class: rviz_common/Displays, Name: Displays}
+Visualization Manager:
+  Class: ""
+  Global Options: {Fixed Frame: crane_01/er1_204}
+  Displays:
+    - Class: rviz_default_plugins/PointCloud2
+      Name: ER1-204 only（粗Overlay另选MECHANICAL_SEED配置）
+      Enabled: true
+      Topic: {Value: /crane_01/lidar/er1_204/points, Reliability Policy: Best Effort}
+      Color Transformer: FlatColor
+      Color: 65; 145; 230
+  Views:
+    Current: {Class: rviz_default_plugins/Orbit, Name: 3D View, Distance: 15}

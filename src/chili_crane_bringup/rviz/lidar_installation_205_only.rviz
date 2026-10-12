@@ -1,0 +1,25 @@
+Panels:
+  - {Class: rviz_common/Displays, Name: Displays}
+  - {Class: rviz_common/Views, Name: Views}
+Visualization Manager:
+  Class: ""
+  Global Options: {Fixed Frame: crane_01/er1_205, Background Color: "40; 40; 40"}
+  Displays:
+    - Class: rviz_default_plugins/PointCloud2
+      Name: ER1-205 独立坐标
+      Enabled: true
+      Topic: {Value: /crane_01/lidar/er1_205/points, Reliability Policy: Best Effort, Durability Policy: Volatile}
+      Color Transformer: FlatColor
+      Color: 240; 155; 65
+      Size (m): 0.02
+    - Class: rviz_default_plugins/Image
+      Name: 相机安装预览（无外参或Safety权限）
+      Enabled: false
+      Topic: {Value: /crane_01/camera/hik_01/image_raw, Reliability Policy: Best Effort}
+  Views:
+    Current: {Class: rviz_default_plugins/Orbit, Name: 3D View, Distance: 15}
+    Saved:
+      - {Class: rviz_default_plugins/TopDownOrtho, Name: Top View, Scale: 30}
+      - {Class: rviz_default_plugins/Orbit, Name: Side View, Distance: 15, Pitch: 0, Yaw: 0}
+      - {Class: rviz_default_plugins/Orbit, Name: 3D View, Distance: 15, Pitch: 0.7, Yaw: 0.7}
+Window Geometry: {Width: 1280, Height: 800}

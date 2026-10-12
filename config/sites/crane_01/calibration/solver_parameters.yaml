@@ -1,0 +1,30 @@
+parameter_scope: NOT_CONFIGURED
+voxel_size_m: null
+vgicp_voxel_size_m: null
+max_correspondence_distance_m: null
+range_min_m: null
+range_max_m: null
+outlier_neighbors: null
+outlier_std_ratio: null
+normal_neighbors: null
+maximum_planarity_ratio: null
+max_iterations: null
+rotation_epsilon_rad: null
+translation_epsilon_m: null
+observability_eigen_ratio: null
+consensus_huber_delta: null
+rotation_to_translation_scale_m: null
+maximum_points: 200000
+minimum_accumulated_frames: 20
+minimum_calibration_scenes: 5
+minimum_validation_scenes: 1
+acceptance:
+  min_overlap_ratio: null
+  max_nn_p95_m: null
+  max_plane_p95_m: null
+  max_normal_angle_p95_deg: null
+  max_plane_offset_p95_m: null
+  max_translation_dispersion_m: null
+  max_rotation_dispersion_rad: null
+  max_crosscheck_translation_m: null
+  max_crosscheck_rotation_rad: null

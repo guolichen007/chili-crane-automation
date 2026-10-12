@@ -1,0 +1,8 @@
+baseline_sha: 72019e0d464d4de6b38df74bc8c2097ae1829846
+scope: PHASE1C_MUST_NOT_CHANGE_PTP_MAIN_CHAIN
+files:
+  src/chili_crane_slam/src/chili_crane_slam/timescale.py: a11064c0a687d713c35c1521bfa65a8aba9be3e56223c09c7513614cc0f163a1
+  src/chili_crane_slam/src/chili_crane_slam/timebase.py: 518b6f9c57bf1fe63cbc8dd74c27361b683047259e887739266a58fd56cbbadd
+  src/chili_crane_slam/src/chili_crane_slam/dual_lidar_node.py: 26e0dc361f52dc9da4e60996e5f93a1d21103f8c0be867d6846dfd6e0351302f
+  src/chili_crane_hardware/src/chili_crane_hardware/er1_time_status.py: 2dab4c83f852f7c3cea83a08e3473125757290d14d52fd710c848465172603a0
+  src/chili_crane_hardware/scripts/er1_clock_observer.py: 31a113f20178cf6ebf506530316bd9cbfbb635c3d5227cda57c611447dc07270
