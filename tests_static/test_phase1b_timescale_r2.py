@@ -189,6 +189,7 @@ class TimescaleR2Tests(unittest.TestCase):
         for status, label in ((1, "PTP_SYNC_SUCCESS"), (0, "PTP_SYNC_FAILED"), (2, "PTP_SYNC_TIMEOUT"), (255, "UNKNOWN")):
             tracker.observe(difop(status), 10)
             state = tracker.state(10.01)
+            self.assertEqual("PTP_MODE", state["mode_state"])
             self.assertEqual(label, state["clock_state"])
             self.assertEqual(status == 1, state["clock_sync_valid"])
 

@@ -91,6 +91,7 @@ def scenario(name, state="LOCAL_VERIFIED", missing_relation=False, unknown_scale
                             msg.header.stamp, msg.header.frame_id = now.to_msg(), "synthetic/er1_" + sensor
                             msg.sensor_id, msg.source_type = "er1_" + sensor, 4
                             msg.timesync_mode = msg.time_mode = 2
+                            msg.mode_state = "PTP_MODE"
                             msg.timesync_status, msg.frame_sync = status, frame_sync
                             msg.clock_sync_valid, msg.scan_phase_sync_valid = status == 1, frame_sync == 1
                             msg.validity = msg.VALID if status == 1 else msg.DEGRADED

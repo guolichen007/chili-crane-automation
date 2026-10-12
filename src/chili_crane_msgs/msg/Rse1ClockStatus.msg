@@ -12,6 +12,7 @@ uint8 timesync_mode
 uint8 timesync_status
 uint8 time_mode
 uint8 frame_sync
+string mode_state
 string clock_state
 string scan_phase_state
 bool clock_sync_valid

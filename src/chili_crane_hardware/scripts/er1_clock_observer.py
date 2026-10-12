@@ -59,6 +59,7 @@ class Er1ClockObserver(Node):
         msg.header.frame_id = self.configs[sensor]["frame_id"]
         msg.sensor_id, msg.source_type = "er1_" + sensor, 1  # PHYSICAL, never synthetic inference
         msg.clock_state, msg.scan_phase_state = state["clock_state"], state["scan_phase_state"]
+        msg.mode_state = state["mode_state"]
         for key in ("timesync_mode", "timesync_status", "time_mode", "frame_sync"):
             setattr(msg, key, state.get(key, 255))
         msg.clock_sync_valid, msg.scan_phase_sync_valid = state["clock_sync_valid"], state["scan_phase_sync_valid"]

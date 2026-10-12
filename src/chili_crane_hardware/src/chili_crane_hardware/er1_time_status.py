@@ -70,7 +70,8 @@ class RuntimeClockTracker:
         if status is not None and self.timeout is not None and not fresh("DIFOP"):
             clock = "PTP_SYNC_TIMEOUT"
         phase = {0: "FRAME_NOT_SYNCED", 1: "FRAME_SYNCED"}.get(frame, "UNKNOWN")
-        return {**self.fields, "mode_state": "PTP_MODE" if mode == 2 else "NON_PTP_OR_UNKNOWN",
+        return {**self.fields, "mode_state": {0: "INTERNAL_MODE", 2: "PTP_MODE",
+                                            3: "GPTP_MODE_UNVERIFIED"}.get(mode, "UNKNOWN"),
                 "clock_state": clock, "scan_phase_state": phase,
                 "clock_sync_valid": mode == 2 and time_mode == 2 and status == 1 and fresh("DIFOP") and fresh("MSOP"),
                 "scan_phase_sync_valid": frame == 1 and fresh("MSOP"),
