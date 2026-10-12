@@ -38,6 +38,9 @@ float64 lateral_velocity_mps
 float64 innovation_rms_m
 bool motion_stable
 bool measurement_accepted
+string observation_status
+string[] rejection_reasons
+string stage_runtime_json
 uint8[] sensor_support
 float64 residual_p50_m
 float64 residual_p95_m

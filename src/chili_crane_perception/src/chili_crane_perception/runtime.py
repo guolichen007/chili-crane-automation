@@ -185,6 +185,12 @@ class GrabPerceptionNode(Node):
             geometry.tracking_state, geometry.observation_source = result["tracking"], result["source"]
             geometry.opening_state, geometry.source_type = opening, self.config["source_type"]
             geometry.measurement_accepted = result["accepted"]
+            geometry.observation_status = ("ACCEPTED" if result["accepted"] else "DEGRADED"
+                if result["reasons"] and set(result["reasons"]) <= {"WEAK_OBSERVABILITY","INSUFFICIENT_SPATIAL_SUPPORT"}
+                else "REJECTED")
+            geometry.rejection_reasons = result["reasons"]
+            geometry.stage_runtime_json = json.dumps(result["stage_seconds"],allow_nan=False)
+            geometry.reason = "SHADOW_ONLY|" + ("MEASUREMENT_ACCEPTED" if result["accepted"] else "|".join(result["reasons"]))
             geometry.valid_for_control = False
             geometry.total_runtime_sec = result["total_seconds"]
             geometry.dropped_frames = self.slot.dropped
