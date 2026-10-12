@@ -1,6 +1,12 @@
 # 辣椒地池行车自动抓取框架
 
-当前分支为 **Phase1C 双 ER1 安装观察与离线外参标定工具**，基线为 72019e0d。
+当前分支为 **Phase2A 模型驱动抓斗状态估计与几何安全 shadow**，基线为 72234843。
+入口：[项目进展](docs/项目进展.md)、[算法与现场边界](docs/algorithms/Phase2A抓斗状态估计与几何安全.md)。
+三层几何、原生GICP+Huber精化、validator、SE(3) ESKF、bottom/swing/envelope和pit clearance
+仅发布感知证据，不发布SafetyPermit/AuthorizedCommand/ActuationRequest，不启动硬件或自动任务。
+默认CAD/政策/外参/语义地图未知，valid_for_control始终false；FIELD与物理动作均NOT_RUN。
+
+此前 **Phase1C 双 ER1 安装观察与离线外参标定工具**，基线为 72019e0d。
 入口：[安装与外参标定手册](docs/deployment/双ER1现场安装与外参标定手册.md)、
 [Phase1C 跟踪](docs/validation/PHASE1C安装标定跟踪.md)、
 [S15 时间链封板事实](docs/hardware/20261012_S15时间链封板事实.md)、
