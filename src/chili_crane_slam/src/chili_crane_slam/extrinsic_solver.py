@@ -253,6 +253,9 @@ def solve_scenes(scenes, seed, cfg, geometry, mount_revision, git_sha):
         if (s["frame_count"] < cfg["minimum_accumulated_frames"] or not s.get("capture_gate_passed")
                 or s.get("mount_revision") != mount_revision or not s.get("artifact_sha256")):
             raise ValueError("SCENE_CAPTURE_OR_PROVENANCE_INVALID")
+    signatures = [tuple(sorted(s["artifact_sha256"].items())) for s in scenes]
+    if len(signatures) != len(set(signatures)):
+        raise ValueError("DUPLICATE_ARTIFACTS_ARE_NOT_INDEPENDENT_SCENES")
     processed = {}
     for s in scenes:
         processed[s["scene_id"]] = (preprocess(s["target"], np.eye(4), geometry, cfg),
@@ -291,6 +294,7 @@ def solve_scenes(scenes, seed, cfg, geometry, mount_revision, git_sha):
         "git_sha": git_sha, "mount_revision": mount_revision, "scene_ids": ids,
         "source_type": scenes[0]["source_type"], "scene_artifacts": {s["scene_id"]: s["artifact_sha256"] for s in scenes},
         "scene_config_hashes": {s["scene_id"]: s.get("config_hash", "NOT_REPORTED") for s in scenes},
+        "scene_git_shas": {s["scene_id"]: s.get("git_sha", "NOT_REPORTED") for s in scenes},
         "calibration_scenes": results, "validation_scenes": held_out, "dispersion": dispersion,
         "observability": "GOOD", "quantitative_pass": bool(passed), "independent_validation": True,
         "parameters": cfg, "created_at": datetime.now(timezone.utc).isoformat(), "reviewed_at": None,

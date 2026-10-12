@@ -252,7 +252,7 @@ class SolverSynthetic(unittest.TestCase):
             a = cloud(count=1200, rng_seed=i + 30)
             scenes.append({"scene_id": "scene" + str(i), "split": "CALIBRATION" if i < 5 else "VALIDATION",
                 "target": a, "source": transform(a, np.linalg.inv(self.true)), "frame_count": 20,
-                "capture_gate_passed": True, "mount_revision": "r", "artifact_sha256": {"fixture": "a" * 64},
+                "capture_gate_passed": True, "mount_revision": "r", "artifact_sha256": {"fixture": hashlib.sha256(str(i).encode()).hexdigest()},
                 "source_type": "SYNTHETIC", "source_frame": "crane_01/er1_205", "target_frame": "crane_01/er1_204"})
         result = solve_scenes(scenes, self.initial, self.cfg, self.geo, "r", "a" * 40)
         self.assertEqual("CANDIDATE", result["status"])
@@ -260,6 +260,11 @@ class SolverSynthetic(unittest.TestCase):
         self.assertEqual(1, len(result["validation_scenes"]))
         self.assertTrue(result["quantitative_pass"])
         self.assertFalse(result["extrinsic_valid"])
+        previous = scenes[-1]["artifact_sha256"]
+        scenes[-1]["artifact_sha256"] = scenes[0]["artifact_sha256"]
+        with self.assertRaisesRegex(ValueError, "NOT_INDEPENDENT"):
+            solve_scenes(scenes, self.initial, self.cfg, self.geo, "r", "a" * 40)
+        scenes[-1]["artifact_sha256"] = previous
         scenes[-1]["split"] = "CALIBRATION"
         with self.assertRaisesRegex(ValueError, "SCENE_SPLIT"):
             solve_scenes(scenes, self.initial, self.cfg, self.geo, "r", "a" * 40)
