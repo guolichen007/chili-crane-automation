@@ -249,3 +249,20 @@ class NativeGrabTests(unittest.TestCase):
         observation = self.registration.register(partial,pose,"CLOSED")
         self.assertTrue(np.isfinite(observation.covariance).all())
         self.assertLessEqual(observation.sectors,4)
+
+    def test_full_pipeline_global_reacquisition_resets_cross_covariance(self):
+        pipeline = GrabPerceptionPipeline(self.config)
+        pose, _ = self.points()
+        for i in range(3):
+            pipeline.process(scene(self.config["model"],pose,10+i*.1),10+i*.1,
+                             "CLOSED","SYNTHETIC",np.eye(6)*1e-6)
+        self.assertEqual("TRACKED",pipeline.tracker.tracking)
+        pipeline.tracker.predict(11)
+        pipeline.tracker.missing(11)
+        self.assertEqual("LOST",pipeline.tracker.tracking)
+        for i in range(3):
+            stamp = 11.1+i*.1
+            result = pipeline.process(scene(self.config["model"],pose,stamp),stamp,
+                                      "CLOSED","SYNTHETIC",np.eye(6)*1e-6)
+            self.assertGreaterEqual(np.linalg.eigvalsh(pipeline.tracker.covariance).min(),-1e-10)
+        self.assertEqual("TRACKED",result["tracking"])

@@ -70,6 +70,7 @@ class GrabStateEstimator:
         r = covariance(measurement_covariance, 6)
         if self.pose is None:
             self.pose = pose.copy()
+            self.covariance = np.zeros((12,12))  # No old pose/twist cross terms across LOST reinitialization.
             self.covariance[:6, :6] = r
             self.covariance[6:, 6:] = np.eye(6) * self.policy["initial_twist_sigma"]**2
             self.innovation = 0.0
