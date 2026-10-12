@@ -30,4 +30,7 @@ class PreviewContracts(unittest.TestCase):
         for line in lines.splitlines():
             path = line.split("\t", 1)[1]
             if "/scripts/" in path and path.endswith(".py"):
-                self.assertTrue(line.startswith("100755 "), path)
+                if path == "src/chili_crane_hardware/scripts/er1_clock_observer.py":
+                    self.assertTrue(line.startswith("100644 "), path)  # Frozen implementation data.
+                else:
+                    self.assertTrue(line.startswith("100755 "), path)
