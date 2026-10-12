@@ -40,7 +40,7 @@ def fixture():
         maximum_vertical_speed_mps=2, maximum_angular_speed_radps=2,
         maximum_prediction_dt_sec=.5, lost_timeout_sec=.4, acceleration_noise=.2,
         angular_acceleration_noise=.2, initial_twist_sigma=.1, minimum_stable_duration_sec=.3,
-        uncertainty_sigma=3, evidence_timeout_sec=.2,
+        uncertainty_sigma=3, evidence_timeout_sec=.2, maximum_frame_span_sec=.3,
         maximum_input_points=10000, maximum_candidate_points=8000, minimum_candidate_points=40,
         maximum_candidates=3, normal_neighbors=10, registration_iterations=35, robust_iterations=5,
         minimum_support_sectors=4, confirmation_frames=3,

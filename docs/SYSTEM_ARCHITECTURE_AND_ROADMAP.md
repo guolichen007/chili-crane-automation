@@ -320,3 +320,16 @@ ADAM TCP/拉绳 RTU 的纯协议与校准、逐点 DI 极性与遥控仲裁、�
 后续Phase1双ER1驱动/同步/外参；Phase2语义/CAD/静态结构；Phase3 X先验+NDT；
 Phase4料面/安全抓点；Phase5抓斗bottom/envelope/swing；Phase6真实安全证据及控制整定；
 Phase7完整重复抓取卸料现场验收。
+
+## 当前分期路线（2026-10-12）
+
+此前Phase编号为初始规划，以下用户确认分期优先，旧记录保留：
+Phase1A/B/R2/1C已交付软件/只读工具；S15/S16A回传不升级FIELD外参。
+Phase2A：模型predict/observe/register/validate/ESKF、bottom/swing/envelope、
+exact/保守pit clearance、latest-wins shadow；七包不变，见ADR0009及项目进展。
+Phase2B：稳定窗口时空2.5D、observed coverage、ESDF加速、
+footprint预计体积/recent-grab penalty，不以插值格授权。
+Phase2C：几何/运动/force接触及关斗/载荷/卸料证据。
+Phase3：现场X servo、静态轨道/语义地图、NDT/EKF，不用动态料面定位。
+AI为未来proposal/semantic辅助，不作第一安全位姿源；当前不引TEASER++。
+软件/mock/source evidence与FIELD/DO验收独立，未知证据继续阻断。

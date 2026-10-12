@@ -17,7 +17,7 @@ NUMERIC_PARAMETERS = (
     "maximum_linear_speed_mps", "maximum_vertical_speed_mps", "maximum_angular_speed_radps",
     "maximum_prediction_dt_sec", "lost_timeout_sec", "acceleration_noise",
     "angular_acceleration_noise", "initial_twist_sigma", "minimum_stable_duration_sec",
-    "uncertainty_sigma", "evidence_timeout_sec")
+    "uncertainty_sigma", "evidence_timeout_sec", "maximum_frame_span_sec")
 INTEGER_PARAMETERS = {"maximum_input_points": (32, 200000), "maximum_candidate_points": (32, 20000),
     "minimum_candidate_points": (20, 20000), "maximum_candidates": (1, 8), "normal_neighbors": (5, 50),
     "registration_iterations": (1, 100), "robust_iterations": (1, 20),
@@ -90,6 +90,12 @@ class GrabPerceptionPipeline:
         return float(speed*span/2), float(angular*span/2)
 
     def process(self, points, stamp, opening, source_type, extrinsic_covariance, suspension=None):
+        from chili_crane_slam.pointcloud import validate_points
+        validate_points(points)
+        if float(np.ptp(points["timestamp"])) > self.policy["maximum_frame_span_sec"]:
+            raise ValueError("FRAME_SPAN_EXCEEDS_VERIFIED_BOUND")
+        if not set(map(int,np.unique(points["sensor_id"]))) <= {0,1}:
+            raise ValueError("UNKNOWN_LIDAR_SENSOR_ID")
         if source_type not in {"PHYSICAL", "REPLAY", "SIMULATED", "SYNTHETIC"}:
             raise ValueError("SOURCE_UNKNOWN")
         if source_type == "PHYSICAL" and self.model.source_type != "PHYSICAL":

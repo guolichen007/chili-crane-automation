@@ -70,6 +70,7 @@
     "initial_twist_sigma": null,
     "minimum_stable_duration_sec": null,
     "uncertainty_sigma": null,
-    "evidence_timeout_sec": null
+    "evidence_timeout_sec": null,
+    "maximum_frame_span_sec": null
   }
 }

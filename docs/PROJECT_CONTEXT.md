@@ -356,3 +356,14 @@ CANCELLED/ABORTED与单一SafetyEvent、canonical24DI和带身份标定出处。
 配置未知时仍不接收动作；SAFE_IDLE需物理停止/OFF证据，故障reset不直达自动。
 租约只证明逻辑输出应OFF，不能证明原厂回路/实际继电器已OFF。
 当前ROS运行仍全OFF/mock，真实deadline、WDT/FSV、硬件/bag/现场均未验收。
+
+## 当前Phase1C/Phase2A（2026-10-12，取代旧阶段的“尚无驱动/时间事实”描述）
+
+Phase1A/B/R2与Phase1C已交付，基线72234843d5850947c5a2fd5e230516bc8fa64839。
+用户S15回传PTP台架事实见hardware/20261012_S15时间链封板事实.md；
+S16A ER1 GICP/VGICP smoke及约3.2mm/0.05deg差异仅USER_REPORTED。
+BENCH_FLOOR_001不是FIELD外参，正式5+1外参到现场再做。
+docs/项目进展.md作为长期事实源；旧阶段记录保留。
+Phase2A按ADR0009实现模型驱动Grab shadow及保守几何，不做Pit/planner/contact/NDT。
+FIELD外参、CAD、pit/bag仍未验收，control authority禁用；TRACKED不代表控制有效。
+详情见algorithms/Phase2A抓斗状态估计与几何安全.md。

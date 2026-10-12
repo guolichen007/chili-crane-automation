@@ -129,10 +129,13 @@ class GrabPerceptionNode(Node):
                     or io.validity != io.VALID or io.fault):
                 raise ValueError("FRAME_SOURCE_FRESHNESS_OR_OPENING_GATE")
             expected_fields = dict(zip(CANONICAL.names, (0,4,8,12,16,18,24)))
+            datatypes = dict(zip(CANONICAL.names,(7,7,7,7,4,2,8)))
             if (cloud.point_step != 32 or cloud.is_bigendian
                     or not 0 < cloud.width * cloud.height <= self.pipeline.policy["maximum_input_points"]
                     or len(cloud.data) != cloud.row_step * cloud.height or cloud.row_step < cloud.width*32
-                    or any(not any(f.name == key and f.offset == offset and f.count == 1 for f in cloud.fields)
+                    or len(cloud.fields) != len(expected_fields)
+                    or any(not any(f.name == key and f.offset == offset and f.count == 1
+                                   and f.datatype == datatypes[key] for f in cloud.fields)
                            for key, offset in expected_fields.items())):
                 raise ValueError("CANONICAL_XYZIRT_REQUIRED")
             points = np.ndarray((cloud.height, cloud.width), dtype=CANONICAL, buffer=cloud.data,
