@@ -90,7 +90,7 @@ def main():
                         timing = SensorTimingState()
                         evidence(timing, now.to_msg())
                         timing.normalization_valid = timing.clock_sync_valid = timing.scan_phase_sync_valid = True
-                        timing.applied_offset_sec = 37
+                        timing.applied_offset_sec = 37.0
                         pubs[s, "timing"].publish(timing)
                         status = Rse1ClockStatus(timesync_status=clock, frame_sync=frame, source_type=4)
                         status.difop_received_at = status.msop_received_at = now.to_msg()

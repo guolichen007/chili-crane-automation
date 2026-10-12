@@ -2,6 +2,7 @@
 import importlib.util
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -255,3 +256,58 @@ class SolverSynthetic(unittest.TestCase):
         scenes[-1]["split"] = "CALIBRATION"
         with self.assertRaisesRegex(ValueError, "SCENE_SPLIT"):
             solve_scenes(scenes, self.initial, self.cfg, self.geo, "r", "a" * 40)
+
+    def test_complete_capture_solver_report_cli_and_tampered_raw(self):
+        spec = importlib.util.spec_from_file_location("solver_cli", ROOT / "tools/dual_lidar_extrinsic_solver.py")
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            site = directory / "site"
+            (site / "calibration").mkdir(parents=True)
+            (site / "calibration/sensor_rig.yaml").write_text(yaml.safe_dump({"mount_revision": "fixture-r1"}))
+            a_seed = seed(xyz=[0, 0, 0], rpy=[0, 0, 0])
+            from scipy.spatial.transform import Rotation
+            b_seed = seed("crane_01/er1_205", self.initial[:3, 3].tolist(),
+                          Rotation.from_matrix(self.initial[:3, :3]).as_euler("xyz").tolist())
+            for s, cfg in (("204", a_seed), ("205", b_seed)):
+                (site / ("calibration/mechanical_seed_er1_" + s + ".yaml")).write_text(yaml.safe_dump(cfg))
+            params, geo = directory / "params.yaml", directory / "geometry.yaml"
+            params.write_text(yaml.safe_dump(self.cfg))
+            geo.write_text(yaml.safe_dump(self.geo))
+            command = [sys.executable, str(ROOT / "tools/dual_lidar_extrinsic_solver.py"), "--site", str(site),
+                       "--parameters", str(params), "--geometry", str(geo), "--output", str(directory / "report")]
+            scenes = []
+            for index in range(6):
+                target = cloud(count=1200, rng_seed=30 + index)
+                xyzs = {"204": target, "205": transform(target, np.linalg.inv(self.true))}
+                accumulator = SceneAccumulator(20, .001, 2)
+                for frame in range(21):
+                    rows = {}
+                    stamp = 100 + index * 100 + frame
+                    for s, xyz in xyzs.items():
+                        raw = np.zeros(len(xyz), dtype=CANONICAL)
+                        for axis, key in enumerate(("x", "y", "z")):
+                            raw[key] = xyz[:, axis]
+                        raw["timestamp"] = stamp + 37
+                        canonical = raw.copy()
+                        canonical["timestamp"] -= 37
+                        rows[s] = {"raw_header_ns": (stamp + 37) * 1000000000, "canonical_header_ns": stamp * 1000000000,
+                                   "raw_points": raw, "canonical_points": canonical, "applied_offset_sec": 37}
+                    accumulator.add(rows, True)
+                scene = directory / ("scene" + str(index))
+                accumulator.save(scene, {"scene_id": scene.name, "split": "CALIBRATION" if index < 5 else "VALIDATION",
+                    "source_type": "SYNTHETIC", "source_frame": "crane_01/er1_205", "target_frame": "crane_01/er1_204",
+                    "mount_revision": "fixture-r1", "config_hash": "b" * 64}, ROOT)
+                command.extend(["--scene", str(scene)])
+                scenes.append(scene)
+            result = subprocess.run(command, capture_output=True, text=True, cwd=ROOT)
+            self.assertEqual(0, result.returncode, result.stderr)
+            artifact = json.loads((directory / "report/metrics.json").read_text(encoding="utf-8"))
+            self.assertTrue(artifact["quantitative_pass"])
+            self.assertEqual("SYNTHETIC", artifact["source_type"])
+            self.assertFalse(artifact["extrinsic_valid"])
+            self.assertTrue((directory / "report/外参标定报告.md").exists())
+            (scenes[0] / "er1_204_raw.npz").write_bytes(b"tampered synthetic fixture")
+            with self.assertRaisesRegex(ValueError, "HASH"):
+                cli.load_scene(scenes[0])
