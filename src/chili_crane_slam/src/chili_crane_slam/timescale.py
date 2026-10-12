@@ -13,7 +13,7 @@ class TimeScale(str, Enum):
 
 
 def known(value):
-    return isinstance(value, str) and bool(value.strip()) and value not in {"UNKNOWN", "NOT_CONFIGURED"}
+    return isinstance(value, str) and bool(value.strip()) and value.strip() not in {"UNKNOWN", "NOT_CONFIGURED"}
 
 
 @dataclass(frozen=True)
@@ -56,7 +56,9 @@ class TimeScaleRelation:
     def bench_allowed(self):
         return (self.source_scale == "PTP_TIMESCALE" and self.target_scale == "HOST_UTC"
                 and self.relation_state in {"LOCAL_VERIFIED", "VALID"}
-                and self.utc_offset_sec is not None and known(self.evidence_id) and known(self.offset_source)
+                and type(self.utc_offset_sec) in (int, float) and math.isfinite(self.utc_offset_sec)
+                and abs(self.utc_offset_sec) <= 128 and int(self.utc_offset_sec) == self.utc_offset_sec
+                and known(self.evidence_id) and known(self.offset_source)
                 and known(self.source_domain) and known(self.target_domain))
 
     @property

@@ -91,6 +91,8 @@ class ClockContract:
             raise ValueError("HOST_DERIVED_MUST_BE_PROVISIONAL")
         if mode == "HOST_DERIVED" and scale not in {"UNKNOWN", "HOST_UTC"}:
             raise ValueError("HOST_DERIVED_SCALE_MISMATCH")
+        if mode == "SENSOR_PTP" and scale not in {"UNKNOWN", "PTP_TIMESCALE"}:
+            raise ValueError("SENSOR_PTP_SCALE_MISMATCH")
         if not domain or domain == "NOT_CONFIGURED":
             if not (mode == "SENSOR_PTP" and state == "PROBING"):
                 raise ValueError("CLOCK_DOMAIN_NOT_CONFIGURED")

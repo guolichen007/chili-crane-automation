@@ -177,9 +177,11 @@ class DualLidarNode(Node):
             raw.timing  # Validate finite positive point times before diagnostic publication.
             raw_valid = True
             contract = self._clocks.get(sensor)
+            if contract is None:
+                raise ValueError("CLOCK_CONTRACT_NOT_VERIFIED")
             scale = self._sensor_configs[sensor].get("raw_time_scale", "UNKNOWN")
             header_ns, normalized, offset = normalize_times(raw.header_nanoseconds, points, scale,
-                                                            contract.relation if contract else None)
+                                                            contract.relation)
             cloud = Cloud(header_ns / 1e9, monotonic, msg.header.frame_id, normalized,
                           int(self._source), now, header_ns)
             cloud.timing.check_span(self._maximum_span)

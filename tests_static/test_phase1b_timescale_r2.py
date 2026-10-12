@@ -132,6 +132,16 @@ class TimescaleR2Tests(unittest.TestCase):
                     host_clock_relation="VALID", host_clock_relation_evidence_id="legacy")
         self.assertFalse(ClockContract.from_config(cfg).pairing_ready)
 
+    def test_ptp_cannot_be_declared_host_utc(self):
+        with self.assertRaisesRegex(ValueError, "SENSOR_PTP_SCALE_MISMATCH"):
+            ClockContract.from_config(clock(raw_time_scale="HOST_UTC"))
+
+    def test_direct_relation_cannot_truncate_fractional_compensation(self):
+        proof = TimeScaleRelation(**relation(utc_offset_sec=37.12))
+        self.assertFalse(proof.bench_allowed)
+        with self.assertRaises(ValueError):
+            normalize_times(137000000000, points(137), "PTP_TIMESCALE", proof)
+
     def test_invalid_offset_and_missing_evidence(self):
         for extra in ({"utc_offset_sec": None}, {"utc_offset_sec": 37.12},
                       {"utc_offset_sec": float("nan")}, {"utc_offset_sec": True},
