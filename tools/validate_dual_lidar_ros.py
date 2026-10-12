@@ -34,12 +34,13 @@ def fixture(site, calibrated, timing_only=False, mixed_domain=False, ptp_probing
     for sensor in ("204", "205"):
         sensor_cfg = {"frame_id": "synthetic/er1_" + sensor,
             "clock_mode": "HOST_DERIVED", "clock_sync_state": "PROVISIONAL", "clock_domain": "synthetic-host",
+            "raw_time_scale": "HOST_UTC",
             "raw_topic": "/phase1a_synthetic/vendor_" + sensor,
             "normalized_topic": "/phase1a_synthetic/raw_" + sensor}
         if mixed_domain and sensor == "205":
             sensor_cfg["clock_domain"] = "synthetic-other-host"
         if ptp_probing:
-            sensor_cfg.update(clock_mode="SENSOR_PTP", clock_sync_state="PROBING")
+            sensor_cfg.update(clock_mode="SENSOR_PTP", clock_sync_state="PROBING", raw_time_scale="PTP_TIMESCALE")
         (site / "sensors" / ("er1_" + sensor + ".yaml")).write_text(yaml.safe_dump(sensor_cfg))
         extrinsic = {"config_state": "VALID" if calibrated else "NOT_CONFIGURED",
             "calibration_id": "synthetic-only", "source_frame": sensor_cfg["frame_id"],
@@ -124,6 +125,11 @@ def scenario(calibrated, timing_only=False, mixed_domain=False, ptp_probing=Fals
                 assert not latest["timing"].timing_ready and not latest["ready"].dual_lidar_ready
                 assert latest["ready"].reason == "FRAME_SPAN_EXCEEDED"
                 return {"frame_span_violation": True, "result": "PASS", "scope": "SYNTHETIC_ROS2_TRANSPORT_ONLY"}
+            if ptp_probing:
+                assert counts["204"] == counts["205"] == counts["merged"] == 0, counts
+                assert not latest["timing"].timing_ready and not transforms
+                return {"ptp_probing_raw_only_no_canonical": True, "result": "PASS",
+                        "scope": "SYNTHETIC_ROS2_TRANSPORT_ONLY"}
             assert min(counts["204"], counts["205"]) >= 3, counts
             assert latest["ready"] is not None
             assert latest["ready"].evidence.source_type == 4
@@ -138,7 +144,8 @@ def scenario(calibrated, timing_only=False, mixed_domain=False, ptp_probing=Fals
                 assert latest["timing"].header_delta_sec > .03
                 assert latest["timing"].mid_delta_sec < .001
             if calibrated and not timing_only:
-                assert counts["merged"] >= 3 and latest["ready"].dual_lidar_ready, counts
+                assert counts["merged"] >= 3 and not latest["ready"].dual_lidar_ready, counts
+                assert not latest["timing"].production_timing_ready  # HOST_DERIVED is provisional.
                 assert {"synthetic/er1_204", "synthetic/er1_205"} <= transforms, transforms
                 pump(.2, ())  # Drain transport before measuring no-old-frame reuse.
                 receive_stamp = latest["ready"].evidence.receive_stamp

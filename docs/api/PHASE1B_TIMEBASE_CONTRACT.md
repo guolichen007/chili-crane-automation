@@ -1,27 +1,31 @@
 # Phase 1B：时间证据接口与字段字典
 
+时间尺度以 [R2 合同](PHASE1B_TIMESCALE_R2.md)为准；
+R1 的 host/PTP domain 相等条件和未正规化 canonical 发布规则已取代。
+
 ## 时间与状态
 
 所有时间为秒或 ROS `builtin_interfaces/Time`；raw 相机 tick 明确例外。
 clock_mode：NOT_CONFIGURED / SENSOR_PTP / HOST_DERIVED。
-clock_sync_state：NOT_CONFIGURED / PROBING / PROVISIONAL / VALID / DEGRADED。
+clock_sync_state：NOT_CONFIGURED / PROBING / PROVISIONAL / LOCAL_VERIFIED / VALID / DEGRADED。
 stamp_basis：FIRST_POINT / LAST_POINT / MID_SCAN / HOST_RECEIVE / CAMERA_DEVICE / CAMERA_HOST。
 当前 ER1 adapter 使用 FIRST_POINT header，MID_SCAN 配对。
 VALID 不能由系统服务、收到包或设备在线推断；SENSOR_PTP 需明确同一 domain、
-已验证时间证据 ID、host_clock_relation=VALID、host_clock_relation_evidence_id，
-且 host_clock_domain 与两雷达 clock_domain 一致。
+已验证时间证据 ID、双雷达共同 PTP domain；PTP domain 与 HOST_UTC domain 不要求相同。
+两域之间必须用显式 TimeScaleRelation 转换。
 HOST_DERIVED 只允许 PROVISIONAL，不标 PTP_VERIFIED。
 SENSOR_PTP/PROBING 可 render use_lidar_clock=true 采集诊断；domain 尚未确认可保留
 NOT_CONFIGURED，但永不 timing_ready/ptp_verified/full_ready。
-PROBING 不拿未证实同域的 Ubuntu now 拒绝全部源时间；原始时间及 receive 对照保留，
-帧结构/有限正时间/单调性和配置后的 span 上限仍校验。VALID 才使用已确认 host relation
-执行 source future/stale 检查。两雷达模式不得混用。
+PROBING 且关系未验证时只保留 vendor/raw evidence，禁止冒充 HOST_UTC canonical。
+关系至少 LOCAL_VERIFIED 才可同时转换 header 与每点时间，再执行 future/stale。
+生产 timing 另需正式 VALID/traceability 和新鲜运行状态。两雷达模式不得混用。
 参数 null 保持未配置；实验 CLI 参数不自动成为生产配置。
 
 ## 每点时间
 
 Canonical XYZIRT：x/y/z/intensity float32、ring uint16、sensor_id uint8、timestamp float64；
-32 字节 point_step，timestamp offset=24。保留原始 header 和每点时间。
+32 字节 point_step，timestamp offset=24。vendor 保留原始 header 和每点时间；
+canonical 保留几何和布局，但 header/每点时间一致正规化至 HOST_UTC。
 帧 start=min(timestamp)，end=max(timestamp)，mid=start+(end-start)/2，span=end-start。
 FIRST_POINT 校验 abs(header-start)，不校验整帧所有点距 header。
 maximum_future_skew_sec 同时约束 header、end；正偏差可接受但上限有限，默认 null。
@@ -43,7 +47,8 @@ Pinned rs_driver `897b14d3bdb6186a75df27ba51b65b5bd5557723` 的
 
 | Topic（/crane_01 前缀） | 类型 | 主要事实 |
 | --- | --- | --- |
-| lidar/er1_204/points、er1_205/points | sensor_msgs/PointCloud2 | 传感器自身 frame，原 header |
+| lidar/er1_204/points、er1_205/points | sensor_msgs/PointCloud2 | 传感器自身 frame，HOST_UTC 正规化 header/每点时间 |
+| lidar/er1_204/clock_status、er1_205/clock_status | Rse1ClockStatus | 新鲜 DIFOP/MSOP 运行事实，clock/scan phase 独立 |
 | lidar/er1_204/timing、er1_205/timing | SensorTimingState | header/receive/start/end/mid、span、basis、时钟合同、period/jitter、计数 |
 | lidar/dual_lidar/timing | DualLidarTimingState | header/mid delta、overlap、pair/drop、timing_ready |
 | lidar/dual_lidar/readiness | DualLidarReadiness | 兼容既有完整 readiness，Phase1B 恒不 full ready |

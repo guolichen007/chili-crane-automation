@@ -20,8 +20,8 @@ def timebase(site, ptp_snapshot=None, camera_snapshot=None):
     for sensor in ("er1_204", "er1_205"):
         cfg = yaml.safe_load((site / "sensors" / (sensor + ".yaml")).read_text())
         lidar[sensor] = {k: cfg.get(k) for k in ("clock_mode", "clock_sync_state", "clock_domain",
-            "time_evidence_id", "stamp_basis", "host_clock_relation", "host_clock_relation_evidence_id",
-            "host_clock_domain", "transport_mode", "destination_address", "host_address", "group_address")}
+            "time_evidence_id", "stamp_basis", "raw_time_scale", "time_scale_relation",
+            "runtime_status_timeout_sec", "transport_mode", "destination_address", "host_address", "group_address")}
         lidar[sensor]["use_lidar_clock"] = (True if cfg["clock_mode"] == "SENSOR_PTP" else
                                              False if cfg["clock_mode"] == "HOST_DERIVED" else None)
     cfg = yaml.safe_load((site / "sensors/hik_01.yaml").read_text())

@@ -15,11 +15,12 @@ from geometry_msgs.msg import TransformStamped
 from tf2_ros import StaticTransformBroadcaster
 from chili_crane_control.qos import state_qos
 from chili_crane_control.evidence_policy import SourceType
-from chili_crane_msgs.msg import DualLidarReadiness, SensorTimingState, DualLidarTimingState
+from chili_crane_msgs.msg import DualLidarReadiness, SensorTimingState, DualLidarTimingState, Rse1ClockStatus
 from .pointcloud import normalize_cloud, crop, validate_points
 from .dual_lidar import Cloud, DualLidarHealth, DualLidarSynchronizer, Extrinsic, DualLidarMerger
 from .rotation import quaternion
 from .timebase import ClockContract, bounded
+from .timescale import normalize_times
 
 
 def cloud_message(cloud):
@@ -53,6 +54,15 @@ class DualLidarNode(Node):
         self._sensor_configs = {s: yaml.safe_load((site / "sensors" / ("er1_" + s + ".yaml")).read_text())
                                 for s in ("204", "205")}
         self._clocks = {}
+        for sensor, cfg in self._sensor_configs.items():
+            timeout = cfg.get("runtime_status_timeout_sec")
+            if timeout is not None:
+                bounded(timeout, "runtime_status_timeout_sec")
+            try:
+                self._clocks[sensor] = ClockContract.from_config(cfg)
+            except (ValueError, TypeError):
+                pass  # Raw vendor stays available; unknown canonical scale never published.
+        self._runtime_status = {}
         self._maximum_span = self._cfg.get("maximum_frame_span_sec")
         if self._maximum_span is not None:
             bounded(self._maximum_span, "maximum_frame_span_sec")
@@ -123,6 +133,9 @@ class DualLidarNode(Node):
                 "lidar/er1_" + sensor + "/timing", state_qos())
             self._cloud_subscriptions.append(self.create_subscription(PointCloud2, cfg["raw_topic"],
                 lambda msg, sensor=sensor: self._receive(sensor, msg), qos_profile_sensor_data))
+            self._cloud_subscriptions.append(self.create_subscription(Rse1ClockStatus,
+                "lidar/er1_" + sensor + "/clock_status",
+                lambda msg, sensor=sensor: self._receive_clock_status(sensor, msg), state_qos()))
         self._merged = self.create_publisher(PointCloud2, "lidar/merged_points", qos_profile_sensor_data)
         self._products = {name: self.create_publisher(PointCloud2, name, qos_profile_sensor_data)
                           for name in self._cfg["products"]}
@@ -149,6 +162,8 @@ class DualLidarNode(Node):
 
     def _receive(self, sensor, msg):
         now, monotonic = self._now()
+        raw = cloud = None
+        raw_valid = False
         try:
             stamp = msg.header.stamp.sec + msg.header.stamp.nanosec / 1e9
             if (self._clock_fault or not math.isfinite(stamp) or stamp <= 0
@@ -157,13 +172,19 @@ class DualLidarNode(Node):
             points = normalize_cloud(msg.data, [(f.name, f.offset, f.datatype, f.count) for f in msg.fields],
                 msg.point_step, msg.row_step, msg.width, msg.height, msg.is_bigendian,
                 0 if sensor == "204" else 1)
-            cloud = Cloud(stamp, monotonic, msg.header.frame_id, points, int(self._source), now,
+            raw = Cloud(stamp, monotonic, msg.header.frame_id, points, int(self._source), now,
                           msg.header.stamp.sec * 1000000000 + msg.header.stamp.nanosec)
+            raw.timing  # Validate finite positive point times before diagnostic publication.
+            raw_valid = True
+            contract = self._clocks.get(sensor)
+            scale = self._sensor_configs[sensor].get("raw_time_scale", "UNKNOWN")
+            header_ns, normalized, offset = normalize_times(raw.header_nanoseconds, points, scale,
+                                                            contract.relation if contract else None)
+            cloud = Cloud(header_ns / 1e9, monotonic, msg.header.frame_id, normalized,
+                          int(self._source), now, header_ns)
             cloud.timing.check_span(self._maximum_span)
-            probing = (self._sensor_configs[sensor].get("clock_mode") == "SENSOR_PTP"
-                       and self._sensor_configs[sensor].get("clock_sync_state") == "PROBING")
-            # Unrelated epochs are measurable diagnostics during PROBING, never ready.
-            if not probing and self._future is not None and self._cfg.get("stale_timeout_sec") is not None:
+            # Only HOST_UTC canonical timestamps may be compared with HOST_UTC now.
+            if self._future is not None and self._cfg.get("stale_timeout_sec") is not None:
                 cloud.timing.check(now, self._future, self._cfg["stale_timeout_sec"],
                                    self._cfg.get("header_first_point_tolerance_sec"), self._maximum_span)
             prior = self._previous_mid[sensor]
@@ -177,8 +198,8 @@ class DualLidarNode(Node):
             self._frame_valid[sensor] = True
             self._health.accepted(sensor, cloud)
             self._raw_pubs[sensor].publish(cloud_message(cloud))
-            self._publish_sensor_timing(sensor, cloud)
-            if self._sync is not None:
+            self._publish_sensor_timing(sensor, raw, cloud, offset)
+            if self._sync is not None and self._clock_gate(now, monotonic):
                 pairs = self._sync.push(sensor, cloud, now, monotonic)
                 for pair in pairs:
                     self._last_temporal = pair
@@ -205,45 +226,106 @@ class DualLidarNode(Node):
             if str(exc) == "FUTURE_TIMESTAMP":
                 self._sensor_counts[sensor]["future"] += 1
             self._error = str(exc)
+            if raw_valid:
+                self._publish_sensor_timing(sensor, raw, cloud, reason=str(exc))
 
-    def _publish_sensor_timing(self, sensor, cloud):
+    def _publish_sensor_timing(self, sensor, raw, cloud=None, offset=0, reason=None):
         def stamp(value):
             return Time(nanoseconds=int(value * 1e9)).to_msg()
-        frame, cfg = cloud.timing, self._sensor_configs[sensor]
+        frame, cfg = (cloud or raw).timing, self._sensor_configs[sensor]
         contract = self._clocks.get(sensor)
+        relation = contract.relation if contract else None
+        clock, phase = self._runtime_facts(sensor, raw.received_source_time, raw.received_monotonic)
         msg = SensorTimingState()
-        msg.header.stamp = stamp(cloud.received_source_time)
-        msg.header.frame_id = cloud.frame_id
-        msg.validity = msg.VALID if self._sync else msg.NOT_CONFIGURED
-        msg.reason = "FRAME_TIME_VALID" if self._sync else "TIMEBASE_NOT_CONFIGURED"
+        msg.header.stamp = stamp(raw.received_source_time)
+        msg.header.frame_id = raw.frame_id
+        valid = bool(cloud and not reason and self._sync and self._clock_gate(raw.received_source_time, raw.received_monotonic))
+        msg.validity = msg.VALID if valid else msg.DEGRADED
+        msg.reason = reason or ("FRAME_TIME_VALID" if valid else "TIMING_NOT_VERIFIED")
         msg.sensor_id, msg.source_type = "er1_" + sensor, int(self._source)
         msg.clock_mode, msg.clock_sync_state = cfg.get("clock_mode", "NOT_CONFIGURED"), cfg.get("clock_sync_state", "NOT_CONFIGURED")
         msg.clock_domain, msg.stamp_basis = cfg.get("clock_domain", "NOT_CONFIGURED"), "FIRST_POINT"
-        for name, value in (("header_stamp", frame.header), ("receive_stamp", cloud.received_source_time),
-                            ("frame_start_stamp", frame.start), ("frame_end_stamp", frame.end), ("frame_mid_stamp", frame.mid)):
-            setattr(msg, name, stamp(value))
-        if cloud.header_nanoseconds is not None:
+        msg.raw_time_scale = cfg.get("raw_time_scale", "UNKNOWN")
+        msg.normalized_time_scale = "HOST_UTC" if cloud else "UNKNOWN"
+        msg.raw_header_stamp = Time(nanoseconds=raw.header_nanoseconds).to_msg()
+        msg.normalization_valid = cloud is not None
+        msg.receive_stamp = stamp(raw.received_source_time)
+        if cloud:
+            for name, value in (("frame_start_stamp", frame.start), ("frame_end_stamp", frame.end), ("frame_mid_stamp", frame.mid)):
+                setattr(msg, name, stamp(value))
             msg.header_stamp = Time(nanoseconds=cloud.header_nanoseconds).to_msg()
+            msg.normalized_header_stamp = msg.header_stamp
+            msg.applied_offset_sec = float((raw.header_nanoseconds - cloud.header_nanoseconds) / 1e9)
+            msg.header_to_first_point_sec, msg.header_to_last_point_sec = frame.start - frame.header, frame.end - frame.header
+            msg.source_to_host_offset_sec = raw.received_source_time - frame.mid
+        msg.relation_state = relation.relation_state if relation else "NOT_CONFIGURED"
+        msg.relation_evidence_id = relation.evidence_id if relation else "NOT_CONFIGURED"
         msg.frame_span_sec = frame.span
-        msg.header_to_first_point_sec, msg.header_to_last_point_sec = frame.start - frame.header, frame.end - frame.header
-        msg.source_to_host_offset_sec = cloud.received_source_time - frame.mid
         periods = self._periods[sensor]
         msg.frame_period_sec = sum(periods) / len(periods) if periods else 0.0
         msg.jitter_sec = (sum((p - msg.frame_period_sec) ** 2 for p in periods) / len(periods)) ** .5 if periods else 0.0
         counts = self._sensor_counts[sensor]
         msg.invalid_timestamp_count, msg.future_stamp_count, msg.clock_regression_count = counts["invalid"], counts["future"], counts["regression"]
-        msg.ptp_verified = bool(contract and contract.ptp_verified)
+        msg.clock_sync_valid, msg.scan_phase_sync_valid = clock, phase
+        msg.ptp_verified = bool(contract and contract.ptp_verified and clock and valid)
+        msg.production_timing_ready = bool(valid and contract and contract.production_ready and clock)
         msg.evidence.source_type, msg.evidence.validity, msg.evidence.reason = msg.source_type, msg.validity, msg.reason
         msg.evidence.measurement_stamp, msg.evidence.receive_stamp = msg.frame_mid_stamp, msg.receive_stamp
         self._timing_pubs[sensor].publish(msg)
+
+    def _runtime_facts(self, sensor, now, monotonic):
+        record = self._runtime_status.get(sensor)
+        timeout = self._sensor_configs[sensor].get("runtime_status_timeout_sec")
+        if not record or timeout is None:
+            return False, False
+        msg, arrival = record
+        def fresh(value):
+            age = now - (value.sec + value.nanosec / 1e9)
+            return -(self._future or 0) <= age <= timeout
+        if not 0 <= monotonic - arrival <= timeout:
+            return False, False
+        msop_fresh = fresh(msg.msop_received_at)
+        clock = (fresh(msg.difop_received_at) and msop_fresh and msg.timesync_mode == 2
+                 and msg.time_mode == 2 and msg.timesync_status == 1 and msg.clock_sync_valid
+                 and msg.validity == msg.VALID)
+        phase = msop_fresh and msg.frame_sync == 1 and msg.scan_phase_sync_valid
+        return clock, phase
+
+    def _clock_gate(self, now, monotonic):
+        return bool(len(self._clocks) == 2 and all(
+            c.pairing_ready and (c.mode == "HOST_DERIVED" or self._runtime_facts(s, now, monotonic)[0])
+            for s, c in self._clocks.items()))
+
+    def _receive_clock_status(self, sensor, msg):
+        now, monotonic = self._now()
+        if (msg.sensor_id != "er1_" + sensor or msg.header.frame_id != self._frames[sensor]
+                or msg.source_type != int(self._source) or not msg.observer_boot_id or msg.observation_sequence == 0):
+            return
+        previous = self._runtime_status.get(sensor)
+        restart = bool(previous and previous[0].observer_boot_id != msg.observer_boot_id)
+        if previous and not restart and msg.observation_sequence <= previous[0].observation_sequence:
+            return  # Timer republishes must not refresh old observations.
+        self._runtime_status[sensor] = (msg, monotonic)
+        if restart or not self._clock_gate(now, monotonic):
+            self._last_temporal = self._last_merged = None
+            if self._sync:
+                for queue in self._sync.queues.values():
+                    queue.clear()
+            self._error = "RUNTIME_PTP_CLOCK_NOT_VALID"
+            self._publish_health()
 
     def _publish_health(self):
         now, monotonic = self._now()
         a, b = [self._health.status(sensor, now, monotonic) for sensor in ("204", "205")]
         if self._sync:
             self._sync.expire(now, monotonic)
+        if not self._clock_gate(now, monotonic):
+            self._last_temporal = self._last_merged = None
+            if self._sync:
+                for queue in self._sync.queues.values():
+                    queue.clear()
         pair = self._last_temporal
-        pairing = bool(not self._clock_fault and pair and self._sync and all(-self._sync.future <= now - c.timing.start <= self._sync.stale
+        pairing = bool(not self._clock_fault and pair and self._sync and self._clock_gate(now, monotonic) and all(-self._sync.future <= now - c.timing.start <= self._sync.stale
             and c.timing.end <= now + self._sync.future
             and 0 <= monotonic - c.received_monotonic <= self._sync.stale for c in pair))
         message = DualLidarReadiness()
@@ -258,7 +340,8 @@ class DualLidarNode(Node):
         message.pairing_valid = pairing
         message.extrinsic_valid = self._merger is not None
         message.coverage_valid = self._cfg.get("coverage_verified") is True
-        message.dual_lidar_ready = (not self._clock_fault and message.a_frame_valid and message.b_frame_valid
+        production_timing = bool(pairing and all(c.production_ready for c in self._clocks.values()))
+        message.dual_lidar_ready = (production_timing and not self._clock_fault and message.a_frame_valid and message.b_frame_valid
             and a["fresh"] and b["fresh"] and pairing
             and message.extrinsic_valid and message.coverage_valid
             and self._sync is not None and all(c.pairing_ready for c in self._clocks.values()))
@@ -280,6 +363,11 @@ class DualLidarNode(Node):
         timing.extrinsic_valid = message.extrinsic_valid
         timing.spatial_merge_ready = timing.dual_lidar_full_ready = message.dual_lidar_ready
         timing.ptp_verified = bool(self._sync and self._clocks and all(c.ptp_verified for c in self._clocks.values()))
+        timing.ptp_verified = timing.ptp_verified and pairing
+        facts = [self._runtime_facts(s, now, monotonic) for s in ("204", "205")]
+        timing.clock_sync_valid = all(clock for clock, _ in facts)
+        timing.scan_phase_sync_valid = all(phase for _, phase in facts)
+        timing.production_timing_ready = production_timing
         timing.paired_count = self._sync.paired_count if self._sync else 0
         timing.dropped_a = self._sync.dropped["204"] if self._sync else 0
         timing.dropped_b = self._sync.dropped["205"] if self._sync else 0
@@ -304,8 +392,10 @@ class DualLidarNode(Node):
             "coverage_valid": message.coverage_valid, "dual_lidar_ready": message.dual_lidar_ready,
             "timing_ready": pairing, "spatial_reason": "SPATIAL_FUSION_NOT_CONFIGURED" if not self._merger else "CALIBRATED",
             "ptp_verified": timing.ptp_verified,
-            "host_clock_relation": {s: c.get("host_clock_relation", "NOT_CONFIGURED")
+            "time_scale_relation": {s: c.get("time_scale_relation", {})
                                     for s, c in self._sensor_configs.items()},
+            "clock_sync_valid": timing.clock_sync_valid, "scan_phase_sync_valid": timing.scan_phase_sync_valid,
+            "production_timing_ready": production_timing,
             "maximum_frame_span_sec": self._maximum_span,
             "invalid_timestamps": self._sensor_counts,
             "reused_old_frame": False, "source_type": self._source.name, "reason": self._error}

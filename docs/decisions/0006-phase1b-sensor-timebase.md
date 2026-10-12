@@ -3,6 +3,8 @@
 - 状态：ACCEPTED，2026-10-10。
 - 基线：`fbe823bb4794d7c7d9cb502312e657ae361614c6`。
 - 分支：`codex/phase1b-sensor-timebase-v1`；不修改 main。
+- 时间尺度与 host relation 部分由 [ADR0007](0007-phase1b-ptp-timescale-r2.md)取代；
+  以下为历史 Phase1B 决策，canonical 不再将 PTP raw 时间直接作为 HOST_UTC。
 
 ## 本轮决策
 

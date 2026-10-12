@@ -10,6 +10,7 @@ from unittest.mock import patch
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 for package in ("hardware", "slam"):
     sys.path.insert(0, str(ROOT / ("src/chili_crane_" + package + "/src")))
 from chili_crane_hardware.er1_transport import packet_role, driver_transport
@@ -35,10 +36,10 @@ def transport(**extra):
 
 
 def ptp(**extra):
+    from tests_static.test_phase1b_timescale_r2 import relation
     cfg = dict(clock_mode="SENSOR_PTP", clock_sync_state="VALID", clock_domain="synthetic-ptp-0",
-               time_evidence_id="synthetic-time", host_clock_relation="VALID",
-               host_clock_relation_evidence_id="synthetic-host",
-               host_clock_domain="synthetic-ptp-0")
+               time_evidence_id="synthetic-time", raw_time_scale="PTP_TIMESCALE",
+               time_scale_relation=relation(source_domain="synthetic-ptp-0"))
     cfg.update(extra)
     return cfg
 
@@ -179,18 +180,22 @@ class BenchR1Tests(unittest.TestCase):
 
     def test_ptp_probing_never_ready_even_with_evidence(self):
         for domain in ("NOT_CONFIGURED", "synthetic-ptp-0"):
-            contract = ClockContract.from_config(ptp(clock_sync_state="PROBING", clock_domain=domain))
+            cfg = ptp(clock_sync_state="PROBING", clock_domain=domain)
+            if domain == "NOT_CONFIGURED":
+                cfg["time_scale_relation"] = None
+            contract = ClockContract.from_config(cfg)
             self.assertFalse(contract.ptp_verified)
             self.assertFalse(contract.pairing_ready)
 
-    def test_ptp_valid_requires_host_relation_domain_and_evidence(self):
+    def test_ptp_valid_requires_explicit_timescale_relation_not_domain_equality(self):
         self.assertTrue(ClockContract.from_config(ptp()).ptp_verified)
-        for change in ({"host_clock_relation": "NOT_CONFIGURED"}, {"host_clock_relation": "PROBING"},
-                       {"host_clock_relation": "DEGRADED"}, {"host_clock_domain": "another-domain"},
-                       {"host_clock_relation_evidence_id": "NOT_CONFIGURED"},
-                       {"time_evidence_id": "NOT_CONFIGURED"}, {"clock_domain": "NOT_CONFIGURED"}):
+        for change in ({"time_evidence_id": "NOT_CONFIGURED"}, {"clock_domain": "NOT_CONFIGURED"}):
             with self.assertRaises(ValueError):
                 ClockContract.from_config(ptp(**change))
+        self.assertFalse(ClockContract.from_config(ptp(time_scale_relation=None)).pairing_ready)
+        cfg = ptp()
+        cfg["time_scale_relation"]["relation_state"] = "DEGRADED"
+        self.assertFalse(ClockContract.from_config(cfg).pairing_ready)
 
     def test_render_ptp_probing_and_unicast(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -198,7 +203,7 @@ class BenchR1Tests(unittest.TestCase):
             (site / "sensors").mkdir()
             for i, sensor in enumerate(("204", "205")):
                 cfg = transport()
-                cfg.update(ptp(clock_sync_state="PROBING", clock_domain="NOT_CONFIGURED"))
+                cfg.update(ptp(clock_sync_state="PROBING", clock_domain="NOT_CONFIGURED", time_scale_relation=None))
                 cfg.update(driver_enabled=True, port_roles="VALID", msop_port=11000 + i * 2,
                            difop_port=11001 + i * 2, frame_id="synthetic/" + sensor, raw_topic="/vendor_" + sensor)
                 (site / "sensors" / ("er1_" + sensor + ".yaml")).write_text(yaml.safe_dump(cfg))

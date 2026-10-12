@@ -1,10 +1,15 @@
 # 辣椒地池行车自动抓取框架
 
-当前分支为 **Phase 1B Bench R1 / 台架接入前补丁**，基线为 8118f993。
+当前分支为 **Phase 1B PTP TimeScale R2 / 时间尺度收口**，基线为 48674999。
+原始 vendor PTP 时间保持不变；canonical header 和每点时间按显式关系一起减 UTC offset。
+S14 的 37 秒关系只达 LOCAL_VERIFIED，不等于生产可追溯 VALID。
+入口：[R2 合同](docs/api/PHASE1B_TIMESCALE_R2.md)、
+[S13/S14 回传事实](docs/hardware/20261012_S13_S14时间尺度验证事实.md)、
+[R2 跟踪](docs/validation/PHASE1B_TIMESCALE_R2_TRACKER.md)。
 网络配置以[传感器网络 S3-FINAL 收口](docs/hardware/20261010_传感器网络接入收口.md)为准：
 SENSOR-NET、enp3s0、192.168.1.102/24，双 ER1 单播到本机；
 相机地址 192.168.1.180。这些是用户回传网络证据，不是本轮实机采集。
-入口：[R1 跟踪](docs/validation/PHASE1B_BENCH_R1_TRACKER.md)。
+历史：[R1 跟踪](docs/validation/PHASE1B_BENCH_R1_TRACKER.md)。
 
 Phase 1B 承接 Phase 1A，
 提供双 ER1 每点帧时间、中点配对、PTP 探测、一台海康辅助图像/时间与录包工具。

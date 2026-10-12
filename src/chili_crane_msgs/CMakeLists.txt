@@ -31,6 +31,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CycleStatus.msg"
   "msg/DualLidarReadiness.msg"
   "msg/SensorTimingState.msg"
+  "msg/Rse1ClockStatus.msg"
   "msg/DualLidarTimingState.msg"
   "msg/CameraTimingState.msg"
   "msg/EvidenceMetadata.msg"

@@ -14,6 +14,7 @@ install(PROGRAMS
   scripts/adam_do_test.py
   scripts/pull_wire_probe.py
   scripts/hik_camera_node.py
+  scripts/er1_clock_observer.py
   DESTINATION lib/${PROJECT_NAME})
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
@@ -22,6 +23,8 @@ if(BUILD_TESTING)
   ament_add_pytest_test(phase1b_camera ../../tests_static/test_phase1b_camera.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
   ament_add_pytest_test(phase1b_bench_r1 ../../tests_static/test_phase1b_bench_r1.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
+  ament_add_pytest_test(phase1b_timescale_r2 ../../tests_static/test_phase1b_timescale_r2.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
 endif()
 ament_package()

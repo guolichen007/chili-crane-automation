@@ -18,12 +18,22 @@ driver_enabled: false
 frame_id: crane_01/er1_204
 raw_topic: /crane_01/lidar/er1_204/vendor_points
 normalized_topic: /crane_01/lidar/er1_204/points
-clock_mode: NOT_CONFIGURED
-clock_sync_state: NOT_CONFIGURED
-clock_domain: NOT_CONFIGURED
+clock_mode: SENSOR_PTP
+clock_sync_state: LOCAL_VERIFIED
+clock_domain: ptp-domain-0
+raw_time_scale: PTP_TIMESCALE
 stamp_basis: FIRST_POINT
-time_evidence_id: NOT_CONFIGURED
-host_clock_relation: NOT_CONFIGURED
-host_clock_relation_evidence_id: NOT_CONFIGURED
-host_clock_domain: NOT_CONFIGURED
+time_evidence_id: USER_REPORTED_S13_S14
+runtime_status_timeout_sec: null
+time_scale_relation:
+  source_scale: PTP_TIMESCALE
+  target_scale: HOST_UTC
+  source_domain: ptp-domain-0
+  target_domain: host-utc
+  utc_offset_sec: 37
+  relation_state: LOCAL_VERIFIED
+  evidence_id: USER_REPORTED_S14
+  offset_source: PMC_AND_LOCAL_HOST_COMPARISON
+  current_utc_offset_valid: false
+  time_traceable: false
 lidar_type: RSE1

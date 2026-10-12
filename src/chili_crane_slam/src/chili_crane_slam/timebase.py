@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 import math
 import numpy as np
+from .timescale import TimeScale, TimeScaleRelation, known
 
 
 def bounded(value, name, upper=10.0, allow_zero=False):
@@ -67,9 +68,8 @@ class ClockContract:
     state: str
     domain: str
     evidence_id: str = ""
-    host_relation: str = "NOT_CONFIGURED"
-    host_evidence_id: str = ""
-    host_domain: str = "NOT_CONFIGURED"
+    raw_time_scale: str = "UNKNOWN"
+    relation: TimeScaleRelation = TimeScaleRelation()
 
     @classmethod
     def from_config(cls, cfg):
@@ -81,34 +81,44 @@ class ClockContract:
             value = cfg.get(key)
             return value if isinstance(value, str) and value.strip() and value != "NOT_CONFIGURED" else ""
         evidence = evidence_value("time_evidence_id")
-        relation = cfg.get("host_clock_relation", "NOT_CONFIGURED")
-        host_evidence = evidence_value("host_clock_relation_evidence_id")
-        host_domain = cfg.get("host_clock_domain", "NOT_CONFIGURED")
-        if relation not in {"NOT_CONFIGURED", "PROBING", "VALID", "DEGRADED"}:
-            raise ValueError("HOST_CLOCK_RELATION_INVALID")
+        scale = cfg.get("raw_time_scale", "UNKNOWN")
+        if scale not in {s.value for s in TimeScale}:
+            raise ValueError("RAW_TIME_SCALE_INVALID")
+        relation = TimeScaleRelation.from_config(cfg.get("time_scale_relation"))
+        if relation.bench_allowed and relation.source_domain != domain:
+            raise ValueError("TIME_SCALE_SOURCE_DOMAIN_MISMATCH")
         if mode == "HOST_DERIVED" and state != "PROVISIONAL":
             raise ValueError("HOST_DERIVED_MUST_BE_PROVISIONAL")
+        if mode == "HOST_DERIVED" and scale not in {"UNKNOWN", "HOST_UTC"}:
+            raise ValueError("HOST_DERIVED_SCALE_MISMATCH")
         if not domain or domain == "NOT_CONFIGURED":
             if not (mode == "SENSOR_PTP" and state == "PROBING"):
                 raise ValueError("CLOCK_DOMAIN_NOT_CONFIGURED")
-        if mode == "SENSOR_PTP" and state not in {"PROBING", "VALID"}:
+        if mode == "SENSOR_PTP" and state not in {"PROBING", "LOCAL_VERIFIED", "VALID"}:
             raise ValueError("PTP_EVIDENCE_NOT_VERIFIED")
-        result = cls(mode, state, domain, evidence, relation, host_evidence, host_domain)
-        if mode == "SENSOR_PTP" and state == "VALID" and not result.ptp_verified:
-            raise ValueError("PTP_HOST_RELATION_OR_TIME_EVIDENCE_NOT_VERIFIED")
-        return result
+        if mode == "SENSOR_PTP" and state in {"LOCAL_VERIFIED", "VALID"} and not evidence:
+            raise ValueError("PTP_TIME_EVIDENCE_NOT_VERIFIED")
+        return cls(mode, state, domain, evidence, scale, relation)
 
     @property
     def ptp_verified(self):
-        return (self.mode == "SENSOR_PTP" and self.state == "VALID"
-                and self.domain not in {"", "NOT_CONFIGURED"} and bool(self.evidence_id)
-                and self.host_relation == "VALID" and bool(self.host_evidence_id)
-                and self.host_domain == self.domain)
+        return (self.mode == "SENSOR_PTP" and self.state in {"LOCAL_VERIFIED", "VALID"}
+                and known(self.domain) and bool(self.evidence_id)
+                and self.raw_time_scale == "PTP_TIMESCALE" and self.relation.bench_allowed)
 
     @property
     def pairing_ready(self):
         return (self.mode == "HOST_DERIVED" and self.state == "PROVISIONAL"
-                and self.domain not in {"", "NOT_CONFIGURED"}) or self.ptp_verified
+                and known(self.domain) and self.raw_time_scale == "HOST_UTC") or self.ptp_verified
+
+    @property
+    def production_ready(self):
+        return self.state == "VALID" and self.ptp_verified and self.relation.production_allowed
 
     def compatible(self, other):
-        return self.mode == other.mode and self.domain == other.domain
+        if self.mode != other.mode or self.domain != other.domain:
+            return False
+        if self.relation.bench_allowed and other.relation.bench_allowed:
+            return (self.relation.target_domain == other.relation.target_domain
+                    and self.relation.utc_offset_sec == other.relation.utc_offset_sec)
+        return True

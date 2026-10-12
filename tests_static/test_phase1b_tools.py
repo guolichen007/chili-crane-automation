@@ -84,7 +84,8 @@ class Phase1BToolTests(unittest.TestCase):
 
     def test_manifest_unknown_mode_is_not_host_false(self):
         data = MANIFEST.timebase(ROOT / "config/sites/crane_01")
-        self.assertIsNone(data["lidars"]["er1_204"]["use_lidar_clock"])
+        self.assertTrue(data["lidars"]["er1_204"]["use_lidar_clock"])
+        self.assertEqual("LOCAL_VERIFIED", data["lidars"]["er1_204"]["time_scale_relation"]["relation_state"])
         self.assertFalse(data["ptp"]["ptp_verified"])
         self.assertIsNone(data["ptp"]["hardware_timestamp_supported"])
         self.assertFalse(data["camera"]["camera_control_authority"])
@@ -97,6 +98,7 @@ class Phase1BToolTests(unittest.TestCase):
             for i, s in enumerate(("204", "205")):
                 cfg = {"driver_enabled": True, "port_roles": "VALID", "clock_mode": "HOST_DERIVED",
                     "clock_sync_state": "PROVISIONAL", "clock_domain": "host-one",
+                    "raw_time_scale": "HOST_UTC",
                     "transport_mode": "UNICAST", "host_address": "192.168.1.102",
                     "destination_address": "192.168.1.102", "group_address": None,
                     "msop_port": 10000 + 2 * i, "difop_port": 10001 + 2 * i,

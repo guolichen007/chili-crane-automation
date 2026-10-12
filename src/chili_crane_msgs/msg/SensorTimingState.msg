@@ -29,4 +29,15 @@ uint64 clock_regression_count
 uint64 future_stamp_count
 uint64 invalid_timestamp_count
 bool ptp_verified
+string raw_time_scale
+string normalized_time_scale
+builtin_interfaces/Time raw_header_stamp
+builtin_interfaces/Time normalized_header_stamp
+float64 applied_offset_sec
+string relation_state
+string relation_evidence_id
+bool normalization_valid
+bool clock_sync_valid
+bool scan_phase_sync_valid
+bool production_timing_ready
 chili_crane_msgs/EvidenceMetadata evidence

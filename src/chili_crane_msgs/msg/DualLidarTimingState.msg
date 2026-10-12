@@ -23,4 +23,7 @@ bool extrinsic_valid
 bool spatial_merge_ready
 bool dual_lidar_full_ready
 bool ptp_verified
+bool clock_sync_valid
+bool scan_phase_sync_valid
+bool production_timing_ready
 chili_crane_msgs/EvidenceMetadata evidence

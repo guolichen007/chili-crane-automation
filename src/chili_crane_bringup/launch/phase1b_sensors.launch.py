@@ -28,9 +28,19 @@ def generate_launch_description():
         DeclareLaunchArgument("start_vendor", default_value="false"),
         DeclareLaunchArgument("vendor_config", default_value=""),
         DeclareLaunchArgument("start_camera", default_value="false"),
+        DeclareLaunchArgument("start_clock_observer", default_value="false"),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(share + "/launch/phase1_lidar.launch.py"),
             launch_arguments={"config_root": LaunchConfiguration("config_root"),
                 "start_vendor": LaunchConfiguration("start_vendor"), "vendor_config": LaunchConfiguration("vendor_config"),
                 "timing_only": "true"}.items()),
         OpaqueFunction(function=camera),
+        OpaqueFunction(function=clock_observer),
     ])
+
+
+def clock_observer(context):
+    if LaunchConfiguration("start_clock_observer").perform(context).lower() != "true":
+        return []
+    site = Path(LaunchConfiguration("config_root").perform(context)) / "sites/crane_01"
+    return [Node(package="chili_crane_hardware", executable="er1_clock_observer.py", namespace="crane_01",
+                 parameters=[{"site_config": str(site), "use_sim_time": False}], output="screen")]

@@ -3,7 +3,7 @@
 ## 1. 边界与前置条件
 
 原生 Ubuntu22.04 / ROS2 Humble / Python3.10 / GCC11。按精确 SHA checkout
-`codex/phase1b-bench-r1`；不修改 main，不把台架当生产验收。
+`codex/phase1b-ptp-timescale-r2`；不修改 main，不把台架当生产验收。
 physical_output_enabled=false、automatic_control_enabled=false、camera_control_authority=false。
 不接 DO，不做运动、NDT、外参、视觉 AI。外参保持 NOT_CONFIGURED。
 Phase1B 启动强制 timing-only，即使错误提供 VALID 外参也不发 TF/merged。
@@ -57,11 +57,15 @@ linuxptp 候选命令只打印，不运行；owner 评审 chrony/timesyncd/PTP �
 
 双 ER1 必须同模式/domain；port_roles、msop/difop、frame/topic 仍需现场确认。
 SENSOR_PTP 初次采证：clock_sync_state=PROBING，use_lidar_clock=true，
-允许记录尚未对齐的时间域；timing_ready/ptp_verified/full_ready 恒 false。
+允许 vendor/raw 记录尚未对齐的时间域；关系未验证时 canonical 不发布，
+timing_ready/ptp_verified/full_ready 恒 false。
 PROBING 时 domain 可未知，但不能据此推断相同已验证时间域。
-SENSOR_PTP 完成采证：VALID + 真实 time_evidence_id + 两雷达共同 clock_domain，
-host_clock_relation=VALID + host_clock_relation_evidence_id + 同域 host_clock_domain。
-需证明 Ubuntu source_now 与该域的关系，不能凭 ptp4l/报文在线确认。
+SENSOR_PTP 完成相对采证：真实 time_evidence_id + 两雷达共同 clock_domain；
+raw_time_scale=PTP_TIMESCALE，显式 time_scale_relation 指向 HOST_UTC。
+PTP domain 与 host UTC domain 不要求相等，R1 等式废弃。
+S14 offset=37、LOCAL_VERIFIED、两个 traceability flag=false：仅台架允许。
+正式生产 timing 要求 clock_sync_state=VALID、关系 VALID 和 traceability flags=true。
+还需 runtime_status_timeout_sec 实测门限及持续 DIFOP/MSOP 状态；无门限不 ready。
 HOST_DERIVED：use_lidar_clock=false，PROVISIONAL，PTP_VERIFIED=false，domain 指向同一台主机时钟。
 不要混用。不复用过去 SENSOR_SYNCHRONIZED/HOST_RECEIVE 名称。
 dual_lidar.yaml 明确 config_state=VALID、MID_SCAN、配对差、stale、future、FIRST_POINT 门限；
@@ -76,6 +80,12 @@ ros2 launch chili_crane_bringup phase1b_sensors.launch.py config_root:=/absolute
 # 另一终端，传入 owner 选择的实验门限；变量未设则 shell 拒绝。
 python3 scripts/sensors/dual_er1_timing_probe.py --seconds 120 --pair-delta "${PROBE_PAIR_DELTA:?}" --future-skew "${PROBE_FUTURE_SKEW:?}" --stale "${PROBE_STALE:?}" --output-dir /absolute/artifacts/dual-timing
 ```
+
+现场 owner 在具备 CAP_NET_RAW 的终端，可显式增加 start_clock_observer:=true。
+观察器读取 AF_PACKET，不绑定抢占 vendor UDP 端口，不写设备、不保存 payload。
+它必须匹配现场已确认的 port_roles、目的地址和端口；本仓库仍保持 driver_disabled。
+不修改厂商 driver，不对 vendor_points 做减 37 或补 0.12 秒 patch。
+field 状态与 CI 合成状态分开，S13/S14 不是永久 runtime readiness。
 
 生成 JSON/CSV/Markdown，分析 Hz、span、header/mid delta、overlap、receive latency、
 重复/倒退/未来/丢帧。探测工具不会改 site config，探测统计不独自升级 VALID。

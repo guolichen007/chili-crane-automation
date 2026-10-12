@@ -6,6 +6,7 @@ import unittest
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src/chili_crane_slam/src"))
 from chili_crane_slam.timebase import ClockContract, FrameTime
 from chili_crane_slam.dual_lidar import Cloud, DualLidarSynchronizer
@@ -79,7 +80,8 @@ class TimebaseTests(unittest.TestCase):
                 FrameTime.from_points(10, ts)
 
     def test_host_semantics_and_common_domain(self):
-        cfg = {"clock_mode": "HOST_DERIVED", "clock_sync_state": "PROVISIONAL", "clock_domain": "host-A"}
+        cfg = {"clock_mode": "HOST_DERIVED", "clock_sync_state": "PROVISIONAL",
+               "clock_domain": "host-A", "raw_time_scale": "HOST_UTC"}
         a = ClockContract.from_config(cfg)
         self.assertFalse(a.ptp_verified)
         self.assertTrue(a.compatible(ClockContract.from_config(cfg)))
@@ -91,8 +93,8 @@ class TimebaseTests(unittest.TestCase):
         cfg = {"clock_mode": "SENSOR_PTP", "clock_sync_state": "VALID", "clock_domain": "ptp-0"}
         with self.assertRaises(ValueError):
             ClockContract.from_config(cfg)
+        from tests_static.test_phase1b_timescale_r2 import relation
         ptp = ClockContract.from_config(dict(cfg, time_evidence_id="synthetic-only",
-            host_clock_relation="VALID", host_clock_relation_evidence_id="synthetic-host-proof",
-            host_clock_domain="ptp-0"))
+            raw_time_scale="PTP_TIMESCALE", time_scale_relation=relation(source_domain="ptp-0")))
         self.assertTrue(ptp.ptp_verified)
         self.assertFalse(ptp.compatible(ClockContract("HOST_DERIVED", "PROVISIONAL", "ptp-0")))
