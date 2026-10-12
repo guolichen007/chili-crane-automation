@@ -20,8 +20,8 @@ def box_shape(dimensions):
                 point[other] = [a * half[other[0]], b * half[other[1]]]
                 faces.append(point)
     return dict(sampled_surface=np.unique(faces, axis=0).tolist(), safety_vertices=vertices.tolist(),
-                bottom_reference_xyz=[0, 0, -half[2]], top_reference_xyz=[0, 0, half[2]],
-                suspension_reference_xyz=[0, 0, half[2]])
+                bottom_reference_xyz=[0, 0, -float(half[2])], top_reference_xyz=[0, 0, float(half[2])],
+                suspension_reference_xyz=[0, 0, float(half[2])])
 
 
 def fixture():

@@ -16,6 +16,12 @@ from chili_crane_perception.synthetic import fixture, scene, pit
 
 
 class GeometryTests(unittest.TestCase):
+    def test_fixture_yaml_roundtrip_matches_ros_runtime(self):
+        import yaml
+        config = yaml.safe_load(yaml.safe_dump(fixture()))
+        GrabGeometryModel(config["model"])
+        policy_from_config(config["policy"])
+
     def setUp(self):
         self.config = fixture()
         self.model = GrabGeometryModel(self.config["model"])
