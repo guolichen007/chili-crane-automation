@@ -111,13 +111,17 @@ def lifecycle(artifact, state, operator, revision, quantitative_pass=False, inde
         raise ValueError("INVALID_REVIEW")
     output = dict(artifact)
     if state == "INVALIDATED" or artifact.get("mount_revision") != revision:
-        output.update(status="INVALIDATED", invalidated_by=operator, invalidation_reason="SUPPORT_MOVED_OR_REVISION_CHANGED")
+        output.update(status="INVALIDATED", invalidated_by=operator, invalidation_reason="SUPPORT_MOVED_OR_REVISION_CHANGED",
+                      extrinsic_valid=False, dual_lidar_ready=False)
         return output
     allowed = (current, state) in {("CANDIDATE", "REVIEWED"), ("REVIEWED", "FIELD_VALIDATED")}
     if not allowed or not quantitative_pass or not independent_validation or artifact.get("observability") != "GOOD":
         raise ValueError("CALIBRATION_REVIEW_GATE_REJECTED")
     if state == "FIELD_VALIDATED" and artifact.get("source_type") != "PHYSICAL":
         raise ValueError("SYNTHETIC_CANNOT_BE_FIELD_VALIDATED")
+    if state == "FIELD_VALIDATED" and artifact.get("parameters", {}).get("parameter_scope") != "FIELD_FROZEN":
+        raise ValueError("FIELD_PARAMETERS_REQUIRE_OWNER_FREEZE")
     from datetime import datetime, timezone
-    output.update(status=state, reviewed_by=operator, reviewed_at=datetime.now(timezone.utc).isoformat())
+    output.update(status=state, reviewed_by=operator, reviewed_at=datetime.now(timezone.utc).isoformat(),
+                  extrinsic_valid=False, dual_lidar_ready=False)
     return output

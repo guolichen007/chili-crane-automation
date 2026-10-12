@@ -12,6 +12,7 @@ Visualization Manager:
       Color Transformer: FlatColor
       Color: 65; 145; 230
       Size (m): 0.02
+      Decay Time: 0.3
     - Class: rviz_default_plugins/Image
       Name: 相机安装预览（无外参或Safety权限）
       Enabled: false

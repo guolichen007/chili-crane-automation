@@ -29,7 +29,7 @@ class InstallationPreview(Node):
         for s in ("204", "205"):
             self.subs.append(self.create_subscription(PointCloud2, "lidar/er1_" + s + "/points",
                 lambda m, s=s: self.receive(s, m), qos_profile_sensor_data))
-        self.timer = self.create_timer(.5, self.render)
+        self.timer = self.create_timer(.1, self.render)
 
     def receive(self, sensor, msg):
         if not 0 < msg.width * msg.height <= 200000:

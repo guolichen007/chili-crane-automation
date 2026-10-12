@@ -11,6 +11,7 @@ Visualization Manager:
       Topic: {Value: /crane_01/installation/rough/er1_204, Reliability Policy: Best Effort, Durability Policy: Volatile}
       Color Transformer: FlatColor
       Color: 65; 145; 230
+      Decay Time: 0.3
       Size (m): 0.02
     - Class: rviz_default_plugins/PointCloud2
       Name: ER1-205 MECHANICAL_SEED NOT_CALIBRATED
@@ -18,6 +19,7 @@ Visualization Manager:
       Topic: {Value: /crane_01/installation/rough/er1_205, Reliability Policy: Best Effort, Durability Policy: Volatile}
       Color Transformer: FlatColor
       Color: 240; 155; 65
+      Decay Time: 0.3
       Size (m): 0.02
     - Class: rviz_default_plugins/Image
       Name: 相机安装预览（无外参或Safety权限）

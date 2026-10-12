@@ -125,6 +125,7 @@ python3 tools/review_lidar_calibration.py --candidate /path/calibration-report/c
 
 视觉核对柱/梁/墙/边/地面，204蓝、205橙；界面明确 CANDIDATE，不发布生产 TF。
 REVIEWED 之后才可再对 PHYSICAL artifact 显式申请 FIELD_VALIDATED；synthetic 永不允许。
+参数还需 owner 标为 FIELD_FROZEN，BENCH_EXPERIMENT 报告不能作为现场定稿。
 审核 artifact 不自动进入生产 profile；生产投用仍另行审核，不属于本轮。
 支架移动用新 revision 使旧外参 INVALIDATED，并重新测量和采集。
 

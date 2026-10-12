@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Explicit human lifecycle review; never copies a candidate into production config."""
 import argparse
+import hashlib
 from pathlib import Path
 import sys
 import yaml
@@ -17,11 +18,14 @@ def main():
     p.add_argument("--confirm-report", action="store_true")
     p.add_argument("--output", type=Path, required=True)
     a = p.parse_args()
-    if a.output.exists() or a.output.resolve() == a.candidate.resolve():
+    root = Path(__file__).resolve().parents[1]
+    if (a.output.exists() or a.output.resolve() == a.candidate.resolve()
+            or a.output.resolve() == root or root in a.output.resolve().parents):
         p.error("new reviewed artifact required; do not overwrite provenance")
     candidate = yaml.safe_load(a.candidate.read_text())
     reviewed = lifecycle(candidate, a.state, a.operator, a.mount_revision,
         a.confirm_report and candidate.get("quantitative_pass") is True, candidate.get("independent_validation") is True)
+    reviewed["reviewed_artifact_sha256"] = hashlib.sha256(a.candidate.read_bytes()).hexdigest()
     a.output.write_text(yaml.safe_dump(reviewed, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
 

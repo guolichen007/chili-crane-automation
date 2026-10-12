@@ -86,8 +86,15 @@ class InstallationContracts(unittest.TestCase):
             lifecycle({"status": "MECHANICAL_SEED", "mount_revision": "r"}, "FIELD_VALIDATED", "owner", "r", True, True)
 
     def test_support_movement_invalidates(self):
-        result = lifecycle({"status": "FIELD_VALIDATED", "mount_revision": "old"}, "FIELD_VALIDATED", "owner", "new", True, True)
+        result = lifecycle({"status": "FIELD_VALIDATED", "mount_revision": "old", "extrinsic_valid": True}, "FIELD_VALIDATED", "owner", "new", True, True)
         self.assertEqual("INVALIDATED", result["status"])
+        self.assertFalse(result["extrinsic_valid"])
+
+    def test_physical_bench_thresholds_cannot_be_field_validated(self):
+        with self.assertRaisesRegex(ValueError, "OWNER_FREEZE"):
+            lifecycle({"status": "REVIEWED", "source_type": "PHYSICAL", "mount_revision": "r",
+                "observability": "GOOD", "parameters": {"parameter_scope": "BENCH_EXPERIMENT"}},
+                "FIELD_VALIDATED", "owner", "r", True, True)
 
     def test_synthetic_no_field_validation(self):
         with self.assertRaisesRegex(ValueError, "SYNTHETIC"):
