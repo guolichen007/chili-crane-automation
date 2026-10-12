@@ -46,6 +46,11 @@ def main():
         rig = yaml.safe_load(rig_path.read_text())
         rig.update(parent_mode="DYNAMIC_PARENT", mount_revision="synthetic-r1")
         rig_path.write_text(yaml.safe_dump(rig))
+        for sensor in ("204", "205"):
+            path = site / ("sensors/er1_" + sensor + ".yaml")
+            config = yaml.safe_load(path.read_text())
+            config["preview_cloud_timeout_sec"] = .5  # Synthetic transport fixture, not field TTL.
+            path.write_text(yaml.safe_dump(config))
         rclpy.init(args=["--ros-args", "-r", "__ns:=/crane_01", "-p", "site_config:=" + str(site)])
         executor = SingleThreadedExecutor()
         observer = Node("phase1c_synthetic_observer")

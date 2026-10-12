@@ -11,6 +11,9 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("site_config", default_value=share + "/config/sites/crane_01"),
         DeclareLaunchArgument("candidate"),
+        DeclareLaunchArgument("overlay_frame", default_value="crane_01/er1_204"),
         Node(package="chili_crane_slam", executable="installation_preview_node.py", namespace="crane_01",
-             parameters=[{"site_config": LaunchConfiguration("site_config"), "candidate": LaunchConfiguration("candidate")}]),
-        Node(package="rviz2", executable="rviz2", arguments=["-d", share + "/rviz/extrinsic_candidate.rviz"])])
+             parameters=[{"site_config": LaunchConfiguration("site_config"), "candidate": LaunchConfiguration("candidate"),
+                          "overlay_frame": LaunchConfiguration("overlay_frame")}]),
+        Node(package="rviz2", executable="rviz2", arguments=["-d", share + "/rviz/extrinsic_candidate.rviz",
+             "-f", LaunchConfiguration("overlay_frame")])])

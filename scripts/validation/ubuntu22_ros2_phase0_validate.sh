@@ -61,6 +61,18 @@ timeout 35s python3 tools/validate_dual_lidar_ros.py | tee "$run_dir/dual-lidar-
 timeout 35s python3 tools/validate_ptp_timescale_ros.py | tee "$run_dir/ptp-timescale-synthetic-ros.json"
 timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-dir "$run_dir/phase1c" | tee "$run_dir/installation-capture-synthetic-ros.json"
 bash scripts/validation/rviz_installation_smoke.sh "$workspace" "$run_dir/rviz" | tee "$run_dir/rviz-smoke-result.txt"
+# Independent install tree catches executable modes hidden by normal install copies.
+colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$workspace/src" \
+  --build-base "$run_dir/symlink-build" --install-base "$run_dir/symlink-install"
+(
+  set +u
+  . "$run_dir/symlink-install/setup.bash"
+  set -u
+  for package in chili_crane_slam chili_crane_hardware chili_crane_control; do
+    ros2 pkg executables "$package"
+  done
+  timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-dir "$run_dir/symlink-phase1c"
+) > "$run_dir/symlink-executables-and-transport.log" 2>&1
 ros2 launch chili_crane_bringup mock_system.launch.py > "$run_dir/mock-launch.log" 2>&1 &
 launch_pid=$!
 cleanup() {

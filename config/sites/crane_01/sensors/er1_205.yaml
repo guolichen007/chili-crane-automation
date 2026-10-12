@@ -26,6 +26,7 @@ raw_time_scale: PTP_TIMESCALE
 stamp_basis: FIRST_POINT
 time_evidence_id: USER_REPORTED_S13_S14
 runtime_status_timeout_sec: 0.2
+preview_cloud_timeout_sec: null
 runtime_timeout_scope: BENCH_ONLY_S15
 time_scale_relation:
   source_scale: PTP_TIMESCALE

@@ -14,6 +14,7 @@ from chili_crane_slam.pointcloud import normalize_cloud
 from chili_crane_slam.dual_lidar import Cloud
 from chili_crane_slam.dual_lidar_node import cloud_message
 from chili_crane_slam.calibration_geometry import mechanical_seed, transform, coverage, rigid
+from chili_crane_slam.preview_contract import receive_fresh, preview_transform
 
 
 class InstallationPreview(Node):
@@ -21,6 +22,8 @@ class InstallationPreview(Node):
         super().__init__("installation_preview")
         self.declare_parameter("site_config", "")
         self.declare_parameter("candidate", "")
+        self.declare_parameter("overlay_frame", "")
+        self.overlay_frame = self.get_parameter("overlay_frame").value
         self.site = Path(self.get_parameter("site_config").value)
         self.candidate_path = self.get_parameter("candidate").value
         self.latest, self.subs = {}, []
@@ -54,10 +57,12 @@ class InstallationPreview(Node):
             report["sensor"][s] = {"point_count": len(points), "age_sec": time.monotonic() - arrival,
                 "range_m": {str(q): float(np.percentile(ranges, q)) for q in (10, 50, 90, 95)}}
             sensor_cfg = yaml.safe_load((self.site / ("sensors/er1_" + s + ".yaml")).read_text())
-            ttl = sensor_cfg.get("runtime_status_timeout_sec")
+            ttl = sensor_cfg.get("preview_cloud_timeout_sec")
             stamp = msg.header.stamp.sec + msg.header.stamp.nanosec / 1e9
             source_age = self.get_clock().now().nanoseconds / 1e9 - stamp
-            if ttl is None or time.monotonic() - arrival > ttl or not 0 <= source_age <= ttl:
+            report["sensor"][s]["source_age_sec"] = source_age
+            report["sensor"][s]["source_age_domain"] = sensor_cfg.get("time_scale_relation", {}).get("target_scale", "UNKNOWN")
+            if not receive_fresh(time.monotonic(), arrival, ttl):
                 report["sensor"][s]["state"] = "STALE"
                 continue
             try:
@@ -68,8 +73,10 @@ class InstallationPreview(Node):
                             or candidate.get("source_frame") != "crane_01/er1_205"
                             or candidate.get("target_frame") != "crane_01/er1_204"):
                         raise ValueError("CANDIDATE_INVALIDATED_OR_FRAME_MISMATCH")
-                    t = rigid(candidate["T_target_source"]) if s == "205" else np.eye(4)
-                    frame = candidate["target_frame"]
+                    seeds = [yaml.safe_load((self.site / ("calibration/mechanical_seed_er1_" + n + ".yaml")).read_text())
+                             for n in ("204", "205")]
+                    frame = self.overlay_frame or candidate["target_frame"]
+                    t = preview_transform(msg.header.frame_id, frame, rig, seeds, candidate)
                 else:
                     seed = yaml.safe_load((self.site / ("calibration/mechanical_seed_er1_" + s + ".yaml")).read_text())
                     t = mechanical_seed(seed, rig["mount_revision"])
@@ -86,13 +93,16 @@ class InstallationPreview(Node):
         if set(clouds) == {"204", "205"}:
             geometry = yaml.safe_load((self.site / "calibration/installation_geometry.yaml").read_text())
             try:
-                if geometry.get("coordinate_frame") != frame:
-                    raise ValueError("ROI_FRAME_MISMATCH")
-                report["coverage"] = coverage(clouds["204"], clouds["205"], geometry)
+                roi_frame = geometry.get("coordinate_frame")
+                seeds = [yaml.safe_load((self.site / ("calibration/mechanical_seed_er1_" + s + ".yaml")).read_text())
+                         for s in ("204", "205")]
+                to_roi = preview_transform(frame, roi_frame, rig, seeds)
+                roi_clouds = {s: transform(c, to_roi) for s, c in clouds.items()}
+                report["coverage"] = coverage(roi_clouds["204"], roi_clouds["205"], geometry)
                 from chili_crane_slam.calibration_geometry import inside
                 report["common_static_structure"] = {roi["name"]: {
-                    "204_points": int(inside(clouds["204"], roi["bounds_m"]).sum()),
-                    "205_points": int(inside(clouds["205"], roi["bounds_m"]).sum())}
+                    "204_points": int(inside(roi_clouds["204"], roi["bounds_m"]).sum()),
+                    "205_points": int(inside(roi_clouds["205"], roi["bounds_m"]).sum())}
                     for roi in geometry.get("static_structure_rois", [])}
             except ValueError as exc:
                 report["coverage"] = str(exc)
