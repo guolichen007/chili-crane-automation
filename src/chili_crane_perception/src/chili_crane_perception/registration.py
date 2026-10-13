@@ -12,7 +12,7 @@ from .geometry import positive
 
 
 class GrabCandidateProvider:
-    def candidates(self, points, state, policy, suspension=None):
+    def candidates(self, points, state, policy, suspension=None, opening="CLOSED"):
         raise NotImplementedError
 
 

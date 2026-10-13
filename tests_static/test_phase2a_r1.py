@@ -52,6 +52,10 @@ def connected_material(config, pose, stamp, opening="CLOSED", penetration=0., ro
 
 class R1TrackingTests(unittest.TestCase):
     def test_epoch_and_validity_do_not_refresh_on_publication(self):
+        self.assertEqual("NOT_CONFIGURED",validity_for_reason("[Errno 2] No such file",False))
+        import inspect
+        from chili_crane_perception.registration import GrabCandidateProvider
+        self.assertIn("opening",inspect.signature(GrabCandidateProvider.candidates).parameters)
         self.assertEqual((10.,.7),tuple(round(v,5) for v in epoch_diagnostic(10.,10.7)))
         for reason,valid in (("INPUT_TIMEOUT","STALE"),("MODEL_NOT_CONFIGURED","NOT_CONFIGURED"),
                              ("WEAK_OBSERVABILITY","DEGRADED"),("unclassified","UNKNOWN")):

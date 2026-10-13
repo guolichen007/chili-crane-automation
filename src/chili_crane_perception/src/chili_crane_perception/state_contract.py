@@ -2,7 +2,9 @@
 import math
 
 
-def validity_for_reason(reason):
+def validity_for_reason(reason, configured=True):
+    if not configured:
+        return "NOT_CONFIGURED"
     if any(k in reason for k in ("TIMEOUT", "STALE", "FRESHNESS", "DEADLINE")):
         return "STALE"
     if any(k in reason for k in ("NOT_CONFIGURED", "MISSING", "CALIBRATION", "FRAME_MISMATCH", "MAP_MISMATCH")):

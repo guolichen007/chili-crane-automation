@@ -94,7 +94,7 @@ class GrabPerceptionNode(Node):
             if self.last_header is not None:
                 message.header = copy.deepcopy(self.last_header)
             message.header.frame_id = self.config.get("common_frame", "NOT_CONFIGURED")
-            message.validity = getattr(message, validity_for_reason(reason))
+            message.validity = getattr(message, validity_for_reason(reason, self.pipeline is not None))
             message.reason = reason
             message.evidence_age_sec = 1e9
         state.tracking_state = GrabState.TRACK_LOST
@@ -325,7 +325,7 @@ class GrabClearanceNode(Node):
             result.publish_latency_sec = result.evidence_age_sec
         except (ValueError, TypeError, KeyError) as exc:
             result.reason = str(exc)
-            result.validity = getattr(result, validity_for_reason(result.reason))
+            result.validity = getattr(result, validity_for_reason(result.reason, self.pit is not None))
             result.wall_collision_risk = True
             result.evidence_age_sec = 1e9
         self.pub.publish(result)
