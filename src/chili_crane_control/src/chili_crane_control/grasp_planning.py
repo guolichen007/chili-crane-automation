@@ -120,6 +120,11 @@ class GraspPlanner:
                 or any(c.index != i for i,c in enumerate(snapshot.cells))):
             return self._empty(snapshot,"GRID_CAPACITY_OR_LAYOUT_INVALID")
         candidates = []
+        distance_field = None
+        if p.get("distance_acceleration_enabled") is True:
+            from .distance_acceleration import RejectionDistanceField
+            distance_field = RejectionDistanceField(snapshot,g.polygon)
+        radius=max(math.hypot(x,y) for x,y in self.kernel.footprint_xy)
         for cell in snapshot.cells:
             # Generate centers ONLY inside admissible domain; exact checks still follow.
             x = snapshot.origin[0]+(cell.index%snapshot.width+.5)*snapshot.resolution
@@ -131,6 +136,8 @@ class GraspPlanner:
                 break
             fp = self.kernel.footprint(xy)
             reasons=[]
+            if distance_field is not None and distance_field.definitely_reject(xy,radius+p["wall_margin_m"]):
+                reasons.append("DISTANCE_FIELD_FAST_REJECT")
             clearance = float(g.polygon.boundary.distance(fp)) if g.polygon.covers(fp) else 0.
             pit = next(v for v in g.semantic["pits"] if v["pit_id"] == self.config["pit_id"])
             if not g.polygon.covers(fp) or clearance < p["wall_margin_m"] + pit["safety_inset_m"]:
@@ -176,7 +183,7 @@ class GraspPlanner:
             upper=max((c.z_upper_bound for c in heights),default=0.)
             volume=sum(a*min(self.kernel.capture_depth_m,max(0.,c.z_median-pit["pit_bottom_z_m"])) for c,a in supported)
             volume_lower=sum(a*min(self.kernel.capture_depth_m,max(0.,c.z_lower_bound-pit["pit_bottom_z_m"])) for c,a in supported)
-            penalty=recent.penalty(fp,now) if recent is not None else 0.
+            penalty=recent.penalty(fp,now,snapshot.context.key) if recent is not None else 0.
             candidates.append(GraspCandidate(f"{snapshot.snapshot_id}:{cell.index}",xy,tuple(fp.exterior.coords)[:-1],
                 not reasons,tuple(sorted(set(reasons))),coverage,unknown,nominal,lower,upper,roughness,slope,
                 volume,volume_lower,clearance,penalty))

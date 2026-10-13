@@ -26,7 +26,8 @@ def planning_fixture():
         provenance='synthetic-model-v1',footprint_xy_m=[[-.25,-.25],[.25,-.25],[.25,.25],[-.25,.25]],
         capture_depth_m=.3,yaw_control_available=False,yaw_mode='FIXED_MECHANICAL',fixed_yaw_rad=0.),
         planning=dict(minimum_observed_fraction=1.,maximum_unknown_fraction=0.,maximum_slope_rad=.6,
-            maximum_roughness_m=.1,wall_margin_m=.1,distance_acceleration_enabled=False))
+            maximum_roughness_m=.1,wall_margin_m=.1,distance_acceleration_enabled=False,
+            disturbance_dilation_m=.05,recent_grab_radius_m=.75,recent_grab_ttl_sec=3.,maximum_recent_events=4))
     return c,s,ctx,OperationalGeofence(gc,s)
 
 

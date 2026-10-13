@@ -158,6 +158,7 @@ class PitSurfaceGrid:
         self.frames = deque(maxlen=c["maximum_window_frames"])
         self.generation, self.last_epoch, self.last_counter = 0, 0., -1
         self.context, self.reason = None, "NO_OBSERVATIONS"
+        self.invalidated_at = np.zeros(self.width*self.height)
         self.config_hash = hashlib.sha256(json.dumps(c, sort_keys=True).encode()).hexdigest()
 
     def cell_polygon(self, index):
@@ -201,6 +202,8 @@ class PitSurfaceGrid:
             keep = (ij[:, 0] >= 0) & (ij[:, 0] < self.width) & (ij[:, 1] >= 0) & (ij[:, 1] < self.height)
             p, sensors, ij = p[keep], sensors[keep], ij[keep]
             indices = ij[:, 1]*self.width + ij[:, 0]
+            keep = epoch > self.invalidated_at[indices]
+            p,sensors,indices = p[keep],sensors[keep],indices[keep]
             observations = {}
             for index in np.unique(indices):
                 values, support = p[indices == index, 2], sensors[indices == index]
@@ -232,6 +235,8 @@ class PitSurfaceGrid:
     def invalidate(self, polygon, event_epoch):
         """Remove old samples in disturbed intersecting cells, never just reduce score."""
         indices = {i for i in range(self.width*self.height) if polygon.intersects(self.cell_polygon(i))}
+        for i in indices:
+            self.invalidated_at[i] = max(self.invalidated_at[i],event_epoch)
         self.frames = deque(((e, {i: v for i, v in obs.items() if i not in indices or e > event_epoch}, u)
                              for e, obs, u in self.frames), maxlen=self.config["maximum_window_frames"])
         self.generation += 1
