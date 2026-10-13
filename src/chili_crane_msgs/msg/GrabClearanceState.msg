@@ -9,6 +9,16 @@ uint8 validity
 string reason
 
 string pit_id
+string map_id
+string semantic_version
+string model_id
+string geometry_version
+string extrinsic_calibration_id
+string extrinsic_state
+float64 publish_latency_sec
+# Cross/outside: numeric clearance=0 sentinel, clearance_defined=false.
+bool clearance_defined
+bool geometry_violation
 float64 raw_horizontal_clearance_m
 float64 conservative_clearance_m
 bool inside_pit

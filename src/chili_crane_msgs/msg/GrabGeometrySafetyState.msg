@@ -9,6 +9,12 @@ uint8 validity
 string reason
 
 bool valid_for_control
+# header is canonical MID_SCAN state epoch; latency is independent.
+float64 publish_latency_sec
+string model_id
+string geometry_version
+string extrinsic_calibration_id
+string extrinsic_state
 string source_type
 string tracking_state
 string observation_source

@@ -40,8 +40,10 @@ def main():
         tmp = Path(tmp)
         config = fixture()
         semantic = tmp / "semantic.yaml"
-        semantic.write_text(yaml.safe_dump({"config_state":"VALID","frame_id":"map","pits":[pit()]}), encoding="utf-8")
+        semantic.write_text(yaml.safe_dump({"config_state":"VALID","schema_version":1,
+            "map_id":"SYNTHETIC_MAP","semantic_version":"synthetic-v1","frame_id":"map","pits":[pit()]}), encoding="utf-8")
         config.update(config_state="VALID",time_domain="ROS_TIME",config_version="synthetic-ci-v1",extrinsic_calibration_id="synthetic-extrinsic",
+            synthetic_processing_delay_sec=.01,
             physical_output_enabled=False,automatic_control_enabled=False,camera_control_authority=False,
             semantic_map_file=str(semantic),pit_id="SYNTHETIC_PIT")
         file = tmp / "shadow.yaml"
@@ -109,12 +111,18 @@ def main():
             assert state.validity == state.DEGRADED
             assert geometry.evidence.source_type == geometry.evidence.SOURCE_SYNTHETIC
             assert geometry.bottom_lower_bound_m <= 1.4
+            assert geometry.header.stamp == geometry.evidence.measurement_stamp
+            assert clearance.header.stamp == clearance.evidence.measurement_stamp
+            assert clearance.map_id == "SYNTHETIC_MAP" and clearance.semantic_version == "synthetic-v1"
+            assert clearance.model_id == config["model"]["model_id"]
+            assert geometry.publish_latency_sec >= .01
             assert clearance.conservative_clearance_m <= clearance.raw_horizontal_clearance_m
             # Stop all input; timers must expire output rather than heartbeat-refresh evidence.
             deadline = time.monotonic()+1
             while time.monotonic() < deadline:
                 rclpy.spin_once(node,timeout_sec=.02)
             assert received["perception/grab_state"].tracking_state == GrabState.TRACK_LOST
+            assert received["perception/grab_state"].validity == GrabState.STALE
             assert received["perception/grab_clearance"].validity != GrabClearanceState.VALID
             assert not forbidden
             print(json.dumps({"SHADOW_RUNTIME_STATUS":"PASS_SYNTHETIC_ROS",

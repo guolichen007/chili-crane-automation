@@ -20,6 +20,7 @@ from chili_crane_slam.rotation import quaternion
 from .geometry import positive, covariance, PitBoundaryModel
 from .pipeline import GrabPerceptionPipeline, LatestFrameSlot
 from .tracker import SuspensionPrior
+from .state_contract import validity_for_reason
 
 QOS = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT)
 SOURCE_NAMES = {1: "PHYSICAL", 2: "SIMULATED", 3: "REPLAY", 4: "SYNTHETIC"}
@@ -59,12 +60,17 @@ class GrabPerceptionNode(Node):
                     or self.config.get("config_version") in (None, "", "NOT_CONFIGURED")):
                 raise ValueError("SOURCE_FRAME_CALIBRATION_NOT_CONFIGURED")
             covariance(self.config["extrinsic_covariance"], 6)
+            delay = self.config.get("synthetic_processing_delay_sec", 0.)
+            if (type(delay) not in (int,float) or not np.isfinite(delay) or not 0 <= delay <= .05
+                    or delay and self.config["source_type"] != "SYNTHETIC"):
+                raise ValueError("SYNTHETIC_DELAY_GATE")
             self.pipeline = GrabPerceptionPipeline(self.config)
         except (OSError, KeyError, ValueError, TypeError) as exc:
             self.error = str(exc)
         self.slot = LatestFrameSlot()
         self.meta, self.io, self.prior = None, None, None
         self.last_counter, self.last_arrival = 0, None
+        self.last_header = None
         self.inputs = ReentrantCallbackGroup()
         self.worker = MutuallyExclusiveCallbackGroup()
         self.cloud_sub = self.create_subscription(PointCloud2, "perception/grab_input",
@@ -85,9 +91,10 @@ class GrabPerceptionNode(Node):
             self.pipeline.tracker.missing(self.pipeline.tracker.stamp or 0, force_lost=True)
         state, geometry = GrabState(), GrabGeometrySafetyState()
         for message in (state, geometry):
-            message.header.stamp = self.get_clock().now().to_msg()
+            if self.last_header is not None:
+                message.header = copy.deepcopy(self.last_header)
             message.header.frame_id = self.config.get("common_frame", "NOT_CONFIGURED")
-            message.validity = message.NOT_CONFIGURED
+            message.validity = getattr(message, validity_for_reason(reason))
             message.reason = reason
             message.evidence_age_sec = 1e9
         state.tracking_state = GrabState.TRACK_LOST
@@ -151,6 +158,7 @@ class GrabPerceptionNode(Node):
                 raise ValueError("MID_SCAN_DOMAIN_MISMATCH")
             opening = ("CONFLICT" if io.open_limit and io.closed_limit else
                        "OPEN" if io.open_limit else "CLOSED" if io.closed_limit else "TRANSITION")
+            self.last_header = copy.deepcopy(cloud.header)
             prior = None
             if prior_tuple is not None:
                 p, received = prior_tuple
@@ -161,6 +169,8 @@ class GrabPerceptionNode(Node):
                         seconds(p.evidence.measurement_stamp), p.evidence.calibration_id)
             result = self.pipeline.process(points, frame_stamp, opening, self.config["source_type"],
                                            self.config["extrinsic_covariance"], prior)
+            if self.config.get("synthetic_processing_delay_sec", 0.):
+                time.sleep(self.config["synthetic_processing_delay_sec"])
             self.last_counter, self.last_arrival = meta.source_counter, arrival
             age = max(time.monotonic() - arrival,
                       time.monotonic() - meta_arrival + meta.evidence_age_sec,
@@ -169,7 +179,7 @@ class GrabPerceptionNode(Node):
                 raise ValueError("PROCESSING_DEADLINE_EXCEEDED")
             state, geometry = GrabState(), GrabGeometrySafetyState()
             for message in (state, geometry):
-                message.header.stamp = self.get_clock().now().to_msg()
+                message.header = copy.deepcopy(cloud.header)
                 message.header.frame_id = cloud.header.frame_id
                 message.validity = message.DEGRADED
                 message.reason = "SHADOW_ONLY_NOT_VALID_FOR_CONTROL"
@@ -193,6 +203,11 @@ class GrabPerceptionNode(Node):
             geometry.stage_runtime_json = json.dumps(result["stage_seconds"],allow_nan=False)
             geometry.reason = "SHADOW_ONLY|" + ("MEASUREMENT_ACCEPTED" if result["accepted"] else "|".join(result["reasons"]))
             geometry.valid_for_control = False
+            geometry.publish_latency_sec = age
+            geometry.model_id = self.pipeline.model.config["model_id"]
+            geometry.geometry_version = self.pipeline.model.config["geometry_version"]
+            geometry.extrinsic_calibration_id = self.config["extrinsic_calibration_id"]
+            geometry.extrinsic_state = self.config.get("extrinsic_state", "NOT_CONFIGURED")
             geometry.total_runtime_sec = result["total_seconds"]
             geometry.dropped_frames = self.slot.dropped
             geometry.frame_span_sec = float(np.ptp(points["timestamp"]))
@@ -245,8 +260,15 @@ class GrabClearanceNode(Node):
             semantic = yaml.safe_load(Path(self.config["semantic_map_file"]).read_text(encoding="utf-8"))
             if semantic.get("config_state") != "VALID":
                 raise ValueError("SEMANTIC_MAP_NOT_CONFIGURED")
-            pit = next(p for p in semantic["pits"] if p["pit_id"] == self.config["pit_id"])
+            if (semantic.get("schema_version") != 1 or any(semantic.get(k) in (None,"","NOT_CONFIGURED")
+                    for k in ("map_id","semantic_version","frame_id"))):
+                raise ValueError("SEMANTIC_PROVENANCE_NOT_CONFIGURED")
+            matches = [p for p in semantic["pits"] if p["pit_id"] == self.config["pit_id"]]
+            if len(matches) != 1:
+                raise ValueError("PIT_ID_NOT_CONFIGURED")
+            pit = matches[0]
             self.pit = PitBoundaryModel(dict(pit, config_state=semantic["config_state"]), semantic["frame_id"])
+            self.map_id, self.semantic_version = semantic["map_id"], semantic["semantic_version"]
         except (ValueError, KeyError, OSError, TypeError, StopIteration) as exc:
             self.error = str(exc)
         self.latest = None
@@ -258,22 +280,31 @@ class GrabClearanceNode(Node):
 
     def publish(self):
         result = GrabClearanceState()
-        result.header.stamp = self.get_clock().now().to_msg()
         result.validity, result.reason = result.NOT_CONFIGURED, self.error
         result.valid_for_control = False
         try:
             if self.pit is None or self.latest is None:
                 raise ValueError(self.error)
             message, received = self.latest
+            result.header = copy.deepcopy(message.header)
+            result.evidence = copy.deepcopy(message.evidence)
+            for key in ("model_id", "geometry_version", "extrinsic_calibration_id", "extrinsic_state"):
+                setattr(result, key, getattr(message, key))
+            result.map_id, result.semantic_version, result.pit_id = self.map_id, self.semantic_version, self.pit.pit_id
             ttl = positive(self.config["policy"]["evidence_timeout_sec"], "evidence_timeout_sec")
-            if (message.header.frame_id != self.pit.frame_id or message.tracking_state != "TRACKED"
+            if not 0 <= message.evidence_age_sec + time.monotonic() - received <= ttl or message.validity == message.STALE:
+                raise ValueError("GEOMETRY_STALE")
+            if message.header.frame_id != self.pit.frame_id:
+                raise ValueError("GEOMETRY_FRAME_MISMATCH")
+            if (message.tracking_state != "TRACKED"
                     or message.observation_source not in ("MEASURED","FILTERED") or not message.measurement_accepted
                     or message.validity not in (message.VALID,message.DEGRADED)
                     or message.evidence.source_type not in SOURCE_NAMES
                     or message.evidence.calibration_id in ("","NOT_CONFIGURED")
                     or message.evidence.config_version in ("","NOT_CONFIGURED")
-                    or not 0 <= message.evidence_age_sec + time.monotonic() - received <= ttl):
-                raise ValueError("STALE_OR_PREDICTED_OR_FRAME_MISMATCH")
+                    or message.model_id in ("","NOT_CONFIGURED") or message.geometry_version in ("","NOT_CONFIGURED")
+                    or message.extrinsic_calibration_id != message.evidence.calibration_id):
+                raise ValueError("PREDICTED_OR_GEOMETRY_PROVENANCE_GATE")
             from .geometry import GrabEnvelope
             env = GrabEnvelope(np.array([[p.x,p.y] for p in message.nominal_footprint.points]),
                 np.array([[p.x,p.y] for p in message.conservative_footprint.points]),
@@ -291,8 +322,10 @@ class GrabClearanceNode(Node):
             result.confidence = message.confidence
             result.evidence = copy.deepcopy(message.evidence)
             result.evidence_age_sec = message.evidence_age_sec + time.monotonic() - received
+            result.publish_latency_sec = result.evidence_age_sec
         except (ValueError, TypeError, KeyError) as exc:
             result.reason = str(exc)
+            result.validity = getattr(result, validity_for_reason(result.reason))
             result.wall_collision_risk = True
             result.evidence_age_sec = 1e9
         self.pub.publish(result)
