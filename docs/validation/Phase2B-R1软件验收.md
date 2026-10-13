@@ -16,6 +16,12 @@ Ubuntu22/Humble normal/symlink七包、A/B installed shadow、旧双雷达/PTP/P
 修复仅R1测试自身源路径；不放松断言/核心/Phase2A门限。新SHA完整CI必须重新执行。
 同时保留具体hard-reject reason，不再被无观测snapshot泛化为SURFACE_STALE；增加遮罩共时原因持久反证。
 
+5af95cedab4763861fe7b02b2831f5948056c82f：[Static 38376530473](https://github.com/guolichen007/chili-crane-automation/actions/runs/38376530473)通过；
+[ROS 38376530444](https://github.com/guolichen007/chili-crane-automation/actions/runs/38376530444)的normal七包构建、313包测试、
+R1 installed CDR/performance、Phase2A installed、旧前置入口及vendor通过。
+Phase2B installed harness仍按原高频debug同步假设断言，遇到1Hz debug初始空帧而失败，symlink后续未执行。
+修复为独立等待非空observed/UNKNOWN debug，仍保留原非空断言，不修改1Hz设计或任何生产门禁。
+
 Windows完整unittest：370项，366通过、4项无ROS环境跳过；仓库契约/格式通过。
 旧21场景+64确定性序列×7帧通过，八类旧反证全部0；R1新增五类反证全部0。
 R1专项16项（15通过、1缺ROS跳过），含真实ESDF拒绝减少精确检查，顺序/空坑/活动域/缓存反证。

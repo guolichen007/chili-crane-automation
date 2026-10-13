@@ -113,6 +113,10 @@ def main():
             wait(lambda:all(pub.get_subscription_count()>0 for pub in pubs.values())
                 and replay.get_subscription_count()>=2,timeout=8.)
             wait(lambda:'proposal' in received and bool(received['proposal'].selected_candidate_id),timeout=12.,frames=True)
+            # Debug is intentionally independent 1 Hz, not a planning heartbeat.
+            # Keep publishing evidence until actual nonempty visualization arrives.
+            wait(lambda:'unknown' in received and 'debug' in received
+                and received['unknown'].width>0 and received['debug'].width>0,timeout=3.,frames=True)
             proposal=received['proposal'];snapshot=received['snapshot']
             assert not proposal.valid_for_control and not forbidden
             assert proposal.header.stamp==proposal.evidence.measurement_stamp
