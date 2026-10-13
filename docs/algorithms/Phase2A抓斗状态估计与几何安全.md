@@ -7,8 +7,9 @@
 ## 1. 算法职责与模型
 
 Grab是已知自身机构，不能把普通目标聚类centroid当控制位姿。
-GeometricGrabCandidateProvider只做ROI、self-mask、voxel和有界欧氏聚类，输出多个候选。
-TRACKED使用预测局部ROI，LOST_HOLD扩大，LOST使用配置搜索体积/可选悬挂走廊。
+GeometricGrabCandidateProvider在LOST时做ROI、self-mask、voxel和有界欧氏聚类，输出多个候选。
+R1的TRACKED/CANDIDATE使用预测模型表面门控，LOST_HOLD扩大门控加局部聚类，
+LOST使用配置搜索体积/可选悬挂走廊。
 强度仅保留，不成为未经验证的硬阈值。不同位置的合法模型匹配视为关联歧义，
 不会悄悄挑一个锁定。PCA仅为LOST的yaw初值，不发布PCA最终位姿。
 
@@ -17,7 +18,8 @@ GrabGeometryModel独立保存详细sampled surface（可由CAD离线采样）、
 启动检查安全hull包含样本、底/顶参考和版本/provenance；未确认配置拒绝算法启动。
 本轮不提供通用CAD mesh导入器，owner应先导出模型坐标的采样点与安全顶点。
 OPEN/CLOSED分别建模；TRANSITION不估计精确开度，安全模型取二者并集，
-观测不给ACCEPTED，只允许短时预测/保守显示。owner还须验证极限包络及中间机构行程。
+R1允许配置不变刚性TRACKING_CORE，其有效且可观时接受core配准测量更新ESKF；
+缺失/不可观仍仅短时预测并超时失锁。owner还须验证极限包络及中间机构行程。
 symmetry_yaw_period_rad由型号确认，不能普遍猜π；合成fixture专门为π对称盒模型。
 真实几何与噪声/速度/门限在模板中全null/NOT_CONFIGURED，fixture不是现场建议。
 
@@ -92,12 +94,13 @@ wall_top_z_m、pit_bottom_z_m、safety_inset_m，不造第二套schema。
 凹多边形用完整covers/intersection，不只检查footprint顶点。
 包含时精确segment/polygon minimum distance；安全inset用distance>=inset判断，
 不把近似buffer曲线当安全依据，buffer只用于表示safe region。
-跨界/外部明确负距离，联合包围盒直径为保守侵入界，不称精确穿透深度。
+R1取消负包围盒直径：内部精确非负最小距离，接触为0；跨界/外部数值0只是哨兵，
+clearance_defined=false且geometry_violation=true，不定义signed penetration depth。
 raw和conservative分开，后者不高于前者。
 vertical envelope与[pit bottom,wall top]无重叠则collision_relevant=false，
 仍报告有限horizontal clearance，不返回伪infinity。
 GrabClearanceState为当前状态，GraspTarget.wall_clearance为规划目标，不混。
-未配置地图/坐标不符/预测/过期则UNKNOWN，risk保守true。
+配置缺失/坐标不符为NOT_CONFIGURED，预测/弱支持为DEGRADED，过期为STALE，无法分类为UNKNOWN；risk保守true。
 未来ESDF只加速规划，不替代此几何证据。
 
 ## 7. Shadow输入与部署
@@ -122,8 +125,8 @@ PHYSICAL/REPLAY/SIMULATED/SYNTHETIC分离；synthetic模型不能用于physical�
 DDS depth1+最新帧槽，输入/工作callback分组，至多2线程；metadata同帧匹配不受topic乱序影响。
 云/元数据/IO超时、重复、frame mismatch或完成时超deadline无效，
 evidence age包含处理时长；保留source measurement/counter，不心跳刷新测量。
-无输入发布LOST/NOT_CONFIGURED；模型或地图缺失不崩成伪READY。
-shadow所有GrabState/companion/clearance为DEGRADED或NOT_CONFIGURED，
+无输入发布LOST/STALE；模型或地图缺失为NOT_CONFIGURED，不崩成伪READY。
+shadow所有GrabState/companion/clearance为DEGRADED、STALE、UNKNOWN或NOT_CONFIGURED，
 valid_for_control始终false；不发布SafetyPermit/AuthorizedCommand/ActuationRequest。
 algorithm TRACKED不等于整机可下降，PREDICTED更不能授权。
 
@@ -146,6 +149,82 @@ FIELD还需rig/CAD/真实开度、外参、地图、噪声/速度/遮挡bags、�
 最坏延迟与owner参数冻结；现场/物理动作/完整循环全部NOT_RUN。
 ObservedPitBoundary、PitSurfaceEstimator、ExpectedVolumeGraspPlanner、GrabContactEstimator
 仅后续职责声明，不在本轮做料面/planner/contact/load/NDT/servo/Camera AI。
+
+## 9. 固定作业区强先验与动态Grab几何协同（R1）
+
+```text
+Y坑边方向限位 ──物理/驱动禁止链（待现场确认）
+      │ ADAM DI只读证据
+Y pull-wire ──限位窗口交叉验证──┐
+X servo ──fresh/homed/calibrated─┤
+                               ↓
+                        axis-to-map标定
+                               │
+SemanticMap V1 pit ──版本绑定───┤
+                               ↓
+                   OperationalGeofence（悬挂点域）
+                               │ 独立gate，不改Grab位姿
+Grab pose/opening/swing/covariance/extrinsic/smear
+                               ↓
+                    Grab dynamic envelope/clearance
+                               ↓
+              必要条件shadow诊断（永不成为控制许可）
+```
+
+`config/safety/pit_operational_geofence.template.yaml` 只引用原地图和pit。
+X/Y轴的方向、比例、零点、map原点以及标定身份显式配置；不能将servo X等同map.x。
+参考点为SUSPENSION_POINT。圆形保守静态域内缩半径为所有static_margin加pit safety inset；
+owner必须保证grab_horizontal_radius包含所有开度/姿态的静态最大水平占用。
+Shapely圆弧内缩半径除以cos(pi/64)，抵消16段/象限弦近似的乐观误差；
+参考点判定还核验对原pit boundary的精确距离。支持凹坑/MultiPolygon，空域拒绝。
+未来可以采用方向各向异性Minkowski erosion，本轮圆形更保守但不放大真实可达域。
+
+Y_NEGATIVE/POSITIVE_PIT_LIMIT 不等同整轨道机械限位。模板不绑定现有DI语义；
+owner确认后才可绑定y_left_limit/y_right_limit。要求known_signals明确包含两个来源。
+asserted且连续位置不在窗口→Y_POSITION_LIMIT_MISMATCH；窗口内未触发→Y_EXPECTED_LIMIT_NOT_ASSERTED；
+双触发→Y_LIMIT_CONFLICT；未知/过期/标定不符阻断。窗口、NO/NC、断线和硬接状态均现场确认。
+单侧禁止危险方向，反向经过独立几何步长检查才可输出shadow true；STOP仅去励磁。
+direction_probe只诊断该有限路径，不代表制动/持续动作已安全。
+
+限位停止线必须早于坑壁，考虑抓斗半径、最大摆幅、位置/标定误差、
+传感/处理/通信/输出释放延迟、停车滑行、伺服following error与额外margin。
+真实PHYSICAL位置资格需生产标定批准、FIELD axis-to-map、已验证stop/reaction能力。
+未配置不产生任何几何控制资格。soft-limit支持/配置/实机验证仅能力契约，未控制驱动。
+
+Geofence结果包含map/version/pit、X/Y标定、axis-to-map、geofence版本与规范JSON配置真实SHA256。
+动态clearance绑定map/version/pit、Grab model/version、extrinsic ID/state/evidence。
+独立pure FIELD外参资格函数要求FIELD_VALIDATED+PHYSICAL模型/来源；BENCH/CANDIDATE只支持shadow。
+当前valid_for_control与production_control_eligible始终false，即使所有合成必要条件通过。
+
+## 10. R1模型门控、观测与消息迁移
+
+TRACKED距离带包含base band、pose uncertainty与scan mechanical smear，超过owner上限拒绝。
+同时要求观测法线与预测模型法线一致、法向残差不超owner plane band，
+每个CAD采样仅取最近测量，防止密集料面重复增加某模型点权重。
+plane band是显式跟踪连续性约束：快速未建模运动会拒绝并走LOST_HOLD/LOST，不能无界扩大。
+LOST_HOLD扩大带但仍有界、局部聚类；LOST重新有界多假设，不把料面吸附为Grab。
+
+最后内点定义同时满足correspondence欧氏距离与配置法向残差上限；
+离群点仍保留在inlier_ratio分母。P50/P95、observed-normal Hessian、空间支持和R均重算，
+P95内点门槛不能单独证明质量；需内点率/extent/归一化信息/innovation联合检查。
+归一化门禁用bbox support center及RMS特征长度，单位一致；物理Hessian协方差不做单位伪转换。
+confidence=inlier_ratio只是匹配诊断比例，不是概率或安全证书。
+
+OPEN primary同时运行有限CLOSED诊断，反向同理。primary失败且另一个高质量成立记录
+GEOMETRY_IO_OPEN/CLOSED_CONFLICT，拒绝测量。TRANSITION安全包络永远OPEN/CLOSED union。
+TRACKING_CORE必须是经CAD/实测证明的不变机构，不得用插值斗瓣或随意盒子替代真实模型。
+core使用独立owner配置coarse/fine voxel尺度，不能将大抓斗尺度直接套给细小不变机构。
+原生迭代可配置0..2次有界续算，但未收敛永远拒绝，绝不放宽阈值或篡改converged。
+
+GrabState/GrabGeometry header保持LiDAR MID_SCAN；GrabClearance继承其epoch。
+发布/处理延迟独立诊断。失效心跳沿用最后epoch（无测量时0），不能刷新测量时间。
+clearance_defined=false时0值不可用于排序、距离门禁或当作“仅刚触壁”。
+新增消息字段须全量重建ROS消费者；不兼容旧的负距离语义，详见ADR0010。
+
+200 deterministic seeded sequences、连续flat/rough料面、接触/25%/50%穿入、
+core长TRANSITION、单雷达/遮挡/噪声/断流/多候选/IO冲突与Geofence反证为有限软件验收。
+近20万输入点测量latest-wins与Python tracemalloc retained allocation；
+native heap/长时间现场内存与生产时延仍需Ubuntu实机验证，不冻结生产性能。
 
 参考：[small_gicp作者说明](https://github.com/koide3/small_gicp/blob/master/docs/paper.md)
 为局部配准/缓存工具背景；[Open3D鲁棒核说明](https://www.open3d.org/docs/latest/tutorial/t_pipelines/t_robust_kernel.html)

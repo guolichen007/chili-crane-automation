@@ -1,5 +1,15 @@
 # Project Context
 
+## Phase2A-R1 当前补充（2026-10-13）
+
+dc42fb16原版软件shadow已交付。本轮按ADR0010增加固定作业区OperationalGeofence，
+引用SemanticMap V1，采用X servo+Y pull-wire+坑区方向限位+FIELD axis-to-map独立强先验；
+不替代动态Grab包络。当前坑限位安装/硬接、X/Y FIELD标定、停车与地图现场验证均未执行。
+原y_left_limit/y_right_limit仅可经owner确认后绑定坑区语义，模板不猜DI或窗口。
+R1加固TRACKING_CORE、模型门控、IO几何冲突、MID_SCAN状态epoch、可观信息归一化与clearance身份。
+valid_for_control/physical_output_enabled/automatic_control_enabled/camera_control_authority仍false。
+Windows仅静态/合成；CI Ubuntu容器与现场独立。主链PTP/vendor/main不改，不进入Phase2B。
+
 ## Phase1C 当前补充（2026-10-12）
 
 基线 72019e0d 的 S15 时间链已由 owner 回传 FROZEN；本轮不修改 PTP 主链或生产 UTC 级别。

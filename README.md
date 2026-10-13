@@ -1,6 +1,13 @@
 # 辣椒地池行车自动抓取框架
 
-当前分支为 **Phase2A 模型驱动抓斗状态估计与几何安全 shadow**，基线为 72234843。
+当前分支为 **Phase2A-R1 抓斗深审加固与固定作业区强先验 shadow**，基线为 dc42fb16。
+新增OperationalGeofence引用原SemanticMap V1、X/Y axis-to-map、Y坑区方向限位纯策略；
+它不替代动态抓斗包络、不修正感知位姿、不授予自动控制。现场窗口/标定/停车参数仍未知。
+R1包含刚性core TRANSITION、连通料面模型门控、状态epoch与clearance/provenance修复。
+入口：[R1决策](docs/decisions/0010-phase2a-r1-operational-geofence.md)、
+[R1验收与迁移](docs/validation/Phase2A-R1软件验收.md)。
+
+此前 **Phase2A 模型驱动抓斗状态估计与几何安全 shadow**，基线为 72234843。
 入口：[项目进展](docs/项目进展.md)、[算法与现场边界](docs/algorithms/Phase2A抓斗状态估计与几何安全.md)。
 三层几何、原生GICP+Huber精化、validator、SE(3) ESKF、bottom/swing/envelope和pit clearance
 仅发布感知证据，不发布SafetyPermit/AuthorizedCommand/ActuationRequest，不启动硬件或自动任务。

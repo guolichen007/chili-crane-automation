@@ -102,3 +102,22 @@ R1规定命令只accept一次、tick持续复核证据；输出command_sequence�
 分开，有限租约到期的逻辑DO必须OFF。状态机禁止启动/故障恢复直跳AUTO_READY。
 取消为CANCELLED，安全/模式中止为ABORTED；仅SafetyEvent按domain表示故障。
 详见ADR0005和PHASE05_CONTRACTS第9节，不能把纯租约测试当作物理看门狗验收。
+
+## Phase2A-R1：方向限位与固定作业区gate
+
+OperationalGeofence引用SemanticMap V1，不复制pit坐标。SUSPENSION_POINT经X servo、
+Y pull-wire和axis-to-map标定得到；map/version/pit/两轴标定/geofence ID/hash必须可追溯。
+旧轨道机械限位不得默认为坑区方向限位。owner确认绑定后，Y negative坑限位禁止negative，
+positive方向需单独几何评估；双限位冲突、连续位置与限位窗口矛盾或缺证据禁止自动资格。
+STOP只能去励磁；反向逃离仍是励磁，绝不能绕过其它安全门禁。
+
+物理方向禁止链+ADAM DI监督是推荐层级，但硬接/安装/极性/断线未确认，状态NOT_RUN。
+Y生产拉绳标定、X homing/通信/标定、FIELD axis-to-map和停车/反应能力未验证时阻断。
+shadow方向结果仅有限direction_probe路径的必要条件，既非SafetyPermit也不代表真实自动readiness。
+固定强先验不替代动态Grab envelope/clearance，不clamp感知、不掩盖摆动越界。
+
+消息迁移：GrabState/GrabGeometry header=MID_SCAN状态epoch；clearance继承，不用publish-now。
+GrabGeometry新增model/version/extrinsic ID/state与时延；GrabClearance另带map/version/pit。
+内部exact positive minimum，接触0；cross/outside=0哨兵、clearance_defined=false、geometry_violation=true。
+消费者须重建消息，读取defined/inside/risk，不得沿用“负数=穿透深度”的判断。
+NOT_CONFIGURED/STALE/DEGRADED/UNKNOWN分开，始终fail-closed且valid_for_control=false。

@@ -77,3 +77,22 @@ X遥控方向是否独立于原伺服接口；不得假设24通道能同时覆�
 ADAM 固件与 FSV 全LOW、WDT实际超时和其他TCP客户端影响。
 确认 IP/unit ID、拉绳 /dev/serial/by-id、串口/地址/寄存器/端序/比例/零点/方向/范围。
 全量点表未确认前 I/O配置保持 NOT_CONFIGURED，台架输出门控保持关闭。
+
+## Phase2A-R1 固定坑区强先验（全部OPEN）
+
+需电控/厂家/现场owner逐项确认并附精确配置和现场证据：
+
+- Y坑左右方向限位的安装停止线，不是整轨道机械极限，也不能贴坑壁。
+- 是否硬接驱动/电气方向禁止链；ADAM只观察还是承担停止功能；断电/断线状态。
+- DI device/channel、NO/NC、invert、线号、两端预期触发位置窗口与重复性。
+- Y最大负载/速度下实测停车滑行距离、全链路反应时间及拉绳FIELD生产标定。
+- X servo协议、homing、FIELD位置标定、following/stopping error。
+- X驱动内部soft-limit支持、配置身份、正反向实机验证，不能只凭说明书宣称可用。
+- X/Y axis-to-map origin/basis/scale/offset，绑定map_id/semantic_version/pit_id与两轴标定。
+- pit壁/顶部/底部实测、所有开度Grab最大水平半径、最大允许摆幅、误差和margin owner。
+
+Y_PIT_LIMIT_INSTALLATION_STATUS=NOT_RUN；Y_PIT_LIMIT_HARDWIRE_STATUS=NOT_RUN。
+Y_PULLWIRE_FIELD_CALIBRATION_STATUS=NOT_RUN；X_SERVO_PROTOCOL_STATUS=NOT_CONFIGURED。
+X_SERVO_FIELD_CALIBRATION_STATUS=NOT_RUN；X_SERVO_DRIVE_SOFT_LIMIT_STATUS=NOT_RUN。
+AXIS_TO_MAP_CALIBRATION_STATUS=NOT_RUN；OPERATIONAL_GEOFENCE_FIELD_VALIDATION_STATUS=NOT_RUN。
+限位/伺服现场状态不会由synthetic测试升级。
