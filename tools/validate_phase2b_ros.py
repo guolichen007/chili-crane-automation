@@ -202,7 +202,11 @@ def main():
                 OLD_GENERATION_RECOMPUTE_COUNT=0,GRAB_MASK_PROVENANCE_STATUS='PASS_DISTINCT_CHAIN_AND_EXTRINSIC',
                 CONTROL_TOPIC_MESSAGES=len(forbidden),PHYSICAL_ACTUATION_STATUS='NOT_RUN',valid_for_control=False)))
         finally:
-            node.destroy_node();rclpy.shutdown();os.killpg(child.pid,signal.SIGINT)
+            node.destroy_node();rclpy.shutdown()
+            # Launch forwards SIGINT to its workers. Sending it to the entire
+            # group as well double-interrupts destroy_node(), polluting logs.
+            # Keep the owned-session group only for bounded forced cleanup.
+            if child.poll() is None:child.send_signal(signal.SIGINT)
             try:child.wait(timeout=8)
             except subprocess.TimeoutExpired:os.killpg(child.pid,signal.SIGTERM);child.wait(timeout=5)
             log.close()

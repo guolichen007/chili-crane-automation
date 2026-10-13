@@ -9,6 +9,9 @@ Phase2A核心和门限、PTP/vendor、SemanticMap V1、Geofence v2均冻结；�
 接口V2需全体消费者重建；FIELD参数继续null/NOT_CONFIGURED，四控制flags继续false。
 LOST+dense+wall+multiple与TRANSITION core+real moving jaws+continuous material两个现场组合缺口仍POST_R1_FIELD_VALIDATION_REQUIRED。
 本轮验收单独记录于[Phase2B-R1软件验收](validation/Phase2B-R1软件验收.md)。
+R1代码643008abc1b39e46a36327b31289decf658a706d的Static/ROS/vendor均通过，
+normal/symlink七包及各313测试、A/B installed shadow、稀疏CDR/缓存/QoS和旧入口通过。
+PHASE2B_R1_STATUS=PASS_SOFTWARE_SHADOW_NOT_FIELD。归档后的最终HEAD仍按精确SHA独立验CI，现场状态不升级。
 
 ## Phase2B 新阶段（2026-10-13）
 
