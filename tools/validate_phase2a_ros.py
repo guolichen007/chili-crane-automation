@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Installed-node/launch transport acceptance, synthetic only. Run on Ubuntu."""
 import argparse
+import copy
 import json
 from pathlib import Path
 import subprocess
@@ -21,6 +22,60 @@ from chili_crane_perception.synthetic import fixture, scene, pit
 from chili_crane_slam.dual_lidar import Cloud
 from chili_crane_slam.dual_lidar_node import cloud_message
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def validate_clearance_age(node, config_file, geometry, qos, evidence_dir):
+    """One synthetic Geometry publication to a separate INSTALLED clearance node."""
+    namespace=node.get_namespace()+"/r11_age_contract"
+    samples=[]
+    marker=geometry.evidence.source_counter+10000
+    sub=node.create_subscription(GrabClearanceState,namespace+"/perception/grab_clearance",
+        lambda m:samples.append(m) if m.evidence.source_counter==marker and len(samples)<64 else None,qos)
+    pub=node.create_publisher(GrabGeometrySafetyState,namespace+"/perception/grab_geometry_safety",qos)
+    log=(evidence_dir/"clearance-age-contract.log").open("w",encoding="utf-8")
+    child=subprocess.Popen(["ros2","run","chili_crane_perception","grab_clearance_node.py","--ros-args",
+        "-r","__ns:="+namespace,"-r","__node:=clearance_age_contract","-p","config_file:="+str(config_file)],
+        stdout=log,stderr=subprocess.STDOUT)
+    try:
+        discovery=time.monotonic()+6
+        while pub.get_subscription_count()==0 and time.monotonic()<discovery:
+            assert child.poll() is None,"installed clearance age node exited"
+            rclpy.spin_once(node,timeout_sec=.02)
+        assert pub.get_subscription_count()>0,"clearance age input did not discover"
+        sample=copy.deepcopy(geometry)
+        sample.header.stamp=node.get_clock().now().to_msg()
+        sample.evidence.measurement_stamp=copy.deepcopy(sample.header.stamp)
+        sample.evidence.header=copy.deepcopy(sample.header)
+        sample.evidence.source_counter=marker
+        sample.evidence_age_sec=sample.evidence.evidence_age_sec=0.
+        sample.valid_for_control=False
+        pub.publish(sample)  # EXACTLY ONCE: no new Geometry can renew its age.
+        end=time.monotonic()+1
+        while time.monotonic()<end:
+            rclpy.spin_once(node,timeout_sec=.01)
+        assert len(samples)>=4,"insufficient clearance timer samples"
+        key=lambda s:(s.sec,s.nanosec)
+        epochs=key(sample.header.stamp)
+        assert all(key(m.header.stamp)==epochs and key(m.evidence.measurement_stamp)==epochs
+                   and m.evidence.source_counter==marker for m in samples)
+        assert all(abs(m.evidence_age_sec-m.evidence.evidence_age_sec)<1e-9 for m in samples)
+        assert all(a.evidence_age_sec<b.evidence_age_sec for a,b in zip(samples,samples[1:]))
+        assert any(m.validity==m.DEGRADED and m.reason=="SHADOW_GEOMETRY_ONLY" for m in samples)
+        assert samples[-1].validity==samples[-1].STALE and samples[-1].wall_collision_risk
+        assert samples[-1].evidence.validity==samples[-1].evidence.STALE
+        assert all(not m.valid_for_control for m in samples)
+        return dict(CLEARANCE_OUTER_INNER_AGE_MATCH="PASS",CLEARANCE_AGE_MONOTONIC="PASS",
+                    CLEARANCE_MEASUREMENT_EPOCH_UNCHANGED="PASS",CLEARANCE_EVENTUALLY_STALE="PASS",
+                    geometry_publications=1,clearance_samples=len(samples))
+    finally:
+        child.send_signal(2)
+        try:
+            child.wait(timeout=8)
+        except subprocess.TimeoutExpired:
+            child.terminate();child.wait(timeout=5)
+        log.close()
+        node.destroy_subscription(sub)
+        node.destroy_publisher(pub)
 
 
 def main():
@@ -117,6 +172,7 @@ def main():
             assert clearance.model_id == config["model"]["model_id"]
             assert geometry.publish_latency_sec >= .01
             assert clearance.conservative_clearance_m <= clearance.raw_horizontal_clearance_m
+            assert clearance.evidence_age_sec==clearance.evidence.evidence_age_sec
             # Stop all input; timers must expire output rather than heartbeat-refresh evidence.
             deadline = time.monotonic()+1
             while time.monotonic() < deadline:
@@ -125,8 +181,10 @@ def main():
             assert received["perception/grab_state"].validity == GrabState.STALE
             assert received["perception/grab_clearance"].validity != GrabClearanceState.VALID
             assert not forbidden
+            age_status=validate_clearance_age(node,file,geometry,qos,args.evidence_dir)
             print(json.dumps({"SHADOW_RUNTIME_STATUS":"PASS_SYNTHETIC_ROS",
                 "INSTALLED_PREVIEW_STATUS":"PASS_SOFTWARE","INPUT_EXPIRY_STATUS":"PASS",
+                "R11_CLEARANCE_AGE_CONTRACT":age_status,
                 "CONTROL_TOPIC_MESSAGES":len(forbidden),"PHYSICAL_ACTUATION_STATUS":"NOT_RUN"}))
         finally:
             node.destroy_node()

@@ -20,6 +20,17 @@ def epoch_diagnostic(measurement_epoch, publication_time):
     return measurement_epoch, publication_time-measurement_epoch
 
 
+def synchronize_clearance_age(result, upstream_age, received_at, publication_time):
+    """One age sample for both envelopes, without changing measurement identity."""
+    values = (upstream_age, received_at, publication_time)
+    valid = (all(type(v) in (int,float) and math.isfinite(v) for v in values)
+             and upstream_age >= 0 and publication_time >= received_at)
+    age = upstream_age + publication_time-received_at if valid else 1e9
+    result.evidence_age_sec = result.evidence.evidence_age_sec = age
+    result.publish_latency_sec = age
+    return age
+
+
 def field_extrinsic_eligible(state, calibration_id, model_source, source_type):
     return (state == "FIELD_VALIDATED" and isinstance(calibration_id, str)
             and calibration_id not in ("", "NOT_CONFIGURED", "UNKNOWN")

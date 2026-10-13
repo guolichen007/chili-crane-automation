@@ -20,7 +20,7 @@ from chili_crane_slam.rotation import quaternion
 from .geometry import positive, covariance, PitBoundaryModel
 from .pipeline import GrabPerceptionPipeline, LatestFrameSlot
 from .tracker import SuspensionPrior
-from .state_contract import validity_for_reason
+from .state_contract import validity_for_reason, synchronize_clearance_age
 
 QOS = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT)
 SOURCE_NAMES = {1: "PHYSICAL", 2: "SIMULATED", 3: "REPLAY", 4: "SYNTHETIC"}
@@ -282,17 +282,21 @@ class GrabClearanceNode(Node):
         result = GrabClearanceState()
         result.validity, result.reason = result.NOT_CONFIGURED, self.error
         result.valid_for_control = False
+        snapshot = self.latest
+        message, received, ttl = None, None, None
         try:
-            if self.pit is None or self.latest is None:
+            if snapshot is not None:
+                message, received = snapshot
+                result.header = copy.deepcopy(message.header)
+                result.evidence = copy.deepcopy(message.evidence)
+            if self.pit is None or message is None:
                 raise ValueError(self.error)
-            message, received = self.latest
-            result.header = copy.deepcopy(message.header)
-            result.evidence = copy.deepcopy(message.evidence)
             for key in ("model_id", "geometry_version", "extrinsic_calibration_id", "extrinsic_state"):
                 setattr(result, key, getattr(message, key))
             result.map_id, result.semantic_version, result.pit_id = self.map_id, self.semantic_version, self.pit.pit_id
             ttl = positive(self.config["policy"]["evidence_timeout_sec"], "evidence_timeout_sec")
-            if not 0 <= message.evidence_age_sec + time.monotonic() - received <= ttl or message.validity == message.STALE:
+            age = synchronize_clearance_age(result,message.evidence_age_sec,received,time.monotonic())
+            if not 0 <= age <= ttl or message.validity == message.STALE:
                 raise ValueError("GEOMETRY_STALE")
             if message.header.frame_id != self.pit.frame_id:
                 raise ValueError("GEOMETRY_FRAME_MISMATCH")
@@ -320,14 +324,18 @@ class GrabClearanceNode(Node):
             result.pose_uncertainty_margin_m, result.geometry_uncertainty_margin_m = env.pose_margin, env.geometry_margin
             result.motion_smear_margin_m = env.smear_margin
             result.confidence = message.confidence
-            result.evidence = copy.deepcopy(message.evidence)
-            result.evidence_age_sec = message.evidence_age_sec + time.monotonic() - received
-            result.publish_latency_sec = result.evidence_age_sec
         except (ValueError, TypeError, KeyError) as exc:
             result.reason = str(exc)
             result.validity = getattr(result, validity_for_reason(result.reason, self.pit is not None))
             result.wall_collision_risk = True
-            result.evidence_age_sec = 1e9
+        # Re-sample at publication after geometry processing, on EVERY path.
+        # A stale/error result must not carry a younger copied nested metadata.
+        age = synchronize_clearance_age(result,
+            message.evidence_age_sec if message is not None else None,received,time.monotonic())
+        if ttl is not None and age > ttl and result.validity in (result.VALID,result.DEGRADED):
+            result.validity, result.reason = result.STALE, "GEOMETRY_STALE"
+            result.wall_collision_risk = True
+        result.evidence.validity, result.evidence.reason = result.validity, result.reason
         self.pub.publish(result)
 
 
