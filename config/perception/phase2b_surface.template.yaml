@@ -1,0 +1,51 @@
+contract_version: 1
+config_state: NOT_CONFIGURED
+config_version: NOT_CONFIGURED
+source_type: NOT_CONFIGURED
+time_domain: NOT_CONFIGURED
+semantic_map_file: NOT_CONFIGURED
+geofence_file: NOT_CONFIGURED
+pit_id: NOT_CONFIGURED
+resolution_m: null
+frame_ttl_sec: null
+surface_ttl_sec: null
+window_sec: null
+maximum_frame_span_sec: null
+epoch_tolerance_sec: null
+sensor_uncertainty_m: null
+single_sensor_extra_uncertainty_m: null
+mad_scale: null
+max_height_dispersion_m: null
+minimum_neighborhood_coverage: null
+minimum_cell_samples: null
+minimum_cell_frames: null
+maximum_input_points: null
+maximum_grid_cells: null
+maximum_window_frames: null
+maximum_candidates: null
+dynamic_mask_dilation_m: null
+static_masks_state: NOT_CONFIGURED
+static_masks: []
+kernel:
+  state: NOT_CONFIGURED
+  kernel_id: NOT_CONFIGURED
+  provenance: NOT_CONFIGURED
+  footprint_xy_m: null
+  capture_depth_m: null
+  yaw_control_available: false
+  yaw_mode: NOT_CONFIGURED
+  fixed_yaw_rad: null
+planning:
+  minimum_observed_fraction: null
+  maximum_unknown_fraction: null
+  maximum_slope_rad: null
+  maximum_roughness_m: null
+  wall_margin_m: null
+  distance_acceleration_enabled: false
+  recent_grab_radius_m: null
+  recent_grab_ttl_sec: null
+  disturbance_dilation_m: null
+  maximum_recent_events: null
+physical_output_enabled: false
+automatic_control_enabled: false
+camera_control_authority: false
