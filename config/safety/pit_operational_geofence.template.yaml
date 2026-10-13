@@ -1,0 +1,64 @@
+contract_version: 1
+config_state: NOT_CONFIGURED
+config_version: NOT_CONFIGURED
+geofence_id: NOT_CONFIGURED
+geofence_version: NOT_CONFIGURED
+frame_id: map
+semantic_map_id: NOT_CONFIGURED
+semantic_version: NOT_CONFIGURED
+pit_id: NOT_CONFIGURED
+reference_point: SUSPENSION_POINT
+source_type: NOT_CONFIGURED
+x:
+  source: SERVO_POSITION
+  calibration_id: NOT_CONFIGURED
+  production_approved: false
+  stop_distance_verified: false
+  reaction_time_verified: false
+  stop_model_evidence_id: NOT_CONFIGURED
+  negative_limit_signal: NOT_CONFIGURED
+  positive_limit_signal: NOT_CONFIGURED
+y:
+  source: RS485_PULL_WIRE
+  calibration_id: NOT_CONFIGURED
+  production_approved: false
+  stop_distance_verified: false
+  reaction_time_verified: false
+  stop_model_evidence_id: NOT_CONFIGURED
+  negative_limit_signal: NOT_CONFIGURED
+  positive_limit_signal: NOT_CONFIGURED
+  limit_semantics: NOT_CONFIGURED
+  negative_expected_window_m: null
+  positive_expected_window_m: null
+axis_to_map:
+  calibration_id: NOT_CONFIGURED
+  state: NOT_CONFIGURED
+  map_id: NOT_CONFIGURED
+  semantic_version: NOT_CONFIGURED
+  pit_id: NOT_CONFIGURED
+  x_calibration_id: NOT_CONFIGURED
+  y_calibration_id: NOT_CONFIGURED
+  origin_map_xy_m: null
+  x_direction_map_xy: null
+  y_direction_map_xy: null
+  x_scale: null
+  y_scale: null
+  x_offset_m: null
+  y_offset_m: null
+static_margin:
+  grab_horizontal_radius_m: null
+  maximum_swing_m: null
+  position_uncertainty_m: null
+  calibration_uncertainty_m: null
+  stop_margin_m: null
+  additional_margin_m: null
+evidence_timeout_sec: null
+direction_probe_m: null
+physical_limit_wiring_state: NOT_CONFIGURED
+servo_drive_soft_limit:
+  supported: NOT_CONFIGURED
+  configured: NOT_CONFIGURED
+  field_verified: false
+physical_output_enabled: false
+automatic_control_enabled: false
+camera_control_authority: false

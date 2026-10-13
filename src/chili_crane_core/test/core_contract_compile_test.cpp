@@ -1,11 +1,16 @@
 #include <gtest/gtest.h>
 
 #include "chili_crane_core/semantic_map.hpp"
+#include "chili_crane_core/operational_geofence.hpp"
 #include "chili_crane_core/task_state.hpp"
 #include "chili_crane_core/task_transition_policy.hpp"
 #include "chili_crane_core/validity.hpp"
 
 TEST(CoreContractCompileTest, PublicHeadersInstantiate) {
+    chili_crane_core::OperationalGeofenceShadow geofence;
+    EXPECT_FALSE(geofence.valid_for_control);
+    EXPECT_FALSE(geofence.x_positive);
+    EXPECT_EQ(geofence.validity, chili_crane_core::Validity::NOT_CONFIGURED);
     chili_crane_core::SemanticMap semantic_map;
     EXPECT_EQ(semantic_map.schema_version, 1U);
     EXPECT_EQ(
