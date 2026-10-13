@@ -15,5 +15,5 @@ def generate_launch_description():
         DeclareLaunchArgument('config_file',default_value=share+'/config/perception/phase2b_surface.template.yaml'),
         DeclareLaunchArgument('use_sim_time',default_value='false'),
         Node(package='chili_crane_perception',executable='pit_surface_shadow_node.py',namespace='crane_01',parameters=[params]),
-        Node(package='chili_crane_control',executable='grasp_proposal_shadow_node.py',namespace='crane_01',parameters=[params]),
+        Node(package='chili_crane_perception',executable='grasp_proposal_shadow_node.py',namespace='crane_01',parameters=[params]),
     ])

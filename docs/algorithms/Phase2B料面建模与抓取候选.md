@@ -10,6 +10,7 @@ canonical XYZIRT → 显式PlanningSpatialContext → stable-window gate → fix
 
 perception：pit_surface.py、surface_mask.py、surface_disturbance.py；control：grasp_planning.py、distance_acceleration.py。
 surface_transport.py是typed ROS适配，不引入设备寄存器、TF猜测或Phase3定位算法。
+surface_runtime/grasp_runtime均安装于perception，调用control纯策略；依赖方向perception→slam→control不反转。
 完整格网使用独立PitSurfaceSnapshot（最多100000格，实际配置另限）；PitSurfaceStatus仅摘要。
 旧GraspTarget保持历史占位；新GraspProposal不是它的自动控制升级。新增/扩展消息需全部消费者重建。
 
@@ -36,7 +37,7 @@ lower/upper还包住短窗median范围；这是假设经标定的经验保守模
 坡度用真实3×3邻域的三次有界Huber平面IRLS；不够coverage/non-collinear support就UNKNOWN质量。
 roughness保留帧内MAD与局部平面MAD；coverage保存邻域support，边界缺邻域不假装补齐。
 无return不等于EMPTY。没有planning interpolation函数，debug也只显示observed与独立UNKNOWN。
-单雷达格DEGRADED并扩大不确定性，sensor mask不能冒充dual。
+单雷达格DEGRADED并扩大不确定性；交替单雷达帧即使窗口mask并集为3也保持DEGRADED与附加界。
 
 ## 遮罩、扰动与代际
 
@@ -47,7 +48,8 @@ static/self mask从Phase2B配置引用，空列表也需要owner明确VALID；�
 SurfaceDisturbanceTracker只接受synthetic/replay event；未来正式TaskExecution另行授权接入。
 受扰footprint+dilation与格相交即移除旧观测，固定大小tombstone记event epoch，
 事件前迟到帧仍不能恢复；只有事件后真实新观测并达到原support门槛才能恢复。
-旧generation提议拒绝。recent事件deque有界且过期；周边penalty不替代失效。
+旧generation提议拒绝；提议节点收到事件后等待料面端last_disturbance_id/counter确认，
+不能用后续普通帧generation增长冒充失效确认。recent事件deque有界且过期；周边penalty不替代失效。
 
 ## 候选与proxy
 

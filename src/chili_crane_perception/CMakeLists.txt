@@ -7,7 +7,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 ament_python_install_package(${PROJECT_NAME} PACKAGE_DIR src/${PROJECT_NAME})
 install(PROGRAMS scripts/grab_perception_node.py scripts/grab_clearance_node.py
-  scripts/pit_surface_shadow_node.py DESTINATION lib/${PROJECT_NAME})
+  scripts/pit_surface_shadow_node.py scripts/grasp_proposal_shadow_node.py DESTINATION lib/${PROJECT_NAME})
 find_package(chili_crane_core REQUIRED)
 find_package(chili_crane_msgs REQUIRED)
 add_library(${PROJECT_NAME} INTERFACE)

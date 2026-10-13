@@ -88,6 +88,15 @@ class SurfaceTests(unittest.TestCase):
         self.assertAlmostEqual(s.cells[100].slope, np.arctan(.2))
         self.assertLess(s.cells[100].roughness, 1e-8)
 
+    def test_alternating_single_frames_remain_degraded(self):
+        p,sensors=cloud(self.g)
+        self.assertTrue(add(self.g,p,np.zeros(len(p),dtype=int),self.context))
+        self.assertTrue(add(self.g,p,np.ones(len(p),dtype=int),self.context,10.05,2))
+        cell=self.g.snapshot(10.06).cells[100]
+        self.assertEqual(cell.sensor_support_mask,3)
+        self.assertEqual(cell.validity,'DEGRADED')
+        self.assertAlmostEqual(cell.height_uncertainty,.04)
+
     def test_ttl_generation_and_window_bounded(self):
         self.observed()
         for i in range(3,12):

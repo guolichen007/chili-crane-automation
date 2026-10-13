@@ -17,6 +17,7 @@
   <exec_depend>python3-shapely</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
   <exec_depend>chili_crane_slam</exec_depend>
+  <exec_depend>chili_crane_control</exec_depend>
   <test_depend>ament_cmake_pytest</test_depend>
   <depend>chili_crane_core</depend>
   <depend>chili_crane_msgs</depend>

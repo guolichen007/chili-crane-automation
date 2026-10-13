@@ -116,6 +116,8 @@ class SurfaceSnapshot:
     reason: str
     config_sha256: str
     valid_for_control: bool = False
+    last_disturbance_id: str = ''
+    disturbance_counter: int = 0
 
 
 class PitSurfaceGrid:
@@ -158,6 +160,7 @@ class PitSurfaceGrid:
         self.frames = deque(maxlen=c["maximum_window_frames"])
         self.generation, self.last_epoch, self.last_counter = 0, 0., -1
         self.context, self.reason = None, "NO_OBSERVATIONS"
+        self.last_disturbance_id,self.disturbance_counter='',0
         self.invalidated_at = np.zeros(self.width*self.height)
         self.config_hash = hashlib.sha256(json.dumps(c, sort_keys=True).encode()).hexdigest()
 
@@ -254,13 +257,14 @@ class PitSurfaceGrid:
             z = float(np.median(heights))
             dispersion = max(float(np.median(np.abs(heights-z))), max(r[1][1] for r in rows))
             mask = int(np.bitwise_or.reduce([r[1][3] for r in rows]))
+            single_frame_support = any(r[1][3] != 3 for r in rows)
             uncertainty = (c["mad_scale"]*dispersion + c["sensor_uncertainty_m"] + max(r[2] for r in rows)
-                           + (c["single_sensor_extra_uncertainty_m"] if mask != 3 else 0))
+                           + (c["single_sensor_extra_uncertainty_m"] if single_frame_support else 0))
             # Include temporal range, rather than claiming a median is a maximum surface.
             lower, upper = float(min(heights)-uncertainty), float(max(heights)+uncertainty)
             valid = dispersion <= c["max_height_dispersion_m"]
             cells.append(SurfaceCell(index, True, count, len(rows), mask, max(r[0] for r in rows), z,
-                lower, upper, dispersion, math.nan, uncertainty, validity="VALID" if valid and mask == 3 else "DEGRADED"))
+                lower, upper, dispersion, math.nan, uncertainty, validity="VALID" if valid and not single_frame_support else "DEGRADED"))
         # Fit local plane only to actual observed neighbors; no fill of holes.
         original = tuple(cells)
         for i, cell in enumerate(original):
@@ -292,4 +296,5 @@ class PitSurfaceGrid:
         snapshot_id = f"{self.config_hash[:12]}:{self.generation}:{self.context.key[:12] if self.context else 'unknown'}"
         return SurfaceSnapshot(snapshot_id, self.generation, min(starts, default=end), end, self.context,
             tuple(cells), self.origin, self.resolution, self.width, self.height,
-            "DEGRADED" if starts else "STALE", self.reason, self.config_hash)
+            "DEGRADED" if starts else "STALE", self.reason, self.config_hash,False,
+            self.last_disturbance_id,self.disturbance_counter)

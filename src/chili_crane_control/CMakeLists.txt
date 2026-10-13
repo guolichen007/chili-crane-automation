@@ -4,7 +4,7 @@ find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 ament_python_install_package(${PROJECT_NAME} PACKAGE_DIR src/${PROJECT_NAME})
 install(PROGRAMS scripts/fail_safe_safety_supervisor.py
-  scripts/mock_servo_csv_publisher.py scripts/action_executor.py scripts/grasp_proposal_shadow_node.py DESTINATION lib/${PROJECT_NAME})
+  scripts/mock_servo_csv_publisher.py scripts/action_executor.py DESTINATION lib/${PROJECT_NAME})
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(operational_geofence ../../tests_static/test_operational_geofence.py

@@ -31,6 +31,8 @@ class DisturbanceTests(unittest.TestCase):
         old=self.grid.snapshot(10.06)
         self.tracker.apply(self.grid,self.event,10.11)
         new=self.grid.snapshot(10.11)
+        self.assertEqual(new.last_disturbance_id,self.event.event_id)
+        self.assertEqual(new.disturbance_counter,self.event.source_counter)
         self.assertGreater(new.generation,old.generation)
         self.assertFalse(new.cells[8*new.width+8].observed)
         planner=GraspPlanner(self.c,self.g)

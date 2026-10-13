@@ -10,6 +10,7 @@ Phase2A-R1.1正式软件封板：PASS_SOFTWARE_SHADOW_NOT_FIELD；进一步Grab 
 ## 模块与身份
 
 七包不变；perception承载PitSurfaceGrid/动态mask与扰动生命周期，control承载独立纯规划策略。
+ROS surface/proposal适配器均在perception；既有perception→slam→control依赖方向保持，无control→perception环。
 复用PitSurfaceStatus概念；旧GraspTarget仍是历史占位，不把它悄悄升级为控制目标。
 显式PlanningSpatialContext证明source→map transform、map/pit/calibration/version、measurement epoch、
 逐雷达provenance和平台静止证据。相同frame名字也不能替代transform证明。

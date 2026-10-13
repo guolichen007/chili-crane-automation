@@ -28,3 +28,5 @@ string spatial_calibration_id
 string config_sha256
 bool spatial_eligible
 bool valid_for_control
+string last_disturbance_id
+uint64 disturbance_counter

@@ -9,6 +9,20 @@ sys.path[:0]=[str(ROOT/'src/chili_crane_perception/src'),str(ROOT/'src/chili_cra
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_internal_package_dependency_graph_is_acyclic(self):
+        import xml.etree.ElementTree as ET
+        packages={path.parent.name:ET.parse(path).getroot() for path in (ROOT/'src').glob('*/package.xml')}
+        graph={name:{item.text for item in package if item.tag in ('depend','exec_depend','build_depend','test_depend')
+                     and item.text in packages} for name,package in packages.items()}
+        visiting,done=set(),set()
+        def visit(name):
+            self.assertNotIn(name,visiting,'package dependency cycle: '+str(graph))
+            if name in done:return
+            visiting.add(name)
+            for dependency in graph[name]:visit(dependency)
+            visiting.remove(name);done.add(name)
+        for name in graph:visit(name)
+
     def test_phase2a_frozen_content(self):
         import hashlib
         import yaml
@@ -19,7 +33,7 @@ class DeliveryTests(unittest.TestCase):
     def test_shadow_publisher_types_and_no_execution_startup(self):
         publishers=set()
         for relative in ('src/chili_crane_perception/src/chili_crane_perception/surface_runtime.py',
-                         'src/chili_crane_control/src/chili_crane_control/grasp_runtime.py'):
+                         'src/chili_crane_perception/src/chili_crane_perception/grasp_runtime.py'):
             tree=ast.parse((ROOT/relative).read_text(encoding='utf-8'))
             for node in ast.walk(tree):
                 if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute) and node.func.attr=='create_publisher':

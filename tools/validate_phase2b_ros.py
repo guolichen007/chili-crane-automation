@@ -29,7 +29,7 @@ ROOT=Path(__file__).resolve().parents[1]
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--evidence-dir',type=Path,required=True)
     args=parser.parse_args();args.evidence_dir.mkdir(parents=True,exist_ok=True)
-    for package,name in (('chili_crane_perception','pit_surface_shadow_node.py'),('chili_crane_control','grasp_proposal_shadow_node.py')):
+    for package,name in (('chili_crane_perception','pit_surface_shadow_node.py'),('chili_crane_perception','grasp_proposal_shadow_node.py')):
         assert name in subprocess.check_output(['ros2','pkg','executables',package],text=True)
     c,s,gc,ctx,grab=fixture(ROOT/'config/safety/pit_operational_geofence.template.yaml')
     with tempfile.TemporaryDirectory(prefix='phase2b-synthetic-') as tmp:
@@ -119,7 +119,8 @@ def main():
                 transform_id=ctx.transform_id,kernel_id=c['kernel']['kernel_id'],footprint=copy.deepcopy(selected.footprint))
             event.header.frame_id='map';event.header.stamp=node.get_clock().now().to_msg()
             pubs['event'].publish(event)
-            wait(lambda:received['snapshot'].status.surface_generation>original_generation,timeout=3.)
+            wait(lambda:received['snapshot'].status.surface_generation>original_generation
+                and received['snapshot'].status.last_disturbance_id==event.event_id,timeout=3.)
             disturbed=received['snapshot']
             from shapely.geometry import Polygon,box
             disturbed_polygon=Polygon([(p.x,p.y) for p in event.footprint.points]).buffer(c['planning']['disturbance_dilation_m'])

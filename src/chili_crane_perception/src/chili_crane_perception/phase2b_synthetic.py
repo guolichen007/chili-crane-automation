@@ -42,7 +42,7 @@ def fixture(geofence_template):
         'synthetic-map-transform','synthetic-extrinsic','SYNTHETIC_VALIDATED','SYNTHETIC',10.,.01,tuple(np.eye(4).ravel()),
         ('synthetic-er1-0','synthetic-er1-1'),True,'synthetic-stationary-window')
     grab=GrabMask(10.,'map',semantic['map_id'],semantic['semantic_version'],'SYNTHETIC_PIT','synthetic-extrinsic','SYNTHETIC',
-        'TRACKED',True,True,((-.4,-.4),(.4,-.4),(.4,.4),(-.4,.4)),.85,1.8,0.)
+        'TRACKED',True,True,((-.4,-.4),(.4,-.4),(.4,.4),(-.4,.4)),.85,1.8,0.,'SYNTHETIC_VALIDATED')
     return c,semantic,gc,ctx,grab
 
 

@@ -66,6 +66,7 @@ def snapshot_to_message(snapshot,now,counter):
     m.validity,m.reason=s.validity,s.reason
     s.snapshot_id,s.surface_generation=snapshot.snapshot_id,snapshot.generation
     s.config_sha256=snapshot.config_sha256
+    s.last_disturbance_id,s.disturbance_counter=snapshot.last_disturbance_id,snapshot.disturbance_counter
     s.resolution_m=snapshot.resolution
     s.window_start,s.window_end=stamp(snapshot.window_start),stamp(snapshot.window_end)
     s.total_cell_count=len(snapshot.cells)
@@ -125,7 +126,7 @@ def snapshot_from_message(m,config):
         {v:k for k,v in VALIDITY.items()}.get(c.validity,'UNKNOWN')) for c in m.cells)
     return SurfaceSnapshot(s.snapshot_id,s.surface_generation,seconds(s.window_start),seconds(s.window_end),ctx,cells,
         (m.origin_x_m,m.origin_y_m),s.resolution_m,m.width,m.height,{v:k for k,v in VALIDITY.items()}.get(s.validity,'UNKNOWN'),
-        s.reason,s.config_sha256)
+        s.reason,s.config_sha256,False,s.last_disturbance_id,s.disturbance_counter)
 
 
 def proposal_to_message(proposal,surface_message,age):

@@ -14,7 +14,7 @@ def mask_fixture():
     c,s,ctx=fixture()
     c.update(dynamic_mask_dilation_m=.05,static_masks_state='VALID',static_masks=[])
     grab=GrabMask(10.,'map','map1','v1','pit','cal1','SYNTHETIC','TRACKED',True,True,
-                  ((-.4,-.4),(.4,-.4),(.4,.4),(-.4,.4)),.9,1.8,0.)
+                  ((-.4,-.4),(.4,-.4),(.4,.4),(-.4,.4)),.9,1.8,0.,'SYNTHETIC_VALIDATED')
     return c,s,ctx,grab
 
 
@@ -52,7 +52,7 @@ class MaskTests(unittest.TestCase):
 
     def test_map_and_calibration_mismatch(self):
         for grab in (replace(self.grab,map_id='other'),replace(self.grab,frame_id='cloud'),
-                     replace(self.grab,calibration_id='other')):
+                     replace(self.grab,calibration_id='other'),replace(self.grab,extrinsic_state='BENCH_VALIDATED')):
             self.assertFalse(ingest(self.b,self.p,self.sensors,self.ctx,grab))
 
     def test_vertical_mask_not_column_to_infinity(self):

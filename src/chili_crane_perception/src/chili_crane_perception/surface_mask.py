@@ -22,12 +22,16 @@ class GrabMask:
     bottom_lower_bound_m: float
     top_upper_bound_m: float
     evidence_age_sec: float
+    extrinsic_state: str = 'NOT_CONFIGURED'
 
     def validate(self, context, now, ttl):
         if (self.frame_id != context.target_frame or self.map_id != context.map_id
                 or self.semantic_version != context.semantic_version or self.pit_id != context.pit_id
                 or self.calibration_id != context.calibration_id or self.source_type != context.source_type):
             raise ValueError("GRAB_MASK_PROVENANCE_MISMATCH")
+        required='FIELD_VALIDATED' if context.source_type=='PHYSICAL' else 'SYNTHETIC_VALIDATED'
+        if self.extrinsic_state != required:
+            raise ValueError('GRAB_MASK_SPATIAL_ELIGIBILITY_FALSE')
         if not identity(self.calibration_id) or not math.isfinite(self.epoch) or not 0 <= now-self.epoch <= ttl:
             raise ValueError("GRAB_MASK_STALE")
         if not math.isfinite(self.evidence_age_sec) or not 0 <= self.evidence_age_sec <= ttl:

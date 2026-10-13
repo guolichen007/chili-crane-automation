@@ -152,6 +152,8 @@ class PitSurfaceShadowNode(Node):
                 geometry,grab_arrival=self.inputs['grab']
                 clearance,clear_arrival=self.inputs['clearance']
                 if (geometry.validity not in (3,4) or clearance.validity not in (3,4)
+                        or geometry.model_id in ('','UNKNOWN','NOT_CONFIGURED')
+                        or geometry.geometry_version in ('','UNKNOWN','NOT_CONFIGURED')
                         or geometry.header != clearance.header or geometry.evidence.measurement_stamp != geometry.header.stamp
                         or clearance.evidence.measurement_stamp != clearance.header.stamp
                         or clearance.extrinsic_calibration_id != geometry.extrinsic_calibration_id
@@ -170,7 +172,7 @@ class PitSurfaceShadowNode(Node):
                     clearance.semantic_version,clearance.pit_id,geometry.extrinsic_calibration_id,geometry.source_type,
                     geometry.tracking_state,geometry.measurement_accepted,geometry.motion_stable,
                     tuple((p.x,p.y) for p in geometry.conservative_footprint.points),geometry.bottom_lower_bound_m,
-                    geometry.top_upper_bound_m,max(geometry.evidence_age_sec,time.monotonic()-grab_arrival))
+                    geometry.top_upper_bound_m,max(geometry.evidence_age_sec,time.monotonic()-grab_arrival),geometry.extrinsic_state)
                 points=decode_cloud(cloud,c['maximum_input_points'])
                 frame=dict(epoch=epoch,source_counter=int(meta.source_counter),frame_id=cloud.header.frame_id,
                     span_sec=float(np.ptp(points['timestamp'])),source_type=ctx.source_type,calibration_id=meta.calibration_id)

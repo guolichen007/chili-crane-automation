@@ -11,8 +11,8 @@ from chili_crane_msgs.msg import PitSurfaceSnapshot,PlanningSpatialContext,Grasp
 from chili_crane_perception.surface_runtime import QOS,configure,source_now,line_marker
 from chili_crane_perception.surface_transport import (snapshot_from_message,context_from_message,proposal_to_message,seconds)
 from chili_crane_perception.surface_disturbance import SurfaceDisturbanceTracker
-from .geofence import OperationalGeofence
-from .grasp_planning import GraspPlanner
+from chili_crane_control.geofence import OperationalGeofence
+from chili_crane_control.grasp_planning import GraspPlanner
 
 
 class GraspProposalShadowNode(Node):
@@ -30,6 +30,7 @@ class GraspProposalShadowNode(Node):
         self.latest,self.context=None,None
         self.generation_floor=-1
         self.last_counter=-1
+        self.pending_event=None
         self.pub=self.create_publisher(GraspProposal,'planning/grasp_proposal_shadow',QOS)
         self.markers=self.create_publisher(MarkerArray,'planning/grasp_proposal_markers',QOS)
         self.create_subscription(PitSurfaceSnapshot,'perception/pit_surface_snapshot',self.surface,QOS)
@@ -39,6 +40,12 @@ class GraspProposalShadowNode(Node):
         self.create_timer(.1,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
 
     def surface(self,m):
+        if self.pending_event is not None:
+            event_id,counter=self.pending_event
+            if m.status.disturbance_counter < counter or m.status.last_disturbance_id != event_id:
+                self.latest=None
+                return
+            self.pending_event=None
         if (m.status.surface_generation < self.generation_floor or m.status.evidence.source_counter < self.last_counter):
             self.latest=None
             return
@@ -52,9 +59,11 @@ class GraspProposalShadowNode(Node):
         try:
             snapshot=snapshot_from_message(self.latest[0],self.config)
             if (m.validity != 4 or m.source_type not in ('SYNTHETIC','REPLAY') or m.source_type != snapshot.context.source_type
+                    or m.header.frame_id != snapshot.context.target_frame
                     or m.map_id != snapshot.context.map_id or m.semantic_version != snapshot.context.semantic_version
                     or m.pit_id != snapshot.context.pit_id or m.transform_id != snapshot.context.transform_id
                     or m.kernel_id != self.planner.kernel.kernel_id or m.source_counter <= self.recent.counter
+                    or seconds(m.header.stamp) <= self.recent.epoch
                     or not 0 <= source_now(self,self.config)-seconds(m.header.stamp) <= self.recent.ttl):
                 raise ValueError('RECENT_EVENT_REJECTED')
             from shapely.geometry import Polygon
@@ -63,8 +72,10 @@ class GraspProposalShadowNode(Node):
                 raise ValueError('RECENT_FOOTPRINT_INVALID')
             self.recent.events.append((seconds(m.header.stamp),fp,snapshot.context.key))
             self.recent.counter=m.source_counter
+            self.recent.epoch=seconds(m.header.stamp)
             # Immediately block old generation until authoritative invalidated snapshot arrives.
             self.generation_floor=max(self.generation_floor,snapshot.generation+1)
+            self.pending_event=(m.event_id,m.source_counter)
             self.latest=None
         except (ValueError,TypeError,KeyError) as exc:
             self.get_logger().warning(str(exc))

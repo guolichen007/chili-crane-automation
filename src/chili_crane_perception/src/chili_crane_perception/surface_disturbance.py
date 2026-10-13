@@ -47,6 +47,7 @@ class SurfaceDisturbanceTracker:
             raise ValueError("DISTURBANCE_FOOTPRINT_INVALID")
         disturbed=footprint.buffer(self.dilation/math.cos(math.pi/64),resolution=16)
         grid.invalidate(disturbed,event.epoch)
+        grid.last_disturbance_id,grid.disturbance_counter=event.event_id,event.source_counter
         self.events.append((event.epoch,disturbed,ctx.key))
         self.counter,self.epoch=event.source_counter,event.epoch
         self.expire(now)
