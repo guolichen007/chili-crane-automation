@@ -7,6 +7,7 @@ import yaml
 import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock,ClockType
+from rclpy.executors import ExternalShutdownException
 from rclpy.qos import QoSProfile,ReliabilityPolicy
 from sensor_msgs.msg import PointCloud2,PointField
 from visualization_msgs.msg import Marker,MarkerArray
@@ -219,5 +220,8 @@ def surface_main():
     rclpy.init();node=PitSurfaceShadowNode()
     try:
         rclpy.spin(node)
+    except (KeyboardInterrupt,ExternalShutdownException):
+        pass
     finally:
-        node.destroy_node();rclpy.shutdown()
+        node.destroy_node()
+        if rclpy.ok():rclpy.shutdown()

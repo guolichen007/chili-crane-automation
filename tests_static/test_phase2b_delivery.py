@@ -6,7 +6,7 @@ import sys
 import unittest
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tests_static'))
-sys.path[:0]=[str(ROOT/'src/chili_crane_perception/src'),str(ROOT/'src/chili_crane_control/src')]
+sys.path[:0]=[str(ROOT/'src/chili_crane_perception/src'),str(ROOT/'src/chili_crane_control/src'),str(ROOT/'src/chili_crane_slam/src')]
 
 
 class DeliveryTests(unittest.TestCase):
@@ -37,6 +37,8 @@ class DeliveryTests(unittest.TestCase):
                          'src/chili_crane_perception/src/chili_crane_perception/grasp_runtime.py'):
             tree=ast.parse((ROOT/relative).read_text(encoding='utf-8'))
             for node in ast.walk(tree):
+                if isinstance(node,ast.Attribute) and isinstance(node.ctx,ast.Store) and isinstance(node.value,ast.Name) and node.value.id=='self':
+                    self.assertNotEqual(node.attr,'context','rclpy.Node.context is read-only')
                 if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute) and node.func.attr=='create_publisher':
                     publishers.add(ast.unparse(node.args[0]))
         self.assertEqual(publishers,{'PitSurfaceSnapshot','PitSurfaceStatus','PointCloud2','MarkerArray','GraspProposal'})
@@ -81,6 +83,26 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(decoded.context.key,snapshot.context.key)
         self.assertEqual(decoded.cells[100].sensor_support_mask,3)
         self.assertEqual(message.status.header.stamp,message.status.evidence.measurement_stamp)
+
+    def test_ros_node_bootstrap_and_default_fail_closed(self):
+        try:
+            import rclpy
+            from chili_crane_msgs.msg import PitSurfaceSnapshot
+        except ImportError:
+            self.skipTest('NOT_RUN: ROS2/generated messages unavailable on Windows')
+        from chili_crane_perception.surface_runtime import PitSurfaceShadowNode
+        from chili_crane_perception.grasp_runtime import GraspProposalShadowNode
+        rclpy.init();nodes=[]
+        try:
+            nodes.append(PitSurfaceShadowNode());nodes.append(GraspProposalShadowNode())
+            for node in nodes:
+                self.assertIsNotNone(node.context)
+                node.tick()
+            self.assertIsNone(nodes[0].builder)
+            self.assertIsNone(nodes[1].planner)
+        finally:
+            for node in nodes:node.destroy_node()
+            if rclpy.ok():rclpy.shutdown()
 
     def test_deterministic_sequence_smoke(self):
         spec=importlib.util.spec_from_file_location('phase2b_validation',ROOT/'tools/validate_phase2b_synthetic.py')

@@ -6,6 +6,7 @@ from pathlib import Path
 import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock,ClockType
+from rclpy.executors import ExternalShutdownException
 from visualization_msgs.msg import Marker,MarkerArray
 from chili_crane_msgs.msg import PitSurfaceSnapshot,PlanningSpatialContext,GraspProposal,SurfaceDisturbance
 from chili_crane_perception.surface_runtime import QOS,configure,source_now,line_marker
@@ -27,14 +28,14 @@ class GraspProposalShadowNode(Node):
             self.recent=SurfaceDisturbanceTracker(self.config)
         except (OSError,ValueError,TypeError,KeyError) as exc:
             self.error=str(exc)
-        self.latest,self.context=None,None
+        self.latest,self.spatial_context_input=None,None
         self.generation_floor=-1
         self.last_counter=-1
         self.pending_event=None
         self.pub=self.create_publisher(GraspProposal,'planning/grasp_proposal_shadow',QOS)
         self.markers=self.create_publisher(MarkerArray,'planning/grasp_proposal_markers',QOS)
         self.create_subscription(PitSurfaceSnapshot,'perception/pit_surface_snapshot',self.surface,QOS)
-        self.create_subscription(PlanningSpatialContext,'planning/spatial_context',lambda m:setattr(self,'context',(m,time.monotonic())),QOS)
+        self.create_subscription(PlanningSpatialContext,'planning/spatial_context',lambda m:setattr(self,'spatial_context_input',(m,time.monotonic())),QOS)
         # This mirrors penalty ONLY. Authoritative invalidation happens in the surface node.
         self.create_subscription(SurfaceDisturbance,'planning/surface_disturbance_shadow',self.event,QOS)
         self.create_timer(.1,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
@@ -82,10 +83,10 @@ class GraspProposalShadowNode(Node):
 
     def tick(self):
         try:
-            if self.planner is None or self.latest is None or self.context is None:
+            if self.planner is None or self.latest is None or self.spatial_context_input is None:
                 raise ValueError(self.error if self.planner is None else 'SURFACE_OR_CONTEXT_MISSING')
             message,arrival=self.latest
-            ctx_msg,ctx_arrival=self.context
+            ctx_msg,ctx_arrival=self.spatial_context_input
             ttl=self.config['frame_ttl_sec']
             if (time.monotonic()-arrival > self.config['surface_ttl_sec'] or time.monotonic()-ctx_arrival > ttl
                     or not 0 <= ctx_msg.evidence.evidence_age_sec <= ttl):
@@ -127,5 +128,8 @@ def proposal_main():
     rclpy.init();node=GraspProposalShadowNode()
     try:
         rclpy.spin(node)
+    except (KeyboardInterrupt,ExternalShutdownException):
+        pass
     finally:
-        node.destroy_node();rclpy.shutdown()
+        node.destroy_node()
+        if rclpy.ok():rclpy.shutdown()

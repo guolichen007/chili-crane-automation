@@ -43,6 +43,8 @@ roughness保留帧内MAD与局部平面MAD；coverage保存邻域support，边�
 
 Grab mask消费TRACKED/measurement_accepted/motion_stable、同地图/frame/calibration/epoch证据，
 使用conservative footprint+bottom_lower/top_upper及显式dilation。原Grab pose与envelope不改。
+当前节点要求map-frame normalized geometry/clearance；若Phase2A仍输出crane/base，缺经审核的空间适配就拒绝mask。
+未实现FIELD空间证明生成器或Grab-to-map实机适配器，不宣称实机直接接通。
 static/self mask从Phase2B配置引用，空列表也需要owner明确VALID；生产模板NOT_CONFIGURED。
 失效mask不能把Grab点当物料，旧窗口立即失效。料面接触并不依赖Grab孤立欧氏簇。
 SurfaceDisturbanceTracker只接受synthetic/replay event；未来正式TaskExecution另行授权接入。

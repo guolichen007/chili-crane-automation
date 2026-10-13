@@ -97,6 +97,14 @@ X_SERVO_FIELD_CALIBRATION_STATUS=NOT_RUN；X_SERVO_DRIVE_SOFT_LIMIT_STATUS=NOT_R
 AXIS_TO_MAP_CALIBRATION_STATUS=NOT_RUN；OPERATIONAL_GEOFENCE_FIELD_VALIDATION_STATUS=NOT_RUN。
 限位/伺服现场状态不会由synthetic测试升级。
 
+## Phase2B FIELD证据（OPEN）
+
+Phase2B新OPEN项：cloud→map FIELD空间链（外参、X/axis-to-map、必要CranePose/静止证据）；
+ROI内旋转误差×杠杆距离的保守空间界、双雷达噪声/稀疏coverage、固定结构/self masks；
+真实Grab CAD/capture footprint/固定yaw或all-yaw界、penetration proxy depth及真实料面/遮挡bag。
+不凭SYNTHETIC_VALIDATED或经验MAD宣称FIELD有效；volume proxy到payload留Phase2C载荷/tension标定。
+PIT_SURFACE_FIELD_STATUS/GRASP_PROPOSAL_FIELD_STATUS/MATERIAL_VOLUME_PROXY_FIELD_STATUS均NOT_RUN。
+
 ## POST_R1_FIELD_VALIDATION_REQUIRED（未覆盖的组合，不是当前软件FAIL）
 
 - LOST + dense chili + wall clutter + multiple candidates的全局重捕获。

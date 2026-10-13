@@ -9,13 +9,14 @@ explicit spatial chain+observed-only格网+footprint hard gates+proxy/ranking；
 PIT_SURFACE_FIELD_STATUS/GRASP_PROPOSAL_FIELD_STATUS/MATERIAL_VOLUME_PROXY_FIELD_STATUS=NOT_RUN。
 实测kernel/CAD/进入深度/生产门槛仍NOT_CONFIGURED；payload留Phase2C。接口与验收见ADR0011和算法文档。
 
-## Phase2A-R1.1 合同收口（2026-10-13）
+## Phase2A-R1.1 合同收口（历史封板，2026-10-13）
 
 基线5a121f8；分支codex/phase2a-r1-1-contract-closeout。保持既有R1感知算法。
 Y negative/positive统一按owner canonical配置解析（含反向绑定和负map比例），X物理限位职责独立。
 Geofence模板contract_version=2，删除X死字段；directional_geometry_available不代表自动控制许可。
 Clearance内外age同步并保持epoch/counter，超时/异常fail-closed。所有现场状态和四控制flags不升级。
-两类组合缺口标记POST_R1_FIELD_VALIDATION_REQUIRED，参见现场OPEN项；本轮不做Phase2B。
+两类组合缺口标记POST_R1_FIELD_VALIDATION_REQUIRED，参见现场OPEN项；该历史收口轮不做Phase2B。
+新的Phase2B授权与范围见本页上方最新阶段，不覆盖或改写历史验收。
 
 ## Phase2A-R1 当前补充（2026-10-13）
 
