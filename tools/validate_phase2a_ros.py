@@ -45,6 +45,7 @@ def validate_clearance_age(node, config_file, geometry, qos, evidence_dir):
         sample=copy.deepcopy(geometry)
         sample.header.stamp=node.get_clock().now().to_msg()
         sample.evidence.measurement_stamp=copy.deepcopy(sample.header.stamp)
+        sample.evidence.receive_stamp=copy.deepcopy(sample.header.stamp)
         sample.evidence.header=copy.deepcopy(sample.header)
         sample.evidence.source_counter=marker
         sample.evidence_age_sec=sample.evidence.evidence_age_sec=0.

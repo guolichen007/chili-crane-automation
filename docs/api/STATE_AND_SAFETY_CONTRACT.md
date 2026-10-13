@@ -121,3 +121,12 @@ GrabGeometry新增model/version/extrinsic ID/state与时延；GrabClearance另�
 内部exact positive minimum，接触0；cross/outside=0哨兵、clearance_defined=false、geometry_violation=true。
 消费者须重建消息，读取defined/inside/risk，不得沿用“负数=穿透深度”的判断。
 NOT_CONFIGURED/STALE/DEGRADED/UNKNOWN分开，始终fail-closed且valid_for_control=false。
+
+## R1.1 合同更正
+
+Geofence配置v2删除X limit signal死字段，拒绝旧版本/旧字段；X只输出方向几何诊断。
+物理/驱动X限位由独立轴安全层核验，不能把默认false当已观测；ServoState消息不升级。
+Y通过统一canonical解析绑定negative/positive，known_signals不够或bool未知即Y_LIMIT_BINDING_UNKNOWN。
+允许左右信号反向绑定；y_scale负号不改变绑定语义，窗口和方向仍属轴位置坐标。
+directional_geometry_available替换automatic_eligibility，只有shadow必要条件，不是自动任务/控制许可。
+Clearance外层age与嵌套EvidenceMetadata age同时采样，异常也同步；重复发布保持epoch/counter，最终STALE。

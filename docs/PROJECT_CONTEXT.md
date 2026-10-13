@@ -1,5 +1,13 @@
 # Project Context
 
+## Phase2A-R1.1 合同收口（2026-10-13）
+
+基线5a121f8；分支codex/phase2a-r1-1-contract-closeout。保持既有R1感知算法。
+Y negative/positive统一按owner canonical配置解析（含反向绑定和负map比例），X物理限位职责独立。
+Geofence模板contract_version=2，删除X死字段；directional_geometry_available不代表自动控制许可。
+Clearance内外age同步并保持epoch/counter，超时/异常fail-closed。所有现场状态和四控制flags不升级。
+两类组合缺口标记POST_R1_FIELD_VALIDATION_REQUIRED，参见现场OPEN项；本轮不做Phase2B。
+
 ## Phase2A-R1 当前补充（2026-10-13）
 
 dc42fb16原版软件shadow已交付。本轮按ADR0010增加固定作业区OperationalGeofence，

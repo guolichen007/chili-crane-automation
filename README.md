@@ -1,6 +1,10 @@
 # 辣椒地池行车自动抓取框架
 
-当前分支为 **Phase2A-R1 抓斗深审加固与固定作业区强先验 shadow**，基线为 dc42fb16。
+R1.1 为基于5a121f8的窄合同收口：Y限位可配置解析、X几何职责独立、Clearance内外age一致。
+配置v2和directional_geometry_available需显式迁移；不改变R1算法、现场状态或控制禁用边界。
+入口：[R1.1合同验收](docs/validation/Phase2A-R1.1合同收口验收.md)。
+
+R1.1继承 **Phase2A-R1 抓斗深审加固与固定作业区强先验 shadow**，R1历史基线为 dc42fb16。
 新增OperationalGeofence引用原SemanticMap V1、X/Y axis-to-map、Y坑区方向限位纯策略；
 它不替代动态抓斗包络、不修正感知位姿、不授予自动控制。现场窗口/标定/停车参数仍未知。
 R1包含刚性core TRANSITION、连通料面模型门控、状态epoch与clearance/provenance修复。

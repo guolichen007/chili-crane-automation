@@ -96,3 +96,14 @@ Y_PULLWIRE_FIELD_CALIBRATION_STATUS=NOT_RUN；X_SERVO_PROTOCOL_STATUS=NOT_CONFIG
 X_SERVO_FIELD_CALIBRATION_STATUS=NOT_RUN；X_SERVO_DRIVE_SOFT_LIMIT_STATUS=NOT_RUN。
 AXIS_TO_MAP_CALIBRATION_STATUS=NOT_RUN；OPERATIONAL_GEOFENCE_FIELD_VALIDATION_STATUS=NOT_RUN。
 限位/伺服现场状态不会由synthetic测试升级。
+
+## POST_R1_FIELD_VALIDATION_REQUIRED（未覆盖的组合，不是当前软件FAIL）
+
+- LOST + dense chili + wall clutter + multiple candidates的全局重捕获。
+  现有dense测试从TRACKED开始；现有global LOST重捕获相对干净，不能合并声称覆盖。
+- TRANSITION tracking core +真实moving jaw surfaces+continuous material contact。
+  当前transition合成可见结构主要是core，未同时反证真实移动斗瓣干扰。
+
+两项留给真实bag/FIELD验证或后续明确授权阶段，R1.1不增加复杂新算法。
+另须现场确认Y negative/positive canonical绑定与轴位置窗口；负map比例不擅自交换信号。
+X物理限位/soft-limit是独立轴安全证据，Geofence几何结果不能代替它们。

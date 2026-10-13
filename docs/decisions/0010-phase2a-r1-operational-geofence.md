@@ -56,3 +56,27 @@ state header 是 canonical MID_SCAN，不是发布时刻；clearance 继承几�
 保留 dc42fb16 历史验收；R1 证据按精确 SHA 单独归档。
 有限合成序列、连通料面与密集云测试不是 FIELD 概率保证或工业安全认证。
 PTP 五文件、vendor lock/patch、main 不改；不进入 PitSurface、GraspPlanner 或物理动作。
+
+## R1.1 合同收口（2026-10-13）
+
+基线5a121f8b9ce5f6615b672bb896b570b7e2cd4bcc；不重做R1算法。
+Geofence配置contract_version升级为2，旧配置需移除x.negative_limit_signal/positive_limit_signal，
+旧版或保留无效X字段的配置明确拒绝，不静默解释。ServoState消息不改。
+
+Y只支持canonical y_left_limit→TrolleyState.left_limit、y_right_limit→right_limit。
+统一resolve_y_limit_state解析，要求known_signals及实际bool；未知/重复/未配置绑定fail-closed。
+negative/positive由owner配置，不再left=negative。窗口/方向是标定后的轴位置坐标，
+axis_to_map.y_scale=-1仅改变到map的几何投影，不再次交换信号绑定。
+冲突、触发窗口、未触发诊断、方向和反证计数都使用同一解析结果。
+
+X Geofence只负责位置/标定/track/pit-derived几何必要条件，不解释ServoState限位bool的knownness。
+X物理限位及驱动内部soft-limit属于独立轴安全层，必须与几何结果、完整SafetyPermit相交后才能考虑动作。
+默认false、甚至没有X限位字段，不代表限位已观测或轴已安全。
+
+纯策略结果automatic_eligibility删除，替换为directional_geometry_available：
+它只表示至少一个shadow方向满足几何必要条件，不等于allow_auto_task，不是SafetyPermit。
+没有旧名兼容别名，消费者须显式迁移；valid_for_control、production_control_eligible永远false。
+
+Clearance每次发布从upstream age+monotonic residence重新采样，同步外层与EvidenceMetadata年龄。
+正常/异常/STALE均不刷新header、measurement_stamp或source_counter；未知年龄使用双层一致的失效哨兵。
+超过既有TTL即STALE/risk=true，嵌套validity同步失效；不改变TTL/deadline或几何计算。
