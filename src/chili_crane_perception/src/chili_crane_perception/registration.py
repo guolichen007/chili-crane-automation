@@ -17,7 +17,11 @@ class GrabCandidateProvider:
 
 
 class GeometricGrabCandidateProvider(GrabCandidateProvider):
-    def candidates(self, points, state, policy, suspension=None):
+    def __init__(self, model=None):
+        self.model = model
+        self.model_normals = {}
+
+    def candidates(self, points, state, policy, suspension=None, opening="CLOSED"):
         validate_points(points)
         if len(points) > policy["maximum_input_points"]:
             raise ValueError("INPUT_POINT_BUDGET_EXCEEDED")
@@ -39,6 +43,52 @@ class GeometricGrabCandidateProvider(GrabCandidateProvider):
         voxel = policy["candidate_voxel_m"]
         _, ids = np.unique(np.floor(xyz / voxel).astype(np.int64), axis=0, return_index=True)
         selected, xyz = selected[ids], xyz[ids]
+        if self.model is not None and state.pose is not None and state.tracking != "LOST":
+            shape = (self.model.tracking_core if opening == "TRANSITION"
+                     else self.model.shapes.get(opening))
+            if shape is None:
+                return []
+            # Surface corridor rather than entire Grab/material connected component.
+            local = transform(xyz, np.linalg.inv(state.pose))
+            radius = float(np.linalg.norm(shape.sampled_surface, axis=1).max())
+            p = state.covariance
+            uncertainty = policy["uncertainty_sigma"] * (
+                np.sqrt(max(np.linalg.eigvalsh(p[:3,:3]).max(), 0))
+                + radius * np.sqrt(max(np.linalg.eigvalsh(p[3:6,3:6]).max(), 0)))
+            span = float(np.ptp(points["timestamp"]))
+            smear = span / 2 * (policy["maximum_linear_speed_mps"]
+                               + radius * policy["maximum_angular_speed_radps"])
+            band = policy["model_gate_band_m"] + uncertainty + smear
+            if state.tracking == "LOST_HOLD":
+                band *= policy["lost_hold_gate_factor"]
+            if band > policy["maximum_model_gate_band_m"]:
+                return []  # Unbounded uncertainty is not permission to eat material.
+            distance, model_ids = cKDTree(shape.sampled_surface).query(local)
+            keep = np.flatnonzero(distance <= band)
+            if len(keep) < policy["normal_neighbors"]:
+                return []
+            if opening not in self.model_normals:
+                self.model_normals[opening] = local_planes(shape.sampled_surface, policy["normal_neighbors"])[0]
+            observed_normals = local_planes(local[keep], policy["normal_neighbors"])[0]
+            normals = self.model_normals[opening][model_ids[keep]]
+            alignment = np.abs(np.einsum("ij,ij->i", observed_normals, normals))
+            plane_residual = np.abs(np.einsum("ij,ij->i", normals,
+                local[keep]-shape.sampled_surface[model_ids[keep]]))
+            plane_band = policy["model_gate_plane_band_m"]
+            if state.tracking == "LOST_HOLD":
+                plane_band *= policy["lost_hold_gate_factor"]
+            keep = keep[(alignment >= policy["model_gate_normal_cosine"]) & (plane_residual <= plane_band)]
+            # Dense material must not multiply the weight of a single CAD sample.
+            # Keep the closest measured support per model sample in predicted frame.
+            order = keep[np.lexsort((distance[keep], model_ids[keep]))]
+            _, first = np.unique(model_ids[order], return_index=True)
+            keep = order[first]
+            selected, xyz = selected[keep], xyz[keep]
+            if len(xyz) > policy["maximum_candidate_points"]:
+                ids = np.linspace(0, len(xyz)-1, policy["maximum_candidate_points"], dtype=int)
+                selected, xyz = selected[ids], xyz[ids]
+            if state.tracking in ("TRACKED", "CANDIDATE"):
+                return [selected.copy()] if len(selected) >= policy["minimum_candidate_points"] else []
         if len(xyz) > policy["maximum_candidate_points"]:
             raise ValueError("CANDIDATE_POINT_BUDGET_EXCEEDED")
         tree, unseen, groups = cKDTree(xyz), set(range(len(xyz))), []
@@ -93,9 +143,19 @@ class GrabModelRegistration:
             raise ValueError("UNPINNED_SMALL_GICP")
         self.native, self.model, self.policy = small_gicp, model, policy
         self.cached = {}
-        for opening, shape in model.shapes.items():
+        self.voxels = {}
+        shapes = dict(model.shapes)
+        if model.tracking_core is not None:
+            shapes["TRACKING_CORE"] = model.tracking_core
+        for opening, shape in shapes.items():
             levels = []
-            for voxel in (policy["coarse_voxel_m"], policy["fine_voxel_m"]):
+            prefix = "tracking_core_" if opening == "TRACKING_CORE" else ""
+            voxels = tuple(positive(policy.get(prefix+k), prefix+k)
+                           for k in ("coarse_voxel_m", "fine_voxel_m"))
+            if voxels[0] < voxels[1]:
+                raise ValueError("INVALID_REGISTRATION_VOXEL_LEVELS")
+            self.voxels[opening] = voxels
+            for voxel in voxels:
                 cloud, tree = small_gicp.preprocess_points(
                     shape.sampled_surface, voxel, policy["normal_neighbors"], 1)
                 xyz, normals = cloud.points()[:, :3].copy(), cloud.normals()[:, :3].copy()
@@ -106,7 +166,7 @@ class GrabModelRegistration:
         observed = np.column_stack([candidate[k] for k in ("x", "y", "z")]).astype(float)
         inverse = np.linalg.inv(rigid(seed))
         cfg, converged = self.policy, False
-        for level, voxel in zip(self.cached[opening], (cfg["coarse_voxel_m"], cfg["fine_voxel_m"])):
+        for level, voxel in zip(self.cached[opening], self.voxels[opening]):
             source, _ = self.native.preprocess_points(observed, voxel, cfg["normal_neighbors"], 1)
             if source.size() < cfg["normal_neighbors"]:
                 raise ValueError("INSUFFICIENT_REGISTRATION_POINTS")
@@ -117,6 +177,18 @@ class GrabModelRegistration:
                 translation_epsilon=cfg["registration_translation_epsilon_m"],
                 rotation_epsilon=cfg["registration_rotation_epsilon_rad"])
             inverse, converged = rigid(result.T_target_source), bool(result.converged)
+            # Continue from the failed finite iterate with the SAME convergence
+            # tolerances; never relabel a non-converged native result as accepted.
+            for _ in range(cfg["registration_retry_count"] if not converged else 0):
+                result = self.native.align(level[0], source, level[1],
+                    init_T_target_source=inverse, registration_type="GICP",
+                    max_correspondence_distance=cfg["correspondence_m"],
+                    max_iterations=cfg["registration_iterations"], num_threads=1,
+                    translation_epsilon=cfg["registration_translation_epsilon_m"],
+                    rotation_epsilon=cfg["registration_rotation_epsilon_rad"])
+                inverse, converged = rigid(result.T_target_source), bool(result.converged)
+                if converged:
+                    break
         pose = np.linalg.inv(inverse)
         _, _, model_points, model_normals, tree = self.cached[opening][-1]
         # Cached MODEL is the target, measured common-frame candidate the source.
@@ -145,6 +217,12 @@ class GrabModelRegistration:
         local = transform(observed, np.linalg.inv(pose))
         distance, ids = tree.query(local)
         keep = distance <= cfg["correspondence_m"]
+        final_normals = model_normals[ids] @ pose[:3,:3].T
+        final_residual = np.einsum("ij,ij->i", final_normals,
+                                  transform(model_points[ids], pose)-observed)
+        # Outliers remain in the denominator. H/support/covariance must describe
+        # the measured inlier surface, not a nearby connected material plane.
+        keep &= np.abs(final_residual) <= cfg["residual_p95_m"]
         if keep.sum() < cfg["normal_neighbors"]:
             raise ValueError("FINAL_SUPPORT_MISSING")
         mp = model_points[ids[keep]]
@@ -158,16 +236,24 @@ class GrabModelRegistration:
         observed_normals = source_normals[source_ids]
         j = np.hstack([observed_normals, np.cross(mp, observed_normals @ pose[:3, :3])])
         h = j.T @ (weights[:, None] * j)
-        eigenvalues, eigenvectors = np.linalg.eigh((h + h.T) / 2)
-        floor = max(eigenvalues.max() * cfg["information_eigen_ratio"], 1e-12)
-        sectors = len(np.unique((mp >= 0).astype(int) @ np.array([1, 2, 4])))
+        physical_values, eigenvectors = np.linalg.eigh((h + h.T) / 2)
+        floor = max(physical_values.max() * cfg["information_eigen_ratio"], 1e-12)
+        support_center = (model_points.min(axis=0) + model_points.max(axis=0)) / 2
+        characteristic_length = max(float(np.sqrt(np.mean(np.sum(
+            (model_points-support_center)**2, axis=1)))), 1e-9)
+        # Gate uses centered, dimensionless lever arms; covariance keeps m/rad units.
+        normalized_j = np.hstack([observed_normals, np.cross(
+            (mp-support_center)/characteristic_length, observed_normals @ pose[:3,:3])])
+        normalized_h = normalized_j.T @ (weights[:,None] * normalized_j)
+        eigenvalues = np.linalg.eigvalsh((normalized_h + normalized_h.T)/2)
+        sectors = len(np.unique((mp >= support_center).astype(int) @ np.array([1, 2, 4])))
         extent = float(np.min(np.ptp(mp, axis=0) / np.maximum(np.ptp(model_points, axis=0), 1e-12)))
         support = max(float(keep.mean()) * max(sectors / 8, 1e-3), 1e-3)
         sensors = tuple(map(int, np.unique(candidate["sensor_id"][keep])))
         variance = max(cfg["sensor_noise_m"]**2, float(np.median(np.abs(residual)))**2) / support
         if len(sensors) == 1:
             variance *= cfg["single_sensor_covariance_factor"]
-        uncertainty = (eigenvectors * (variance / np.maximum(eigenvalues, floor))) @ eigenvectors.T
+        uncertainty = (eigenvectors * (variance / np.maximum(physical_values, floor))) @ eigenvectors.T
         return Observation(rigid(pose), uncertainty, opening, converged, float(keep.mean()),
             float(np.percentile(np.abs(residual), 50)), float(np.percentile(np.abs(residual), 95)),
             sectors, extent, sensors, eigenvalues,
@@ -179,7 +265,8 @@ class GrabObservationValidator:
         reasons = []
         if not observation.converged:
             reasons.append("NATIVE_NOT_CONVERGED")
-        if opening not in {"OPEN", "CLOSED"} or observation.opening != opening:
+        expected = "TRACKING_CORE" if opening == "TRANSITION" and model.tracking_core is not None else opening
+        if expected not in {"OPEN", "CLOSED", "TRACKING_CORE"} or observation.opening != expected:
             reasons.append("OPENING_CONFLICT_OR_TRANSITION")
         if (observation.inlier_ratio < policy["minimum_inlier_ratio"] or observation.p95 > policy["residual_p95_m"]
                 or observation.p50 > policy["residual_p50_m"]):
@@ -204,7 +291,8 @@ class GrabObservationValidator:
                     or np.linalg.norm(da) / dt > policy["maximum_angular_speed_radps"]):
                 reasons.append("IMPOSSIBLE_INNOVATION_SPEED")
         if suspension is not None:
-            offset = transform(model.shapes[observation.opening].suspension_reference[None], pose)[0] - suspension.point
+            shape = model.tracking_core if observation.opening == "TRACKING_CORE" else model.shapes[observation.opening]
+            offset = transform(shape.suspension_reference[None], pose)[0] - suspension.point
             if np.linalg.norm(offset[:2]) > policy["maximum_swing_radius_m"] or offset[2] >= 0:
                 reasons.append("SUSPENSION_CORRIDOR_GATE")
         status = "ACCEPTED"

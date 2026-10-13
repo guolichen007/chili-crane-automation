@@ -63,6 +63,9 @@ class GrabGeometryModel:
         self.config = dict(config)
         self.source_type = config["source_type"]
         self.shapes = {k: ModelShape.from_config(config[k]) for k in ("OPEN", "CLOSED")}
+        # Invariant rigid structure only; never include it as an interpolated jaw.
+        self.tracking_core = (ModelShape.from_config(config["TRACKING_CORE"])
+                              if config.get("TRACKING_CORE") is not None else None)
         self.period = positive(config.get("symmetry_yaw_period_rad"), "symmetry_yaw_period_rad")
         order = 2 * math.pi / self.period
         if not math.isclose(order, round(order), abs_tol=1e-8) or not 1 <= order <= 8:
@@ -181,10 +184,9 @@ class PitBoundaryModel:
             raise ValueError("INVALID_FOOTPRINT")
         if self.polygon.covers(poly):
             return float(poly.distance(self.polygon.boundary))
-        # Crossing/outside has no safe positive distance. Conservative penetration
-        # bound uses union bounding diameter, rather than claiming a sampled negative is exact.
-        bounds = self.polygon.union(poly).bounds
-        return -math.hypot(bounds[2] - bounds[0], bounds[3] - bounds[1])
+        # Numeric sentinel only. Consumers MUST inspect clearance_defined.
+        # No signed penetration depth is claimed for cross/outside polygons.
+        return 0.0
 
     def clearance(self, geometry):
         nominal, conservative = Polygon(geometry.nominal_footprint), Polygon(geometry.conservative_footprint)
@@ -195,6 +197,8 @@ class PitBoundaryModel:
         segments = [LineString([a, b]) for a, b in zip(self.polygon.exterior.coords,
                     list(self.polygon.exterior.coords)[1:])]
         return dict(pit_id=self.pit_id, raw_horizontal_clearance_m=raw, conservative_clearance_m=safe,
+            clearance_defined=self.polygon.covers(conservative),
+            geometry_violation=not safe_inside,
             inside_pit=self.polygon.covers(conservative), inside_safe_polygon=safe_inside,
             vertical_wall_overlap=overlap, wall_collision_relevant=overlap,
             wall_collision_risk=overlap and not safe_inside,

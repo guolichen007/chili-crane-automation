@@ -18,7 +18,10 @@ NUMERIC_PARAMETERS = (
     "maximum_prediction_dt_sec", "lost_timeout_sec", "acceleration_noise",
     "angular_acceleration_noise", "initial_twist_sigma", "minimum_stable_duration_sec",
     "uncertainty_sigma", "evidence_timeout_sec", "maximum_frame_span_sec")
+NUMERIC_PARAMETERS += ("model_gate_band_m", "lost_hold_gate_factor", "maximum_model_gate_band_m",
+                       "model_gate_normal_cosine", "model_gate_plane_band_m")
 INTEGER_PARAMETERS = {"maximum_input_points": (32, 200000), "maximum_candidate_points": (32, 20000),
+    "registration_retry_count": (0, 2),
     "minimum_candidate_points": (20, 20000), "maximum_candidates": (1, 8), "normal_neighbors": (5, 50),
     "registration_iterations": (1, 100), "robust_iterations": (1, 20),
     "minimum_support_sectors": (1, 8), "confirmation_frames": (2, 20)}
@@ -35,6 +38,8 @@ def policy_from_config(config):
         raise ValueError("INVALID_INFORMATION_POLICY")
     if any(not 0 < p[key] <= 1 for key in ("minimum_inlier_ratio", "minimum_extent_ratio")):
         raise ValueError("INVALID_SUPPORT_POLICY")
+    if p["model_gate_normal_cosine"] > 1 or p["lost_hold_gate_factor"] < 1:
+        raise ValueError("INVALID_MODEL_GATE_POLICY")
     from chili_crane_slam.pointcloud import crop, CANONICAL
     crop(np.zeros(0, dtype=CANONICAL), p.get("search_bounds_m"))
     for key in ("stable_enter", "stable_exit"):
@@ -71,7 +76,7 @@ class GrabPerceptionPipeline:
     def __init__(self, config):
         self.policy = policy_from_config(config["policy"])
         self.model = GrabGeometryModel(config["model"])
-        self.provider = GeometricGrabCandidateProvider()
+        self.provider = GeometricGrabCandidateProvider(self.model)
         self.registration = GrabModelRegistration(self.model, self.policy)
         self.validator = GrabObservationValidator()
         self.tracker = GrabStateEstimator(self.policy)
@@ -105,14 +110,20 @@ class GrabPerceptionPipeline:
         total_start, stages = time.perf_counter(), {}
         dt = self.tracker.predict(stamp)
         start = time.perf_counter()
-        candidates = self.provider.candidates(points, self.tracker, self.policy, suspension)
+        candidates = self.provider.candidates(points, self.tracker, self.policy, suspension, opening)
         stages["candidate"] = time.perf_counter() - start
         predicted = self.tracker.pose.copy() if self.tracker.pose is not None else None
         observations, rejected = [], []
         registration_seconds, validation_seconds = 0.0, 0.0
         start = time.perf_counter()
-        openings = [opening] if opening in self.model.shapes else list(self.model.shapes)
-        for candidate in candidates:
+        primary = "TRACKING_CORE" if opening == "TRANSITION" and self.model.tracking_core is not None else opening
+        diagnostic = {"OPEN": "CLOSED", "CLOSED": "OPEN"}.get(opening)
+        diagnostic_candidates = (self.provider.candidates(points, self.tracker, self.policy, suspension, diagnostic)
+                                 if diagnostic else [])
+        proposals = [(c, primary, False) for c in candidates if primary in self.registration.cached]
+        proposals += [(c, diagnostic, True) for c in diagnostic_candidates]
+        diagnostic_observations = []
+        for candidate, geometry_opening, is_diagnostic in proposals:
             xyz = np.column_stack([candidate[k] for k in ("x", "y", "z")])
             center = (xyz.min(axis=0) + xyz.max(axis=0)) / 2
             base = predicted.copy() if predicted is not None else np.eye(4)
@@ -124,7 +135,7 @@ class GrabPerceptionPipeline:
                 _, vectors = np.linalg.eigh(np.cov(xyz[:, :2].T))
                 yaw = float(np.arctan2(vectors[1, -1], vectors[0, -1]))
                 angles = [yaw, yaw + np.pi / 2]
-            for geometry_opening in openings:
+            for geometry_opening in [geometry_opening]:
                 for yaw in angles:
                     seed = base.copy()
                     seed[:3, :3] = seed[:3, :3] @ Rotation.from_rotvec([0, 0, yaw]).as_matrix()
@@ -134,18 +145,24 @@ class GrabPerceptionPipeline:
                         registration_seconds += time.perf_counter()-registration_start
                         validation_start = time.perf_counter()
                         status, reasons, canonical_pose = self.validator.evaluate(
-                            measured, predicted, dt if dt > 0 else None, opening, self.model, self.policy, suspension)
+                            measured, predicted, dt if dt > 0 else None,
+                            geometry_opening if is_diagnostic else opening, self.model, self.policy, suspension)
                         validation_seconds += time.perf_counter()-validation_start
                         if status == "ACCEPTED":
-                            observations.append((measured.p95, measured, canonical_pose))
+                            (diagnostic_observations if is_diagnostic else observations).append(
+                                (measured.p95, measured, canonical_pose))
                         else:
-                            rejected.extend(reasons)
+                            if not is_diagnostic:
+                                rejected.extend(reasons)
                     except (ValueError, RuntimeError) as exc:
-                        rejected.append(str(exc))
+                        if not is_diagnostic:
+                            rejected.append(str(exc))
         stages["registration_validation"] = time.perf_counter() - start
         stages["registration"], stages["validation"] = registration_seconds, validation_seconds
         start = time.perf_counter()
         accepted = min(observations, key=lambda o: o[0]) if observations else None
+        if accepted is None and diagnostic_observations:
+            rejected.append("GEOMETRY_IO_" + opening + "_CONFLICT")
         if accepted is not None and any(np.linalg.norm(o[2][:3, 3] - accepted[2][:3, 3])
                 > self.policy["innovation_translation_m"] for o in observations):
             rejected.append("AMBIGUOUS_MODEL_ASSOCIATION")
@@ -169,6 +186,7 @@ class GrabPerceptionPipeline:
                       source_type=source_type, valid_for_control=False,
                       reasons=list(dict.fromkeys(rejected)), candidate_count=len(candidates),
                       accepted=accepted is not None, envelope=None, swing={"valid": False, "motion_stable": False})
+        result["state_epoch"] = float(stamp)
         if self.tracker.pose is not None and opening in {"OPEN", "CLOSED", "TRANSITION"}:
             start = time.perf_counter()
             span = float(np.ptp(points["timestamp"]))
@@ -191,7 +209,9 @@ class GrabPerceptionPipeline:
                 bottom_lower_bound=state_env.bottom_lower_bound-smear,
                 bottom_upper_bound=state_env.bottom_upper_bound+smear,
                 top_upper_bound=state_env.top_upper_bound+smear, smear_margin=smear)
-            attachment = self.model.shapes[opening if opening in self.model.shapes else "OPEN"].suspension_reference
+            attachment = (self.model.tracking_core.suspension_reference
+                          if opening == "TRANSITION" and self.model.tracking_core is not None
+                          else self.model.shapes[opening if opening in self.model.shapes else "OPEN"].suspension_reference)
             result["swing"] = self.stability.update(self.tracker, suspension, attachment)
             stages["geometry"] = time.perf_counter() - start
         result["observation"] = accepted[1] if accepted else None

@@ -24,7 +24,8 @@
     "geometry_translation_uncertainty_m": null,
     "geometry_rotation_uncertainty_rad": null,
     "OPEN": null,
-    "CLOSED": null
+    "CLOSED": null,
+    "TRACKING_CORE": null
   },
   "policy": {
     "maximum_input_points": null,
@@ -33,6 +34,7 @@
     "maximum_candidates": null,
     "normal_neighbors": null,
     "registration_iterations": null,
+    "registration_retry_count": null,
     "robust_iterations": null,
     "minimum_support_sectors": null,
     "confirmation_frames": null,
@@ -47,6 +49,8 @@
     "maximum_swing_radius_m": null,
     "coarse_voxel_m": null,
     "fine_voxel_m": null,
+    "tracking_core_coarse_voxel_m": null,
+    "tracking_core_fine_voxel_m": null,
     "correspondence_m": null,
     "registration_translation_epsilon_m": null,
     "registration_rotation_epsilon_rad": null,
@@ -72,6 +76,11 @@
     "minimum_stable_duration_sec": null,
     "uncertainty_sigma": null,
     "evidence_timeout_sec": null,
-    "maximum_frame_span_sec": null
+    "maximum_frame_span_sec": null,
+    "model_gate_band_m": null,
+    "lost_hold_gate_factor": null,
+    "maximum_model_gate_band_m": null,
+    "model_gate_normal_cosine": null,
+    "model_gate_plane_band_m": null
   }
 }

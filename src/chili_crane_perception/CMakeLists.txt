@@ -18,6 +18,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(phase2a_grab ../../tests_static/test_phase2a_grab.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_slam/src)
+  ament_add_pytest_test(phase2a_r1 ../../tests_static/test_phase2a_r1.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_slam/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_control/src)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(perception_contract_compile_test test/perception_contract_compile_test.cpp)
   if(TARGET perception_contract_compile_test)

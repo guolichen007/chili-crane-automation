@@ -31,6 +31,10 @@ def fixture():
         geometry_translation_uncertainty_m=.002, geometry_rotation_uncertainty_rad=.002,
         OPEN=box_shape([2.0, 1.8, .9]), CLOSED=box_shape([1.6, 1, 1.2]))
     policy = dict(candidate_voxel_m=.04, cluster_radius_m=.22, tracked_roi_m=2.5, lost_hold_roi_m=3.5,
+        model_gate_band_m=.10, lost_hold_gate_factor=1.5, maximum_model_gate_band_m=2.5,
+        model_gate_normal_cosine=.7,
+        model_gate_plane_band_m=.1,
+        tracking_core_coarse_voxel_m=.05, tracking_core_fine_voxel_m=.025,
         maximum_swing_radius_m=4, coarse_voxel_m=.12, fine_voxel_m=.06, correspondence_m=.3,
         registration_translation_epsilon_m=1e-5, registration_rotation_epsilon_rad=1e-5,
         huber_m=.02, sensor_noise_m=.004, information_eigen_ratio=1e-5,
@@ -43,6 +47,7 @@ def fixture():
         uncertainty_sigma=3, evidence_timeout_sec=.2, maximum_frame_span_sec=.3,
         maximum_input_points=10000, maximum_candidate_points=8000, minimum_candidate_points=40,
         maximum_candidates=3, normal_neighbors=10, registration_iterations=35, robust_iterations=5,
+        registration_retry_count=1,
         minimum_support_sectors=4, confirmation_frames=3,
         search_bounds_m=[-6, 6, -6, 6, 0, 8], self_masks=[],
         stable_enter=[.03, .08, .03, .02], stable_exit=[.06, .15, .06, .04])
