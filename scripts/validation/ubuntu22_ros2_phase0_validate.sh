@@ -47,6 +47,7 @@ python3 tools/check_repo_contracts.py
 python3 -m unittest discover -s tests_static -p "test_*.py"
 python3 tools/validate_architecture_scenarios.py | tee "$run_dir/architecture-scenarios.json"
 python3 tools/validate_phase2a_synthetic.py --output "$run_dir/phase2a-monte-carlo.json"
+timeout 600s python3 tools/validate_phase2a_r1.py --output "$run_dir/phase2a-r1-sequences.json"
 rosdep check --from-paths src --ignore-src --rosdistro humble
 colcon --log-base "$run_dir/log" build --base-paths "$workspace/src" \
   --build-base "$run_dir/build" --install-base "$run_dir/install" \
@@ -70,6 +71,10 @@ colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$
   set +u
   . "$run_dir/symlink-install/setup.bash"
   set -u
+  colcon --log-base "$run_dir/symlink-log" test --base-paths "$workspace/src" \
+    --build-base "$run_dir/symlink-build" --install-base "$run_dir/symlink-install" \
+    --return-code-on-test-failure
+  colcon test-result --test-result-base "$run_dir/symlink-build" --verbose
   for package in chili_crane_slam chili_crane_hardware chili_crane_control chili_crane_perception; do
     ros2 pkg executables "$package"
   done
