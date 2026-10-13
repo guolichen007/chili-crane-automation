@@ -8,7 +8,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock,ClockType
 from rclpy.executors import ExternalShutdownException
-from rclpy.qos import QoSProfile,ReliabilityPolicy
+from rclpy.qos import QoSProfile,ReliabilityPolicy,DurabilityPolicy
+from rclpy.serialization import serialize_message
 from sensor_msgs.msg import PointCloud2,PointField
 from visualization_msgs.msg import Marker,MarkerArray
 from geometry_msgs.msg import Point
@@ -20,6 +21,12 @@ from .surface_disturbance import SurfaceDisturbanceTracker,SurfaceGraspEvent
 from .surface_transport import seconds,stamp,context_from_message,snapshot_to_message,SOURCE_IDS
 
 QOS=QoSProfile(depth=1,reliability=ReliabilityPolicy.BEST_EFFORT)
+# Raw sensors and rapidly expiring evidence remain sensor-compatible. Large
+# generation snapshots are reliable latest-state; late joiners get only one.
+SNAPSHOT_QOS=QoSProfile(depth=1,reliability=ReliabilityPolicy.RELIABLE,
+                      durability=DurabilityPolicy.TRANSIENT_LOCAL)
+PROPOSAL_QOS=QoSProfile(depth=1,reliability=ReliabilityPolicy.RELIABLE)
+EVENT_QOS=QoSProfile(depth=1,reliability=ReliabilityPolicy.RELIABLE)
 
 
 def configure(node):
@@ -85,7 +92,10 @@ class PitSurfaceShadowNode(Node):
         self.last_receive=None
         self.last_grab=None
         self.last_event=None
-        self.pub=self.create_publisher(PitSurfaceSnapshot,'perception/pit_surface_snapshot',QOS)
+        self.last_snapshot_message=None
+        self.last_published_generation=-1
+        self.next_debug=0.
+        self.pub=self.create_publisher(PitSurfaceSnapshot,'perception/pit_surface_snapshot',SNAPSHOT_QOS)
         self.status_pub=self.create_publisher(PitSurfaceStatus,'perception/pit_surface_status',QOS)
         self.debug_pub=self.create_publisher(PointCloud2,'perception/pit_surface_observed_debug',QOS)
         self.unknown_pub=self.create_publisher(PointCloud2,'perception/pit_surface_unknown_debug',QOS)
@@ -96,7 +106,7 @@ class PitSurfaceShadowNode(Node):
                 (GrabGeometrySafetyState,'perception/grab_geometry_safety','grab'),
                 (GrabClearanceState,'perception/grab_clearance','clearance')):
             self.create_subscription(kind,topic,lambda m,key=key:self.inputs.update({key:(m,time.monotonic())}),QOS)
-        self.create_subscription(SurfaceDisturbance,'planning/surface_disturbance_shadow',self.event,QOS)
+        self.create_subscription(SurfaceDisturbance,'planning/surface_disturbance_shadow',self.event,EVENT_QOS)
         self.create_timer(.05,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
 
     def cloud(self,m):
@@ -199,14 +209,33 @@ class PitSurfaceShadowNode(Node):
             except (ValueError,TypeError,KeyError) as exc:
                 b.grid.clear(str(exc))
         snapshot=b.grid.snapshot(now)
-        message=snapshot_to_message(snapshot,source_now(self,c),b.grid.last_counter)
-        self.pub.publish(message);self.status_pub.publish(message.status)
+        if snapshot.generation != self.last_published_generation:
+            tick=time.perf_counter()
+            message=snapshot_to_message(snapshot,source_now(self,c),b.grid.last_counter)
+            b.grid.stage_ms['snapshot_serialization']=(time.perf_counter()-tick)*1000
+            tick=time.perf_counter()
+            payload=serialize_message(message)
+            b.grid.stage_ms['dds_payload_preparation']=(time.perf_counter()-tick)*1000
+            b.grid.metrics.update(serialized_cells=len(message.cells),serialized_bytes=len(payload))
+            self.pub.publish(message)
+            self.last_snapshot_message=message
+            self.last_published_generation=snapshot.generation
+        else:
+            message=self.last_snapshot_message
+        # Heartbeat changes only residence age, not header, counter or source epoch.
+        status=copy.deepcopy(message.status)
+        status.evidence_age_sec=max(0.,now-snapshot.window_end) if now>=snapshot.window_end>0 else 1e9
+        status.evidence.evidence_age_sec=status.evidence_age_sec
+        self.status_pub.publish(status)
+        if time.monotonic() < self.next_debug:
+            return
+        self.next_debug=time.monotonic()+1.
         observed=[];unknown=[]
         for cell in snapshot.cells:
             x,y=b.grid.center(cell.index)
             if cell.observed:
                 observed.append((x,y,cell.z_median,cell.roughness,cell.neighborhood_coverage))
-            elif b.grid.polygon.covers(__import__('shapely').geometry.Point(x,y)):
+            elif b.grid.pit_active_cell_mask[cell.index]:
                 unknown.append((x,y,b.grid.pit['pit_bottom_z_m'],0.,0.))
         self.debug_pub.publish(debug_cloud(message.status.header,observed))
         self.unknown_pub.publish(debug_cloud(message.status.header,unknown))

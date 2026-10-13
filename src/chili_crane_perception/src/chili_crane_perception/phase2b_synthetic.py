@@ -31,16 +31,21 @@ def fixture(geofence_template):
         epoch_tolerance_sec=1e-6,sensor_uncertainty_m=.01,single_sensor_extra_uncertainty_m=.02,mad_scale=3.,max_height_dispersion_m=.3,
         minimum_neighborhood_coverage=.5,minimum_cell_samples=4,minimum_cell_frames=2,maximum_input_points=20000,
         maximum_grid_cells=1024,maximum_window_frames=4,maximum_candidates=128,dynamic_mask_dilation_m=.05,
+        maximum_stationary_transform_translation_delta_m=.003,maximum_stationary_transform_rotation_delta_rad=.002,
+        maximum_grab_mask_time_skew_sec=.03,
         static_masks_state='VALID',static_masks=[],kernel=dict(state='SYNTHETIC_NON_PRODUCTION',kernel_id='synthetic-kernel',
             provenance='NON_PRODUCTION_RECTANGLE',footprint_xy_m=[[-.25,-.25],[.25,-.25],[.25,.25],[-.25,.25]],
             capture_depth_m=.3,yaw_control_available=False,yaw_mode='FIXED_MECHANICAL',fixed_yaw_rad=0.),
         planning=dict(minimum_observed_fraction=1.,maximum_unknown_fraction=0.,maximum_slope_rad=.6,maximum_roughness_m=.1,
             wall_margin_m=.1,distance_acceleration_enabled=True,recent_grab_radius_m=.75,recent_grab_ttl_sec=3.,
+            maximum_evaluated_cells=1024,minimum_material_volume_proxy_lower_bound_m3=.005,
+            minimum_conservative_material_height_above_pit_bottom_m=.05,volume_equivalence_epsilon=.001,
             disturbance_dilation_m=.05,maximum_recent_events=4),
         physical_output_enabled=False,automatic_control_enabled=False,camera_control_authority=False)
     ctx=PlanningSpatialContext('synthetic_cloud','map',semantic['map_id'],semantic['semantic_version'],'SYNTHETIC_PIT',
-        'synthetic-map-transform','synthetic-extrinsic','SYNTHETIC_VALIDATED','SYNTHETIC',10.,.01,tuple(np.eye(4).ravel()),
-        ('synthetic-er1-0','synthetic-er1-1'),True,'synthetic-stationary-window')
+        'synthetic-map-transform','synthetic-spatial-chain','SYNTHETIC_VALIDATED','SYNTHETIC',10.,.01,tuple(np.eye(4).ravel()),
+        ('synthetic-er1-0','synthetic-er1-1'),True,'synthetic-stationary-window',
+        field_extrinsic_id='synthetic-extrinsic',axis_to_map_id='synthetic-axis-map')
     grab=GrabMask(10.,'map',semantic['map_id'],semantic['semantic_version'],'SYNTHETIC_PIT','synthetic-extrinsic','SYNTHETIC',
         'TRACKED',True,True,((-.4,-.4),(.4,-.4),(.4,.4),(-.4,.4)),.85,1.8,0.,'SYNTHETIC_VALIDATED')
     return c,semantic,gc,ctx,grab

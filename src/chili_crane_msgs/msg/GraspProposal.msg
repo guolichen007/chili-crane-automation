@@ -15,6 +15,16 @@ string geofence_version
 string geofence_config_sha256
 string kernel_id
 string[] ranking_order
+bool search_complete
+bool global_optimum_proven
+string[] ranked_candidate_ids
+uint32 candidate_centers_scanned
+uint32 shortlist_size
+uint32 esdf_checked_count
+uint32 esdf_reject_count
+uint32 exact_geometry_check_count
+uint64 planning_compute_count
+uint64 planning_cache_hit_count
 chili_crane_msgs/GraspCandidate[<=4096] candidates
 bool valid_for_control
 chili_crane_msgs/EvidenceMetadata evidence

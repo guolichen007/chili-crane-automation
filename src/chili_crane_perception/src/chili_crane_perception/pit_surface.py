@@ -4,6 +4,7 @@ from dataclasses import dataclass, replace
 import hashlib
 import json
 import math
+from time import perf_counter
 import numpy as np
 from shapely.geometry import Point, Polygon, box
 
@@ -40,11 +41,17 @@ class PlanningSpatialContext:
     crane_pose_evidence_id: str = "NOT_CONFIGURED"
 
     @property
-    def key(self):
-        # Measurement time changes, spatial identity/covariance must not drift silently.
-        d = self.__dict__.copy()
-        d.pop("measurement_epoch")
+    def lineage_key(self):
+        # transform_id is a per-frame proof, calibration_id is the frozen chain.
+        names = ("source_frame", "target_frame", "map_id", "semantic_version", "pit_id",
+                 "transform_state", "source_type", "calibration_id", "sensor_calibration_ids",
+                 "field_extrinsic_id", "axis_to_map_id")
+        d = {k: getattr(self, k) for k in names}
         return hashlib.sha256(json.dumps(d, sort_keys=True, allow_nan=False).encode()).hexdigest()
+
+    @property
+    def key(self):
+        return self.lineage_key
 
     def validate(self, config, semantic, cloud_frame, epoch, now):
         for key in ("source_frame", "target_frame", "map_id", "semantic_version", "pit_id",
@@ -118,6 +125,10 @@ class SurfaceSnapshot:
     valid_for_control: bool = False
     last_disturbance_id: str = ''
     disturbance_counter: int = 0
+    pit_active_cell_count: int = 0
+    observed_cell_count: int = 0
+    support_qualified_cell_count: int = 0
+    dual_supported_cell_count: int = 0
 
 
 class PitSurfaceGrid:
@@ -136,6 +147,11 @@ class PitSurfaceGrid:
             number(c.get(key), key, True)
         for key in ("epoch_tolerance_sec",):
             number(c.get(key), key)
+        for key in ("maximum_stationary_transform_translation_delta_m",
+                    "maximum_stationary_transform_rotation_delta_rad", "maximum_grab_mask_time_skew_sec"):
+            number(c.get(key), key)
+        if c["maximum_stationary_transform_rotation_delta_rad"] > math.pi:
+            raise ValueError("STATIONARY_ROTATION_LIMIT_INVALID")
         if not 0 < c.get("minimum_neighborhood_coverage", 0) <= 1:
             raise ValueError("NEIGHBORHOOD_POLICY_NOT_CONFIGURED")
         for key, upper in (("maximum_input_points", 2000000), ("maximum_grid_cells", 100000),
@@ -163,6 +179,13 @@ class PitSurfaceGrid:
         self.last_disturbance_id,self.disturbance_counter='',0
         self.invalidated_at = np.zeros(self.width*self.height)
         self.config_hash = hashlib.sha256(json.dumps(c, sort_keys=True).encode()).hexdigest()
+        self.pit_active_cell_mask = tuple(self.cell_polygon(i).intersection(self.polygon).area > 1e-12
+                                          for i in range(self.width*self.height))
+        self.pit_active_cell_count = sum(self.pit_active_cell_mask)
+        self.reference_transform = None
+        self._snapshot_cache = None
+        self.stage_ms = {}
+        self.metrics = {}
 
     def cell_polygon(self, index):
         x, y = self.center(index)
@@ -174,12 +197,15 @@ class PitSurfaceGrid:
                 self.origin[1]+(index // self.width+.5)*self.resolution)
 
     def clear(self, reason):
+        if self.context is None and not self.frames and self.reason == reason:
+            return
         self.frames.clear()
         self.context = None
+        self.reference_transform = None
         self.generation += 1
         self.reason = reason
 
-    def ingest(self, xyz, sensor_ids, frame, context, now):
+    def ingest(self, xyz, sensor_ids, frame, context, now, map_xyz=None):
         """Consume once. Caller supplies canonical epoch/source counter; no arrival renewal."""
         try:
             epoch, counter = frame["epoch"], frame["source_counter"]
@@ -194,13 +220,32 @@ class PitSurfaceGrid:
             if (p.ndim != 2 or p.shape[1] != 3 or not 0 < len(p) <= self.config["maximum_input_points"]
                     or sensors.shape != (len(p),) or not np.isfinite(p).all() or not np.isin(sensors, [0, 1]).all()):
                 raise ValueError("POINT_CAPACITY_OR_PROVENANCE_INVALID")
-            if self.context is not None and self.context.key != context.key:
+            if self.context is not None and self.context.lineage_key != context.lineage_key:
                 self.clear("SPATIAL_GENERATION_CHANGED")
-            p = p @ t[:3, :3].T + t[:3, 3]
+            self.expire(now)
+            if not self.frames:
+                self.reference_transform = t.copy()
+            reference = self.reference_transform
+            translation = float(np.linalg.norm(t[:3, 3]-reference[:3, 3]))
+            rotation = math.acos(float(np.clip((np.trace(reference[:3, :3].T@t[:3, :3])-1)/2, -1, 1)))
+            if (translation > self.config["maximum_stationary_transform_translation_delta_m"] + 1e-12
+                    or rotation > self.config["maximum_stationary_transform_rotation_delta_rad"] + 1e-12):
+                raise ValueError("SPATIAL_MOTION_EXCEEDS_STATIONARY_WINDOW")
+            # A bounded stationary window is not a zero-motion assumption. Include the
+            # complete allowed rigid displacement, including rotation lever arm, in z bounds.
+            jitter = (self.config["maximum_stationary_transform_translation_delta_m"]
+                      + 2*math.sin(self.config["maximum_stationary_transform_rotation_delta_rad"]/2)
+                      * float(np.linalg.norm(p, axis=1).max()))
+            tick = perf_counter()
+            p = p @ t[:3, :3].T + t[:3, 3] if map_xyz is None else np.asarray(map_xyz, dtype=float)
+            self.stage_ms["transform"] = (perf_counter()-tick)*1000
+            tick = perf_counter()
             # No hull clipping can create synthetic measurements.
             keep = np.array([self.polygon.covers(Point(v[:2])) for v in p])
             keep &= (p[:, 2] >= self.pit["pit_bottom_z_m"]) & (p[:, 2] <= self.pit["wall_top_z_m"])
             p, sensors = p[keep], sensors[keep]
+            self.stage_ms["pit_filtering"] = (perf_counter()-tick)*1000
+            tick = perf_counter()
             ij = np.floor((p[:, :2]-self.origin)/self.resolution).astype(int)
             keep = (ij[:, 0] >= 0) & (ij[:, 0] < self.width) & (ij[:, 1] >= 0) & (ij[:, 1] < self.height)
             p, sensors, ij = p[keep], sensors[keep], ij[keep]
@@ -214,7 +259,9 @@ class PitSurfaceGrid:
                 mad = float(np.median(np.abs(values-median)))
                 mask = sum(1 << int(v) for v in np.unique(support))
                 observations[int(index)] = (median, mad, len(values), mask)
-            self.frames.append((epoch, observations, context.uncertainty_m))
+            self.frames.append((epoch, observations, context.uncertainty_m+jitter))
+            self.stage_ms["cell_ingest"] = (perf_counter()-tick)*1000
+            self.metrics["input_points"] = len(xyz)
             self.context, self.last_epoch, self.last_counter = context, epoch, counter
             self.generation += 1
             self.reason = "SHADOW_OBSERVED_ONLY"
@@ -246,8 +293,12 @@ class PitSurfaceGrid:
 
     def snapshot(self, now):
         self.expire(now)
+        if self._snapshot_cache is not None and self._snapshot_cache.generation == self.generation:
+            return self._snapshot_cache
         c, cells = self.config, []
+        fusion_ms, bounds_ms = 0., 0.
         for index in range(self.width*self.height):
+            tick = perf_counter()
             rows = [(e, obs[index], u) for e, obs, u in self.frames if index in obs]
             count = sum(r[1][2] for r in rows)
             if len(rows) < c["minimum_cell_frames"] or count < c["minimum_cell_samples"]:
@@ -258,6 +309,8 @@ class PitSurfaceGrid:
             dispersion = max(float(np.median(np.abs(heights-z))), max(r[1][1] for r in rows))
             mask = int(np.bitwise_or.reduce([r[1][3] for r in rows]))
             single_frame_support = any(r[1][3] != 3 for r in rows)
+            fusion_ms += (perf_counter()-tick)*1000
+            tick = perf_counter()
             uncertainty = (c["mad_scale"]*dispersion + c["sensor_uncertainty_m"] + max(r[2] for r in rows)
                            + (c["single_sensor_extra_uncertainty_m"] if single_frame_support else 0))
             # Include temporal range, rather than claiming a median is a maximum surface.
@@ -265,7 +318,10 @@ class PitSurfaceGrid:
             valid = dispersion <= c["max_height_dispersion_m"]
             cells.append(SurfaceCell(index, True, count, len(rows), mask, max(r[0] for r in rows), z,
                 lower, upper, dispersion, math.nan, uncertainty, validity="VALID" if valid and not single_frame_support else "DEGRADED"))
+            bounds_ms += (perf_counter()-tick)*1000
+        self.stage_ms["temporal_fusion"], self.stage_ms["height_bounds"] = fusion_ms, bounds_ms
         # Fit local plane only to actual observed neighbors; no fill of holes.
+        tick = perf_counter()
         original = tuple(cells)
         for i, cell in enumerate(original):
             if not cell.observed:
@@ -291,10 +347,18 @@ class PitSurfaceGrid:
             cells[i] = replace(cell, slope=slope, roughness=residual, neighborhood_coverage=coverage,
                                neighborhood_support=len(observed),
                                validity=cell.validity if math.isfinite(slope) else "DEGRADED")
+        self.stage_ms["slope_roughness"] = (perf_counter()-tick)*1000
         starts = [e for e, _, _ in self.frames]
         end = max(starts, default=self.last_epoch)
         snapshot_id = f"{self.config_hash[:12]}:{self.generation}:{self.context.key[:12] if self.context else 'unknown'}"
-        return SurfaceSnapshot(snapshot_id, self.generation, min(starts, default=end), end, self.context,
+        observed = [v for v in cells if v.observed and self.pit_active_cell_mask[v.index]]
+        qualified = [v for v in observed if math.isfinite(v.slope)
+                     and v.height_uncertainty <= c["max_height_dispersion_m"]
+                     and v.neighborhood_coverage >= c["minimum_neighborhood_coverage"]]
+        self.metrics.update(active_cells=self.pit_active_cell_count, observed_cells=len(observed))
+        self._snapshot_cache = SurfaceSnapshot(snapshot_id, self.generation, min(starts, default=end), end, self.context,
             tuple(cells), self.origin, self.resolution, self.width, self.height,
             "DEGRADED" if starts else "STALE", self.reason, self.config_hash,False,
-            self.last_disturbance_id,self.disturbance_counter)
+            self.last_disturbance_id,self.disturbance_counter,self.pit_active_cell_count,len(observed),
+            len(qualified),sum(v.sensor_support_mask == 3 for v in qualified))
+        return self._snapshot_cache

@@ -1,6 +1,7 @@
 """Independent masks: never modify Grab pose or classify masked points as material."""
 from dataclasses import dataclass
 import math
+from time import perf_counter
 import numpy as np
 from shapely.geometry import Point, Polygon
 from .pit_surface import PitSurfaceGrid, number, identity
@@ -27,7 +28,7 @@ class GrabMask:
     def validate(self, context, now, ttl):
         if (self.frame_id != context.target_frame or self.map_id != context.map_id
                 or self.semantic_version != context.semantic_version or self.pit_id != context.pit_id
-                or self.calibration_id != context.calibration_id or self.source_type != context.source_type):
+                or self.calibration_id != context.field_extrinsic_id or self.source_type != context.source_type):
             raise ValueError("GRAB_MASK_PROVENANCE_MISMATCH")
         required='FIELD_VALIDATED' if context.source_type=='PHYSICAL' else 'SYNTHETIC_VALIDATED'
         if self.extrinsic_state != required:
@@ -89,18 +90,28 @@ class PitSurfaceBuilder:
                 raise ValueError("GRAB_MASK_MISSING")
             t = context.validate(self.grid.config,self.grid.semantic,frame["frame_id"],frame["epoch"],now)
             polygon = grab.validate(context,now,self.grid.config["frame_ttl_sec"])
+            if abs(frame["epoch"]-grab.epoch) > self.grid.config["maximum_grab_mask_time_skew_sec"]:
+                raise ValueError("GRAB_MASK_TIME_ALIGNMENT_REJECTED")
             p = np.asarray(xyz, dtype=float)
             if p.ndim != 2 or p.shape[1] != 3 or not 0 < len(p) <= self.grid.config["maximum_input_points"]:
                 raise ValueError("POINT_CAPACITY_INVALID")
-            if not np.isfinite(p).all() or np.asarray(sensors).shape != (len(p),):
+            if (not np.isfinite(p).all() or np.asarray(sensors).shape != (len(p),)
+                    or not np.isin(sensors,[0,1]).all()):
                 raise ValueError("POINT_INPUT_INVALID")
+            tick = perf_counter()
             map_xyz = p @ t[:3,:3].T + t[:3,3]
+            transform_ms = (perf_counter()-tick)*1000
+            tick = perf_counter()
             keep = self.masks.material_indices(map_xyz,polygon,grab)
             self.masked_count = int((~keep).sum())
             if not keep.any():
                 raise ValueError("ALL_POINTS_MASKED_NO_MATERIAL_EVIDENCE")
             # Grid performs its own identity/time/capacity checks on the original frame.
-            return self.grid.ingest(p[keep],np.asarray(sensors)[keep],frame,context,now)
+            mask_ms = (perf_counter()-tick)*1000
+            result = self.grid.ingest(p[keep],np.asarray(sensors)[keep],frame,context,now,map_xyz[keep])
+            self.grid.stage_ms.update(transform=transform_ms,grab_mask=mask_ms)
+            self.grid.metrics['input_points'] = len(p)
+            return result
         except (ValueError,TypeError,KeyError,AttributeError) as exc:
             self.grid.clear(str(exc))
             return False

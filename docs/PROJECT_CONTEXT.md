@@ -1,5 +1,15 @@
 # Project Context
 
+## Phase2B-R1 FIELD-readiness（2026-10-13）
+
+用户授权从ac0dec1d589d92ab8215d1a0f7b5207762bddbd4建立codex/phase2b-field-readiness-r1。
+原Phase2B保持PASS_SOFTWARE_SHADOW_NOT_FIELD；深审发现FIELD就绪契约需要窄加固，历史验收不改写为FAIL。
+本轮仅稳定融合/遮罩共时与身份、候选搜索/料量硬门禁、稀疏传输/世代缓存/QoS及分阶段软件证据。
+Phase2A核心和门限、PTP/vendor、SemanticMap V1、Geofence v2均冻结；不做Phase2C/NDT/X协议。
+接口V2需全体消费者重建；FIELD参数继续null/NOT_CONFIGURED，四控制flags继续false。
+LOST+dense+wall+multiple与TRANSITION core+real moving jaws+continuous material两个现场组合缺口仍POST_R1_FIELD_VALIDATION_REQUIRED。
+本轮验收单独记录于[Phase2B-R1软件验收](validation/Phase2B-R1软件验收.md)。
+
 ## Phase2B 新阶段（2026-10-13）
 
 用户已授权基于d6f846f1f98e621f18e2f6a124253e083ee68bae建立独立Phase2B分支。

@@ -12,7 +12,7 @@ sys.path.insert(0,str(ROOT/'src/chili_crane_control/src'))
 sys.path.insert(0,str(ROOT/'src/chili_crane_perception/src'))
 from chili_crane_perception.pit_surface import PitSurfaceGrid
 from chili_crane_perception.surface_disturbance import SurfaceDisturbanceTracker,SurfaceGraspEvent
-from chili_crane_control.grasp_planning import GraspPlanner
+from chili_crane_control.grasp_planning import GraspPlanner,rank_candidates
 from test_phase2b_planning import planning_fixture
 from test_phase2b_surface import cloud,add
 
@@ -64,8 +64,7 @@ class DisturbanceTests(unittest.TestCase):
     def test_ranking_components_are_explainable(self):
         snap=self.grid.snapshot(10.06)
         result=GraspPlanner(self.c,self.g).plan(snap,10.06,snap.context,snap.generation,self.tracker)
-        best=min((c for c in result.candidates if c.accepted),key=lambda c:(-c.material_volume_proxy_lower_bound_m3,
-            -c.observed_area_fraction,c.roughness_m,c.slope_rad,c.recent_grab_penalty,c.candidate_id))
+        best=rank_candidates(result.candidates,self.c['planning']['volume_equivalence_epsilon'])[0]
         self.assertEqual(result.selected,best)
 
     def test_esdf_cannot_skip_exact_polygon_gate(self):

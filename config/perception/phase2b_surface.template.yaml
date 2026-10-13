@@ -11,6 +11,9 @@ frame_ttl_sec: null
 surface_ttl_sec: null
 window_sec: null
 maximum_frame_span_sec: null
+maximum_stationary_transform_translation_delta_m: null
+maximum_stationary_transform_rotation_delta_rad: null
+maximum_grab_mask_time_skew_sec: null
 epoch_tolerance_sec: null
 sensor_uncertainty_m: null
 single_sensor_extra_uncertainty_m: null
@@ -41,6 +44,10 @@ planning:
   maximum_slope_rad: null
   maximum_roughness_m: null
   wall_margin_m: null
+  maximum_evaluated_cells: null
+  minimum_material_volume_proxy_lower_bound_m3: null
+  minimum_conservative_material_height_above_pit_bottom_m: null
+  volume_equivalence_epsilon: null
   distance_acceleration_enabled: false
   recent_grab_radius_m: null
   recent_grab_ttl_sec: null

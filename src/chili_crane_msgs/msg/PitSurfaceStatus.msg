@@ -30,3 +30,8 @@ bool spatial_eligible
 bool valid_for_control
 string last_disturbance_id
 uint64 disturbance_counter
+# Active polygon cells, not the bounding-box area; support does not grant control.
+uint32 pit_active_cell_count
+uint32 observed_cell_count
+uint32 support_qualified_cell_count
+uint32 dual_supported_cell_count

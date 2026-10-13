@@ -3,6 +3,8 @@ from dataclasses import dataclass
 import hashlib
 import json
 import math
+import heapq
+from time import perf_counter
 import numpy as np
 from shapely import affinity
 from shapely.geometry import Point, Polygon, box
@@ -61,6 +63,21 @@ class GraspCandidate:
     valid_for_control: bool = False
 
 
+def rank_candidates(candidates, epsilon):
+    """Anchor bands at their maximum; no non-transitive pairwise epsilon comparator."""
+    remaining = sorted((c for c in candidates if c.accepted),
+                       key=lambda c: (-c.material_volume_proxy_lower_bound_m3, c.candidate_id))
+    ranked = []
+    while remaining:
+        floor = remaining[0].material_volume_proxy_lower_bound_m3-epsilon
+        band = [c for c in remaining if c.material_volume_proxy_lower_bound_m3 >= floor]
+        remaining = [c for c in remaining if c.material_volume_proxy_lower_bound_m3 < floor]
+        band.sort(key=lambda c: (-c.observed_area_fraction, c.recent_grab_penalty,
+                                c.roughness_m, c.slope_rad, -c.wall_clearance_m, c.candidate_id))
+        ranked.extend(band)
+    return tuple(ranked)
+
+
 @dataclass(frozen=True)
 class GraspProposal:
     proposal_id: str
@@ -74,6 +91,9 @@ class GraspProposal:
     geofence_provenance: dict
     kernel_id: str
     valid_for_control: bool = False
+    search_complete: bool = False
+    global_optimum_proven: bool = False
+    ranked_candidate_ids: tuple = ()
 
 
 class GraspPlanner:
@@ -91,8 +111,19 @@ class GraspPlanner:
         for key in ("minimum_observed_fraction","maximum_unknown_fraction","maximum_slope_rad","maximum_roughness_m","wall_margin_m"):
             if type(p.get(key)) not in (int,float) or not math.isfinite(p[key]) or p[key] < 0:
                 raise ValueError("PLANNING_POLICY_NOT_CONFIGURED")
+        for key in ("minimum_material_volume_proxy_lower_bound_m3",
+                    "minimum_conservative_material_height_above_pit_bottom_m", "volume_equivalence_epsilon"):
+            if type(p.get(key)) not in (int,float) or not math.isfinite(p[key]) or p[key] < 0:
+                raise ValueError(key+"_NOT_CONFIGURED")
+        if (type(p.get("maximum_evaluated_cells")) is not int
+                or not 1 <= p["maximum_evaluated_cells"] <= config["maximum_grid_cells"]):
+            raise ValueError("SEARCH_BUDGET_NOT_CONFIGURED")
         if not 0 < p["minimum_observed_fraction"] <= 1 or not 0 <= p["maximum_unknown_fraction"] < 1:
             raise ValueError("COVERAGE_POLICY_INVALID")
+        self.cache_key, self.cached_snapshot, self.cached_proposal = None, None, None
+        self.metrics, self.stage_ms = {}, {}
+        self.compute_count, self.cache_hit_count = 0, 0
+        self.layout_key, self.active_indices, self.distance_field = None, (), None
 
     def _empty(self, snapshot, reason):
         return GraspProposal(f"{snapshot.snapshot_id}:none",snapshot.snapshot_id,snapshot.generation,snapshot.window_end,
@@ -115,36 +146,102 @@ class GraspPlanner:
                                       expected_context.measurement_epoch,now)
         except (ValueError,TypeError,KeyError):
             return self._empty(snapshot,"SPATIAL_CONTEXT_STALE_OR_INVALID")
+        a=np.asarray(snapshot.context.transform).reshape(4,4)
+        b=np.asarray(expected_context.transform).reshape(4,4)
+        if (np.linalg.norm(a[:3,3]-b[:3,3]) > self.config['maximum_stationary_transform_translation_delta_m']+1e-12
+                or math.acos(float(np.clip((np.trace(a[:3,:3].T@b[:3,:3])-1)/2,-1,1)))
+                > self.config['maximum_stationary_transform_rotation_delta_rad']+1e-12):
+            return self._empty(snapshot,'SPATIAL_MOTION_EXCEEDS_STATIONARY_WINDOW')
+        cache_key = (snapshot.snapshot_id,snapshot.generation,snapshot.disturbance_counter,
+                     snapshot.context.lineage_key,self.config_hash,getattr(recent,'counter',0))
+        if cache_key == self.cache_key and snapshot is self.cached_snapshot:
+            self.cache_hit_count += 1
+            return self.cached_proposal
         if (snapshot.config_sha256 != self.config_hash or snapshot.resolution != self.config["resolution_m"]
                 or len(snapshot.cells) != snapshot.width*snapshot.height or len(snapshot.cells) > self.config["maximum_grid_cells"]
-                or any(c.index != i for i,c in enumerate(snapshot.cells))
+                or {c.index for c in snapshot.cells} != set(range(snapshot.width*snapshot.height))
                 or tuple(snapshot.origin) != tuple(g.polygon.bounds[:2])
                 or snapshot.width != math.ceil((g.polygon.bounds[2]-snapshot.origin[0])/snapshot.resolution)
                 or snapshot.height != math.ceil((g.polygon.bounds[3]-snapshot.origin[1])/snapshot.resolution)
                 or not 0 < snapshot.window_start <= snapshot.window_end
                 or abs(snapshot.context.measurement_epoch-snapshot.window_end) > self.config['epoch_tolerance_sec']):
             return self._empty(snapshot,"GRID_CAPACITY_OR_LAYOUT_INVALID")
+        self.compute_count += 1
+        self.metrics = dict(candidate_centers_scanned=0,shortlist_size=0,esdf_checked_count=0,
+                            esdf_reject_count=0,exact_geometry_check_count=0)
+        self.stage_ms = dict(esdf_reject=0.,exact_candidate_geometry=0.,ranking=0.)
         candidates = []
-        distance_field = None
-        if p.get("distance_acceleration_enabled") is True:
-            from .distance_acceleration import RejectionDistanceField
-            distance_field = RejectionDistanceField(snapshot,g.polygon)
-        radius=max(math.hypot(x,y) for x,y in self.kernel.footprint_xy)
+        by_index = {c.index:c for c in snapshot.cells}
+        layout_key=(snapshot.origin,snapshot.resolution,snapshot.width,snapshot.height,snapshot.context.lineage_key)
+        if layout_key != self.layout_key:
+            r=snapshot.resolution
+            self.active_indices = tuple(i for i in range(snapshot.width*snapshot.height) if g.polygon.intersection(
+                box(snapshot.origin[0]+i%snapshot.width*r,snapshot.origin[1]+i//snapshot.width*r,
+                    snapshot.origin[0]+(i%snapshot.width+1)*r,snapshot.origin[1]+(i//snapshot.width+1)*r)).area > 1e-12)
+            self.distance_field = None
+            if p.get('distance_acceleration_enabled') is True:
+                from .distance_acceleration import RejectionDistanceField
+                self.distance_field = RejectionDistanceField(snapshot,g.polygon)
+            self.layout_key=layout_key
+        distance_field = self.distance_field
+        # The inscribed disk, NOT circumradius, proves an ESDF wall rejection for
+        # anisotropic kernels. A circumradius would reject valid narrow footprints.
+        local_fp = self.kernel.footprint((0.,0.))
+        radius = local_fp.boundary.distance(Point(0.,0.))
+        pit = next(v for v in g.semantic["pits"] if v["pit_id"] == self.config["pit_id"])
+        heap = []
+        budget = p['maximum_evaluated_cells']
+        active = [by_index[i] for i in self.active_indices]
+        values=np.zeros((snapshot.height,snapshot.width))
         for cell in snapshot.cells:
+            if cell.observed and math.isfinite(cell.z_lower_bound):
+                values[cell.index//snapshot.width,cell.index%snapshot.width]=min(self.kernel.capture_depth_m,
+                    max(0.,cell.z_lower_bound-pit['pit_bottom_z_m']))*snapshot.resolution**2
+        summed=np.pad(values.cumsum(0).cumsum(1),((1,0),(1,0)))
+        eligible_count=0
+        # Explicit stable order if the domain exceeds budget. Never advertise a
+        # truncated scan as a complete search, even if a safe shadow candidate exists.
+        for cell in sorted(active,key=lambda c:c.index)[:budget]:
+            self.metrics['candidate_centers_scanned'] += 1
             # Generate centers ONLY inside admissible domain; exact checks still follow.
             x = snapshot.origin[0]+(cell.index%snapshot.width+.5)*snapshot.resolution
             y = snapshot.origin[1]+(cell.index//snapshot.width+.5)*snapshot.resolution
             xy = (x,y)
             if not cell.observed or not g.safe_region.covers(Point(xy)) or not g.track_inside(np.array(xy)):
                 continue
-            if len(candidates) >= self.config["maximum_candidates"]:
-                break
+            eligible_count += 1
+            tick = perf_counter()
+            if distance_field is not None:
+                self.metrics['esdf_checked_count'] += 1
+                if distance_field.definitely_reject(xy,radius+p['wall_margin_m']+pit['safety_inset_m']):
+                    self.metrics['esdf_reject_count'] += 1
+                    self.stage_ms['esdf_reject'] += (perf_counter()-tick)*1000
+                    continue
+            self.stage_ms['esdf_reject'] += (perf_counter()-tick)*1000
+            # Cheap bounded bbox quadrature, no exact footprint/polygon operations.
+            # This is a pre-score, NOT a material lower bound or safety permission.
+            minx,miny,maxx,maxy = local_fp.bounds
+            r=snapshot.resolution
+            col0=max(0,math.floor((x+minx-snapshot.origin[0])/r))
+            col1=min(snapshot.width-1,math.floor((x+maxx-snapshot.origin[0])/r))
+            row0=max(0,math.floor((y+miny-snapshot.origin[1])/r))
+            row1=min(snapshot.height-1,math.floor((y+maxy-snapshot.origin[1])/r))
+            score=float(summed[row1+1,col1+1]-summed[row0,col1+1]
+                        -summed[row1+1,col0]+summed[row0,col0])
+            # Deterministic tie handling is essential when K is smaller than domain.
+            item=(score,-cell.index,cell.index,xy)
+            if len(heap) < self.config['maximum_candidates']:
+                heapq.heappush(heap,item)
+            elif item > heap[0]:
+                heapq.heapreplace(heap,item)
+        self.metrics['shortlist_size'] = len(heap)
+        for _,_,index,xy in sorted(heap,reverse=True):
+            cell = by_index[index]
+            tick = perf_counter()
+            self.metrics['exact_geometry_check_count'] += 1
             fp = self.kernel.footprint(xy)
             reasons=[]
-            if distance_field is not None and distance_field.definitely_reject(xy,radius+p["wall_margin_m"]):
-                reasons.append("DISTANCE_FIELD_FAST_REJECT")
             clearance = float(g.polygon.boundary.distance(fp)) if g.polygon.covers(fp) else 0.
-            pit = next(v for v in g.semantic["pits"] if v["pit_id"] == self.config["pit_id"])
             if not g.polygon.covers(fp) or clearance < p["wall_margin_m"] + pit["safety_inset_m"]:
                 reasons.append("WALL_OR_PIT_GEOMETRY")
             if g.polygon.boundary.distance(Point(xy)) < g.margin:
@@ -160,7 +257,7 @@ class GraspPlanner:
             for row in range(row0,row1+1):
                 for col in range(col0,col1+1):
                     index=row*snapshot.width+col
-                    current=snapshot.cells[index]
+                    current=by_index[index]
                     area=fp.intersection(box(snapshot.origin[0]+col*r,snapshot.origin[1]+row*r,
                         snapshot.origin[0]+(col+1)*r,snapshot.origin[1]+(row+1)*r)).area
                     if area <= 1e-12:
@@ -194,14 +291,28 @@ class GraspPlanner:
             upper=max((c.z_upper_bound for c in heights),default=0.)
             volume=sum(a*min(self.kernel.capture_depth_m,max(0.,c.z_median-pit["pit_bottom_z_m"])) for c,a in supported)
             volume_lower=sum(a*min(self.kernel.capture_depth_m,max(0.,c.z_lower_bound-pit["pit_bottom_z_m"])) for c,a in supported)
+            if volume_lower < p['minimum_material_volume_proxy_lower_bound_m3']:
+                reasons.append('MATERIAL_INSUFFICIENT')
+            if lower-pit['pit_bottom_z_m'] < p['minimum_conservative_material_height_above_pit_bottom_m']:
+                reasons.append('FLOOR_RESERVE_INSUFFICIENT')
             penalty=recent.penalty(fp,now,snapshot.context.key) if recent is not None else 0.
             candidates.append(GraspCandidate(f"{snapshot.snapshot_id}:{cell.index}",xy,tuple(fp.exterior.coords)[:-1],
                 not reasons,tuple(sorted(set(reasons))),coverage,unknown,nominal,lower,upper,roughness,slope,
                 volume,volume_lower,clearance,penalty))
-        accepted=[c for c in candidates if c.accepted]
-        accepted.sort(key=lambda c:(-c.material_volume_proxy_lower_bound_m3,-c.observed_area_fraction,
-                                    c.roughness_m,c.slope_rad,c.recent_grab_penalty,c.candidate_id))
+            self.stage_ms['exact_candidate_geometry'] += (perf_counter()-tick)*1000
+        tick = perf_counter()
+        accepted=rank_candidates(candidates,p['volume_equivalence_epsilon'])
+        self.stage_ms['ranking'] = (perf_counter()-tick)*1000
         selected=accepted[0] if accepted else None
-        return GraspProposal(f"{snapshot.snapshot_id}:proposal",snapshot.snapshot_id,snapshot.generation,snapshot.window_end,
-            tuple(candidates),selected,"SHADOW_NOT_FOR_CONTROL" if selected else "NO_HARD_GATE_CANDIDATE",
-            snapshot.context,g.provenance(),self.kernel.kernel_id)
+        complete = len(active) <= budget
+        proven = complete and self.metrics['esdf_reject_count'] == 0 and len(heap) == eligible_count
+        reason = 'SHADOW_NOT_FOR_CONTROL' if selected else 'NO_HARD_GATE_CANDIDATE'
+        if not complete:
+            reason += '|SEARCH_TRUNCATED|GLOBAL_OPTIMUM_NOT_PROVEN'
+        elif not proven:
+            reason += '|BOUNDED_SHORTLIST|GLOBAL_OPTIMUM_NOT_PROVEN'
+        self.cached_proposal = GraspProposal(f"{snapshot.snapshot_id}:proposal",snapshot.snapshot_id,snapshot.generation,snapshot.window_end,
+            tuple(candidates),selected,reason,snapshot.context,g.provenance(),self.kernel.kernel_id,
+            False,complete,proven,tuple(c.candidate_id for c in accepted))
+        self.cache_key,self.cached_snapshot = cache_key,snapshot
+        return self.cached_proposal

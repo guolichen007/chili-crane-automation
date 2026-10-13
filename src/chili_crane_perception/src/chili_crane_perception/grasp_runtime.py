@@ -9,7 +9,8 @@ from rclpy.clock import Clock,ClockType
 from rclpy.executors import ExternalShutdownException
 from visualization_msgs.msg import Marker,MarkerArray
 from chili_crane_msgs.msg import PitSurfaceSnapshot,PlanningSpatialContext,GraspProposal,SurfaceDisturbance
-from chili_crane_perception.surface_runtime import QOS,configure,source_now,line_marker
+from chili_crane_perception.surface_runtime import QOS,SNAPSHOT_QOS,PROPOSAL_QOS,EVENT_QOS,configure,source_now,line_marker
+from rclpy.serialization import serialize_message
 from chili_crane_perception.surface_transport import (snapshot_from_message,context_from_message,proposal_to_message,seconds)
 from chili_crane_perception.surface_disturbance import SurfaceDisturbanceTracker
 from chili_crane_control.geofence import OperationalGeofence
@@ -32,15 +33,20 @@ class GraspProposalShadowNode(Node):
         self.generation_floor=-1
         self.last_counter=-1
         self.pending_event=None
-        self.pub=self.create_publisher(GraspProposal,'planning/grasp_proposal_shadow',QOS)
+        self.decoded_message,self.decoded_snapshot=None,None
+        self.serialized_proposal,self.last_result=None,None
+        self.pub=self.create_publisher(GraspProposal,'planning/grasp_proposal_shadow',PROPOSAL_QOS)
         self.markers=self.create_publisher(MarkerArray,'planning/grasp_proposal_markers',QOS)
-        self.create_subscription(PitSurfaceSnapshot,'perception/pit_surface_snapshot',self.surface,QOS)
+        self.create_subscription(PitSurfaceSnapshot,'perception/pit_surface_snapshot',self.surface,SNAPSHOT_QOS)
         self.create_subscription(PlanningSpatialContext,'planning/spatial_context',lambda m:setattr(self,'spatial_context_input',(m,time.monotonic())),QOS)
         # This mirrors penalty ONLY. Authoritative invalidation happens in the surface node.
-        self.create_subscription(SurfaceDisturbance,'planning/surface_disturbance_shadow',self.event,QOS)
+        self.create_subscription(SurfaceDisturbance,'planning/surface_disturbance_shadow',self.event,EVENT_QOS)
         self.create_timer(.1,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
 
     def surface(self,m):
+        if self.latest is not None and m.status.surface_generation <= self.generation_floor:
+            # Old/duplicate DDS history never replaces latest evidence or its arrival.
+            return
         if self.pending_event is not None:
             event_id,counter=self.pending_event
             if m.status.disturbance_counter < counter or m.status.last_disturbance_id != event_id:
@@ -92,20 +98,34 @@ class GraspProposalShadowNode(Node):
                     or not 0 <= ctx_msg.evidence.evidence_age_sec <= ttl):
                 raise ValueError('SURFACE_CONTEXT_RESIDENCE_STALE')
             now=source_now(self,self.config)
-            snapshot=snapshot_from_message(message,self.config)
+            if message is not self.decoded_message:
+                self.decoded_snapshot=snapshot_from_message(message,self.config)
+                self.decoded_message=message
+            snapshot=self.decoded_snapshot
             ctx=context_from_message(ctx_msg)
             result=self.planner.plan(snapshot,now,ctx,self.generation_floor,self.recent)
             age=max(now-snapshot.window_end,message.status.evidence_age_sec+time.monotonic()-arrival)
-            output=proposal_to_message(result,message,age)
+            if result is not self.last_result:
+                tick=time.perf_counter()
+                self.serialized_proposal=proposal_to_message(result,message,age)
+                self.planner.stage_ms['proposal_serialization']=(time.perf_counter()-tick)*1000
+                for key in ('candidate_centers_scanned','shortlist_size','esdf_checked_count',
+                            'esdf_reject_count','exact_geometry_check_count'):
+                    setattr(self.serialized_proposal,key,self.planner.metrics.get(key,0))
+                self.planner.metrics['proposal_serialized_bytes']=len(serialize_message(self.serialized_proposal))
+                self.last_result=result
+            output=self.serialized_proposal
+            output.evidence.evidence_age_sec=age
+            output.planning_compute_count=self.planner.compute_count
+            output.planning_cache_hit_count=self.planner.cache_hit_count
             self.pub.publish(output)
             markers=[Marker(action=Marker.DELETEALL)]
             region=self.planner.geofence.safe_region
             polygons=[region] if region.geom_type=='Polygon' else list(region.geoms)
             for i,p in enumerate(polygons):
                 markers.append(line_marker(output.header,list(p.exterior.coords)[:-1],i,(0.,1.,1.,1.)))
-            accepted=[c for c in result.candidates if c.accepted]
-            accepted.sort(key=lambda c:(-c.material_volume_proxy_lower_bound_m3,-c.observed_area_fraction,
-                                       c.roughness_m,c.slope_rad,c.recent_grab_penalty,c.candidate_id))
+            lookup={c.candidate_id:c for c in result.candidates}
+            accepted=[lookup[i] for i in result.ranked_candidate_ids]
             for i,c in enumerate(accepted[:10]):
                 selected=result.selected is not None and result.selected.candidate_id==c.candidate_id
                 markers.append(line_marker(output.header,c.footprint_xy,100+i,(0.,1.,0.,1.) if selected else (.3,.5,1.,.6),c.surface_upper_m))

@@ -28,6 +28,8 @@ def planning_fixture():
         capture_depth_m=.3,yaw_control_available=False,yaw_mode='FIXED_MECHANICAL',fixed_yaw_rad=0.),
         planning=dict(minimum_observed_fraction=1.,maximum_unknown_fraction=0.,maximum_slope_rad=.6,
             maximum_roughness_m=.1,wall_margin_m=.1,distance_acceleration_enabled=False,
+            maximum_evaluated_cells=1024,minimum_material_volume_proxy_lower_bound_m3=.005,
+            minimum_conservative_material_height_above_pit_bottom_m=.05,volume_equivalence_epsilon=.001,
             disturbance_dilation_m=.05,recent_grab_radius_m=.75,recent_grab_ttl_sec=3.,maximum_recent_events=4))
     return c,s,ctx,OperationalGeofence(gc,s)
 

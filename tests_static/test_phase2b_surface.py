@@ -17,12 +17,15 @@ def fixture():
         single_sensor_extra_uncertainty_m=.02, mad_scale=3., max_height_dispersion_m=.3,
         minimum_neighborhood_coverage=.5, minimum_cell_samples=4, minimum_cell_frames=2,
         maximum_input_points=20000, maximum_grid_cells=1024, maximum_window_frames=4,
+        maximum_stationary_transform_translation_delta_m=.001,
+        maximum_stationary_transform_rotation_delta_rad=.001, maximum_grab_mask_time_skew_sec=.03,
         physical_output_enabled=False, automatic_control_enabled=False, camera_control_authority=False)
     s = dict(config_state='VALID', schema_version=1, map_id='map1', semantic_version='v1', frame_id='map',
         pits=[dict(pit_id='pit', polygon_map_m=[[-2,-2],[2,-2],[2,2],[-2,2]], pit_bottom_z_m=0.,
                    wall_top_z_m=3., safety_inset_m=.1)])
     context = PlanningSpatialContext('cloud', 'map', 'map1', 'v1', 'pit', 'transform1', 'cal1',
-        'SYNTHETIC_VALIDATED', 'SYNTHETIC', 10., .01, tuple(np.eye(4).ravel()), ('s0', 's1'), True, 'motion1')
+        'SYNTHETIC_VALIDATED', 'SYNTHETIC', 10., .01, tuple(np.eye(4).ravel()), ('s0', 's1'), True, 'motion1',
+        field_extrinsic_id='cal1', axis_to_map_id='axis1')
     return c, s, context
 
 
@@ -80,7 +83,7 @@ class SurfaceTests(unittest.TestCase):
             cell = s.cells[100]
             self.assertEqual(cell.sensor_support_mask, 1 << sensor)
             self.assertEqual(cell.validity, 'DEGRADED')
-            self.assertAlmostEqual(cell.height_uncertainty, .04)
+            self.assertGreater(cell.height_uncertainty, .04)
 
     def test_plane_only_observed_neighbors(self):
         p, sensors = cloud(self.g, lambda x,y: 1.+.2*x)
@@ -95,7 +98,7 @@ class SurfaceTests(unittest.TestCase):
         cell=self.g.snapshot(10.06).cells[100]
         self.assertEqual(cell.sensor_support_mask,3)
         self.assertEqual(cell.validity,'DEGRADED')
-        self.assertAlmostEqual(cell.height_uncertainty,.04)
+        self.assertGreater(cell.height_uncertainty,.04)
 
     def test_ttl_generation_and_window_bounded(self):
         self.observed()

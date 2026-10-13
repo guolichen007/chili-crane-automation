@@ -62,6 +62,7 @@ colcon test-result --test-result-base "$run_dir/build" --verbose
 set +u
 . "$run_dir/install/setup.bash"
 set -u
+timeout 180s python3 tools/validate_phase2b_r1.py --output "$run_dir/phase2b-r1-normal.json"
 timeout 35s python3 tools/validate_dual_lidar_ros.py | tee "$run_dir/dual-lidar-synthetic-ros.json"
 timeout 35s python3 tools/validate_ptp_timescale_ros.py | tee "$run_dir/ptp-timescale-synthetic-ros.json"
 timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-dir "$run_dir/phase1c" | tee "$run_dir/installation-capture-synthetic-ros.json"
@@ -82,6 +83,7 @@ colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$
     --return-code-on-test-failure || package_test_status=$?
   colcon test-result --test-result-base "$run_dir/symlink-build" --verbose
   [ "$package_test_status" = 0 ]
+  timeout 180s python3 tools/validate_phase2b_r1.py --output "$run_dir/phase2b-r1-symlink.json"
   for package in chili_crane_slam chili_crane_hardware chili_crane_control chili_crane_perception; do
     ros2 pkg executables "$package"
   done

@@ -7,6 +7,7 @@ from chili_crane_msgs.msg import (PlanningSpatialContext as ContextMessage, PitS
     PitSurfaceSnapshot as SnapshotMessage,PitSurfaceCell as CellMessage,GraspCandidate as CandidateMessage,
     GraspProposal as ProposalMessage)
 from .pit_surface import PlanningSpatialContext,SurfaceCell,SurfaceSnapshot
+from .surface_payload import ENCODING,sparse_cells,expand_sparse
 
 SOURCE_IDS={'PHYSICAL':1,'SIMULATED':2,'REPLAY':3,'SYNTHETIC':4}
 VALIDITY={'UNKNOWN':0,'NOT_CONFIGURED':1,'STALE':2,'DEGRADED':3,'VALID':4}
@@ -69,10 +70,12 @@ def snapshot_to_message(snapshot,now,counter):
     s.last_disturbance_id,s.disturbance_counter=snapshot.last_disturbance_id,snapshot.disturbance_counter
     s.resolution_m=snapshot.resolution
     s.window_start,s.window_end=stamp(snapshot.window_start),stamp(snapshot.window_end)
-    s.total_cell_count=len(snapshot.cells)
+    s.total_cell_count=snapshot.pit_active_cell_count
     observed=[c for c in snapshot.cells if c.observed]
     s.valid_cell_count=len(observed)
-    s.coverage=len(observed)/len(snapshot.cells) if snapshot.cells else 0.
+    s.coverage=len(observed)/s.total_cell_count if s.total_cell_count else 0.
+    for key in ('pit_active_cell_count','observed_cell_count','support_qualified_cell_count','dual_supported_cell_count'):
+        setattr(s,key,getattr(snapshot,key))
     s.robust_min_z_m=min((c.z_lower_bound for c in observed),default=math.nan)
     s.robust_max_z_m=max((c.z_upper_bound for c in observed),default=math.nan)
     s.evidence_age_sec=max(0.,now-snapshot.window_end) if snapshot.window_end > 0 and now >= snapshot.window_end else 1e9
@@ -93,7 +96,8 @@ def snapshot_to_message(snapshot,now,counter):
     s.evidence.validity,s.evidence.reason=s.validity,s.reason
     m.origin_x_m,m.origin_y_m=snapshot.origin
     m.width,m.height=snapshot.width,snapshot.height
-    for cell in snapshot.cells:
+    m.cell_encoding=ENCODING
+    for cell in sparse_cells(snapshot):
         item=CellMessage()
         for key in ('index','observed','sample_count','frame_count','sensor_support_mask','z_median','z_lower_bound',
                     'z_upper_bound','neighborhood_coverage','neighborhood_support'):
@@ -112,7 +116,10 @@ def snapshot_from_message(m,config):
             or s.evidence.measurement_stamp != s.header.stamp or s.window_end != s.header.stamp
             or s.evidence.evidence_age_sec != s.evidence_age_sec or not math.isfinite(s.evidence_age_sec)
             or not 0 <= s.evidence_age_sec <= config['surface_ttl_sec'] or not s.spatial_eligible
-            or m.width*m.height != len(m.cells) or not 0 < len(m.cells) <= config['maximum_grid_cells']):
+            or m.cell_encoding != ENCODING or not 0 < m.width*m.height <= config['maximum_grid_cells']
+            or len(m.cells) > m.width*m.height or len(m.cells) != s.observed_cell_count
+            or s.total_cell_count != s.pit_active_cell_count
+            or not 0 <= s.dual_supported_cell_count <= s.support_qualified_cell_count <= s.observed_cell_count <= s.pit_active_cell_count <= m.width*m.height):
         raise ValueError('SURFACE_TYPED_IDENTITY_OR_FRESHNESS_REJECTED')
     ctx=context_from_message(m.spatial_context)
     if (s.map_id != ctx.map_id or s.semantic_version != ctx.semantic_version or s.pit_id != ctx.pit_id
@@ -120,13 +127,15 @@ def snapshot_from_message(m,config):
             or s.header.frame_id != ctx.target_frame or s.evidence.source_type != SOURCE_IDS[ctx.source_type]
             or s.evidence.calibration_id != ctx.calibration_id):
         raise ValueError('SURFACE_SPATIAL_IDENTITY_MISMATCH')
-    cells=tuple(SurfaceCell(c.index,c.observed,c.sample_count,c.frame_count,c.sensor_support_mask,
+    sparse=tuple(SurfaceCell(c.index,c.observed,c.sample_count,c.frame_count,c.sensor_support_mask,
         seconds(c.last_observed_epoch),c.z_median,c.z_lower_bound,c.z_upper_bound,c.roughness_m,c.slope_rad,
         c.height_uncertainty_m,c.neighborhood_coverage,c.neighborhood_support,
         {v:k for k,v in VALIDITY.items()}.get(c.validity,'UNKNOWN')) for c in m.cells)
+    cells=expand_sparse(sparse,m.width,m.height,config['maximum_grid_cells'])
     return SurfaceSnapshot(s.snapshot_id,s.surface_generation,seconds(s.window_start),seconds(s.window_end),ctx,cells,
         (m.origin_x_m,m.origin_y_m),s.resolution_m,m.width,m.height,{v:k for k,v in VALIDITY.items()}.get(s.validity,'UNKNOWN'),
-        s.reason,s.config_sha256,False,s.last_disturbance_id,s.disturbance_counter)
+        s.reason,s.config_sha256,False,s.last_disturbance_id,s.disturbance_counter,
+        s.pit_active_cell_count,s.observed_cell_count,s.support_qualified_cell_count,s.dual_supported_cell_count)
 
 
 def proposal_to_message(proposal,surface_message,age):
@@ -143,7 +152,10 @@ def proposal_to_message(proposal,surface_message,age):
     m.geofence_id,m.geofence_version=provenance['geofence_id'],provenance['geofence_version']
     m.geofence_config_sha256=provenance['config_sha256']
     m.kernel_id=proposal.kernel_id
-    m.ranking_order=['volume_proxy_lower_desc','observed_coverage_desc','roughness_asc','slope_asc','recent_grab_penalty_asc']
+    m.ranking_order=['volume_lower_anchored_epsilon_bands','observed_coverage_desc','recent_grab_penalty_asc',
+                     'roughness_asc','slope_asc','wall_clearance_desc','candidate_id_asc']
+    m.search_complete,m.global_optimum_proven=proposal.search_complete,proposal.global_optimum_proven
+    m.ranked_candidate_ids=list(proposal.ranked_candidate_ids)
     m.valid_for_control=False
     m.evidence=copy.deepcopy(s.evidence)
     m.evidence.evidence_age_sec=age
