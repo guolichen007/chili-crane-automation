@@ -36,6 +36,15 @@ def verify_geometry(result, pipeline, truth, stamp, counts):
         (not true_inside or clearance["conservative_clearance_m"] > true_distance+1e-5))
 
 
+def perturb_extrinsic(points, bias):
+    # Actual coherent common-frame error, not just a changed covariance number.
+    xyz=np.column_stack([points[k] for k in ("x","y","z")]).astype(float)
+    xyz=xyz@bias[:3,:3].T+bias[:3,3]
+    for axis,key in enumerate(("x","y","z")):
+        points[key]=xyz[:,axis]
+    return points
+
+
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--output",type=Path)
@@ -59,11 +68,15 @@ def main():
         truth[:3,:3]=Rotation.from_euler("xyz",[rng.uniform(-.03,.03),rng.uniform(-.03,.03),
             rng.choice([0.,np.pi])+rng.uniform(-.05,.05)]).as_matrix()
         ext=np.eye(6)*rng.uniform(1e-6,1e-5)
+        bias_rng=np.random.default_rng(20261013+sequence)
+        bias=np.eye(4)
+        bias[:3,3]=bias_rng.uniform(-.0007,.0007,3)
+        bias[:3,:3]=Rotation.from_rotvec(bias_rng.uniform(-.0002,.0002,3)).as_matrix()
         coverage["extrinsic_perturbation"]+=1
         opening="OPEN" if sequence%2 else "CLOSED"
         for frame in range(3):
             stamp=10+frame*.1
-            r=p.process(scene(c["model"],truth,stamp,opening=opening,noise=.001,span=.02),stamp,
+            r=p.process(perturb_extrinsic(scene(c["model"],truth,stamp,opening=opening,noise=.001,span=.02),bias),stamp,
                         opening,"SYNTHETIC",ext)
         assert r["tracking"]=="TRACKED", (sequence,r["reasons"])
         kind=sequence%10
@@ -102,7 +115,7 @@ def main():
                 a=scene(c["model"],target,stamp,opening=op,span=.02)
                 b=scene(c["model"],other,stamp,opening=op,span=.02)
                 points=np.empty(len(a)+len(b),dtype=CANONICAL);points[:len(a)],points[len(a):]=a,b
-            r=p.process(points,stamp,op,"SYNTHETIC",ext)
+            r=p.process(perturb_extrinsic(points,bias),stamp,op,"SYNTHETIC",ext)
             r["opening"]=op
             timings.append(r["total_seconds"])
             if kind==4:
@@ -121,7 +134,7 @@ def main():
             target=truth.copy();target[0,3]+=1.
             for frame in range(3):
                 stamp=12.1+frame*.1
-                r=p.process(scene(c["model"],target,stamp,opening=opening,span=.02),stamp,
+                r=p.process(perturb_extrinsic(scene(c["model"],target,stamp,opening=opening,span=.02),bias),stamp,
                             opening,"SYNTHETIC",ext)
             counts["wrong_reacquisition"]+=int(r["tracking"]!="TRACKED" or
                 np.linalg.norm(p.tracker.pose[:3,3]-target[:3,3])>.15)

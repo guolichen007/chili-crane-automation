@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from scipy.spatial.transform import Rotation
 ROOT = Path(__file__).resolve().parents[1]
-for package in ("perception", "slam", "control"):
+for package in ("perception", "slam"):
     sys.path.insert(0, str(ROOT / ("src/chili_crane_"+package+"/src")))
 from chili_crane_perception.synthetic import fixture, scene, pit, box_shape
 from chili_crane_perception.pipeline import GrabPerceptionPipeline, LatestFrameSlot
@@ -103,10 +103,11 @@ class R1TrackingTests(unittest.TestCase):
         self.assertEqual("LOST",r["tracking"])
 
     def test_io_opposite_geometry_conflict(self):
-        c=fixture();p=GrabPerceptionPipeline(c);pose=np.eye(4);pose[2,3]=2
-        r=p.process(scene(c["model"],pose,10),10,"OPEN","SYNTHETIC",np.eye(6)*1e-6)
-        self.assertIn("GEOMETRY_IO_OPEN_CONFLICT",r["reasons"])
-        self.assertFalse(r["accepted"])
+        for observed,io in (("CLOSED","OPEN"),("OPEN","CLOSED")):
+            c=fixture();p=GrabPerceptionPipeline(c);pose=np.eye(4);pose[2,3]=2
+            r=p.process(scene(c["model"],pose,10,opening=observed),10,io,"SYNTHETIC",np.eye(6)*1e-6)
+            self.assertIn("GEOMETRY_IO_"+io+"_CONFLICT",r["reasons"])
+            self.assertFalse(r["accepted"])
 
     def test_material_contact_flat_rough_open_closed_transition(self):
         for opening in ("OPEN","CLOSED","TRANSITION"):
