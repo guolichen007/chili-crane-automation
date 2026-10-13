@@ -24,6 +24,20 @@ def finite(value, nonnegative=False):
             and (not nonnegative or value >= 0))
 
 
+Y_LIMIT_FIELDS = {"y_left_limit": "left_limit", "y_right_limit": "right_limit"}
+
+
+def resolve_y_limit_state(trolley_state, configured_signal):
+    """Return a known canonical input bool, or None. No left=negative assumption."""
+    if not isinstance(configured_signal, str) or configured_signal not in Y_LIMIT_FIELDS:
+        return None
+    known = field(trolley_state, "known_signals", [])
+    if not isinstance(known, (list, tuple, set)) or configured_signal not in known:
+        return None
+    value = field(trolley_state, Y_LIMIT_FIELDS[configured_signal])
+    return value if type(value) is bool else None
+
+
 def validity_for_reason(reason):
     if any(k in reason for k in ("TIMEOUT", "STALE", "FRESHNESS", "DEADLINE")):
         return "STALE"
@@ -40,6 +54,10 @@ class OperationalGeofence:
         self.config = json.loads(json.dumps(config, allow_nan=False))
         self.semantic = json.loads(json.dumps(semantic, allow_nan=False))
         c, s = self.config, self.semantic
+        if c.get("contract_version") != 2:
+            raise ValueError("GEOFENCE_CONTRACT_VERSION_UNSUPPORTED")
+        if any(k in c.get("x", {}) for k in ("negative_limit_signal", "positive_limit_signal")):
+            raise ValueError("X_LIMIT_CONFIG_OUTSIDE_GEOFENCE")
         self.hash = hashlib.sha256(json.dumps(c, sort_keys=True, separators=(",", ":"),
                                               allow_nan=False).encode("utf-8")).hexdigest()
         if c.get("config_state") != "VALID" or s.get("config_state") != "VALID":
@@ -87,9 +105,10 @@ class OperationalGeofence:
                 raise ValueError("POLICY_NOT_CONFIGURED")
         y = c["y"]
         if (y.get("limit_semantics") != "PIT_DIRECTION_LIMIT"
-                or not identity(y.get("negative_limit_signal")) or not identity(y.get("positive_limit_signal"))
+                or not isinstance(y.get("negative_limit_signal"), str) or not isinstance(y.get("positive_limit_signal"), str)
+                or y.get("negative_limit_signal") not in Y_LIMIT_FIELDS or y.get("positive_limit_signal") not in Y_LIMIT_FIELDS
                 or y["negative_limit_signal"] == y["positive_limit_signal"]):
-            raise ValueError("Y_LIMIT_BINDING_NOT_CONFIGURED")
+            raise ValueError("Y_LIMIT_BINDING_UNKNOWN")
         windows = []
         for key in ("negative_expected_window_m", "positive_expected_window_m"):
             w = y.get(key)
@@ -147,11 +166,13 @@ class OperationalGeofence:
     def evaluate(self, servo, trolley, dynamic, age_x=0., age_y=0.):
         c = self.config
         result = dict(provenance=self.provenance(), valid_for_control=False,
-                      production_control_eligible=False, automatic_eligibility=False,
+                      production_control_eligible=False, directional_geometry_available=False,
                       x_geometry_eligible=False, y_geometry_eligible=False, inside=False,
                       stop_deenergize=True, x_positive=False, x_negative=False,
                       y_positive=False, y_negative=False, reasons=[], validity="DEGRADED")
         reasons = result["reasons"]
+        negative_limit = resolve_y_limit_state(trolley, c["y"]["negative_limit_signal"])
+        positive_limit = resolve_y_limit_state(trolley, c["y"]["positive_limit_signal"])
         for name, state, received_age in (("x", servo, age_x), ("y", trolley, age_y)):
             axis_reasons = []
             age = field(state, "evidence_age_sec")
@@ -171,15 +192,12 @@ class OperationalGeofence:
             if name == "x" and (field(state, "homed") is not True or field(state, "communication_ok") is not True):
                 axis_reasons.append("X_UNHOMED_OR_COMMUNICATION_FAILURE")
             if name == "y":
-                left, right = field(state, "left_limit"), field(state, "right_limit")
-                known = field(state, "known_signals", [])
-                if (type(left) is not bool or type(right) is not bool
-                        or any(c["y"][k] not in known for k in ("negative_limit_signal", "positive_limit_signal"))):
-                    axis_reasons.append("Y_LIMIT_UNKNOWN")
-                elif left and right:
+                if negative_limit is None or positive_limit is None:
+                    axis_reasons.append("Y_LIMIT_BINDING_UNKNOWN")
+                elif negative_limit and positive_limit:
                     axis_reasons.append("Y_LIMIT_CONFLICT")
                 elif finite(field(state, "position_m")):
-                    for asserted, key in ((left, "negative_expected_window_m"), (right, "positive_expected_window_m")):
+                    for asserted, key in ((negative_limit, "negative_expected_window_m"), (positive_limit, "positive_expected_window_m")):
                         low, high = c["y"][key]
                         inside = low <= field(state, "position_m") <= high
                         if asserted and not inside:
@@ -220,9 +238,10 @@ class OperationalGeofence:
                 direction = np.array(a[axis+"_direction_map_xy"])*a[axis+"_scale"]*sign
                 target = p + direction/np.linalg.norm(direction)*c["direction_probe_m"]
                 safe = self.safe_region.covers(LineString([p, target])) and self.track_inside(target)
-                limit = (field(servo, suffix+"_limit", None) if axis == "x"
-                         else field(trolley, "right_limit" if sign == 1 else "left_limit"))
-                # Unknown optional servo limits must be explicitly observed as false.
-                result[axis+"_"+suffix] = bool(safe and limit is False)
-        result["automatic_eligibility"] = any(result[k] for k in ("x_positive", "x_negative", "y_positive", "y_negative"))
+                # X is geometry ONLY. Physical/drive limits belong to independent
+                # axis safety, not default-false ServoState bools.
+                limit_clear = axis == "x" or (positive_limit if sign == 1 else negative_limit) is False
+                result[axis+"_"+suffix] = bool(safe and limit_clear)
+        # At least one SHADOW necessary-condition direction, never allow_auto_task.
+        result["directional_geometry_available"] = any(result[k] for k in ("x_positive", "x_negative", "y_positive", "y_negative"))
         return result

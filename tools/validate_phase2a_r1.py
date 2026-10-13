@@ -14,6 +14,7 @@ sys.path.insert(0,str(ROOT/"tests_static"))
 from test_phase2a_r1 import (core_fixture, connected_material, scene,
     GrabPerceptionPipeline, PitBoundaryModel, pit, LatestFrameSlot, CANONICAL)
 from test_operational_geofence import geofence_fixture, OperationalGeofence
+from chili_crane_control.geofence import resolve_y_limit_state
 
 
 def verify_geometry(result, pipeline, truth, stamp, counts):
@@ -148,7 +149,7 @@ def main():
             if step==1:
                 xs["evidence_age_sec"]=.3
             sr=g.evaluate(xs,ys,d)
-            counts["geofence_false_safe"]+=int(step==1 and sr["automatic_eligibility"])
+            counts["geofence_false_safe"]+=int(step==1 and sr["directional_geometry_available"])
         if sequence%13==0:
             coverage["axis_to_map_mismatch"]+=1
             invalid=copy.deepcopy(gc);invalid["axis_to_map"]["x_calibration_id"]="different"
@@ -171,9 +172,11 @@ def main():
         else: x.update(position_m=2.36)
         gr=g.evaluate(x,y,d)
         if bad<8:
-            counts["geofence_false_safe"]+=int(gr["automatic_eligibility"])
-        counts["directional_limit_violation"]+=int((y["left_limit"] and gr["y_negative"])
-                                                  or (y["right_limit"] and gr["y_positive"]))
+            counts["geofence_false_safe"]+=int(gr["directional_geometry_available"])
+        negative=resolve_y_limit_state(y,gc["y"]["negative_limit_signal"])
+        positive=resolve_y_limit_state(y,gc["y"]["positive_limit_signal"])
+        counts["directional_limit_violation"]+=int((negative is True and gr["y_negative"])
+                                                  or (positive is True and gr["y_positive"]))
     # Adversarial pure material and wall: no initial Grab ground truth exists.
     for wall in (False,True):
         c=core_fixture();c["policy"]["maximum_input_points"]=200000

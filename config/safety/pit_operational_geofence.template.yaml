@@ -1,4 +1,4 @@
-contract_version: 1
+contract_version: 2
 config_state: NOT_CONFIGURED
 config_version: NOT_CONFIGURED
 geofence_id: NOT_CONFIGURED
@@ -16,8 +16,6 @@ x:
   stop_distance_verified: false
   reaction_time_verified: false
   stop_model_evidence_id: NOT_CONFIGURED
-  negative_limit_signal: NOT_CONFIGURED
-  positive_limit_signal: NOT_CONFIGURED
 y:
   source: RS485_PULL_WIRE
   calibration_id: NOT_CONFIGURED

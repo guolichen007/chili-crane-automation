@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT/"src/chili_crane_control/src"))
-from chili_crane_control.geofence import OperationalGeofence
+from chili_crane_control.geofence import OperationalGeofence, resolve_y_limit_state
 
 
 def pit():
@@ -55,6 +55,65 @@ class GeofenceTests(unittest.TestCase):
     def evaluate(self):
         return self.g.evaluate(self.x,self.y,self.d)
 
+    def test_normal_reversed_binding_and_negative_map_scale(self):
+        for reversed_binding in (False,True):
+            for scale in (1,-1):
+                c=copy.deepcopy(self.c)
+                if reversed_binding:
+                    c["y"].update(negative_limit_signal="y_right_limit",positive_limit_signal="y_left_limit")
+                c["axis_to_map"]["y_scale"]=scale
+                g=OperationalGeofence(c,self.s)
+                for sign in (-1,1):
+                    y=dict(self.y,position_m=sign*2.2)
+                    signal=c["y"]["negative_limit_signal" if sign==-1 else "positive_limit_signal"]
+                    y["left_limit" if signal=="y_left_limit" else "right_limit"]=True
+                    r=g.evaluate(self.x,y,self.d)
+                    self.assertTrue(r["directional_geometry_available"],(reversed_binding,scale,sign,r))
+                    self.assertFalse(r["y_negative" if sign==-1 else "y_positive"])
+                    self.assertTrue(r["y_positive" if sign==-1 else "y_negative"])
+                    self.assertFalse(r["valid_for_control"])
+                    self.assertNotIn("automatic_eligibility",r)
+
+    def test_reversed_conflict_and_position_windows(self):
+        c=copy.deepcopy(self.c)
+        c["y"].update(negative_limit_signal="y_right_limit",positive_limit_signal="y_left_limit")
+        g=OperationalGeofence(c,self.s)
+        for changes,reason in ((dict(left_limit=True,right_limit=True),"Y_LIMIT_CONFLICT"),
+              (dict(right_limit=True),"Y_POSITION_LIMIT_MISMATCH"),
+              (dict(position_m=-2.2),"Y_EXPECTED_LIMIT_NOT_ASSERTED"),
+              (dict(position_m=-2.2,left_limit=True),"Y_POSITION_LIMIT_MISMATCH")):
+            r=g.evaluate(self.x,dict(self.y,**changes),self.d)
+            self.assertIn(reason,r["reasons"])
+            self.assertFalse(r["directional_geometry_available"])
+
+    def test_binding_unknown_is_fail_closed_for_dict_and_typed_state(self):
+        from types import SimpleNamespace
+        self.assertIs(False,resolve_y_limit_state(SimpleNamespace(**self.y),"y_right_limit"))
+        for signal in (None,"NOT_CONFIGURED","unsupported"):
+            self.assertIsNone(resolve_y_limit_state(self.y,signal))
+        for changes in (dict(known_signals=[]),dict(known_signals="y_left_limit"),dict(left_limit=None)):
+            r=self.g.evaluate(self.x,dict(self.y,**changes),self.d)
+            self.assertIn("Y_LIMIT_BINDING_UNKNOWN",r["reasons"])
+            self.assertFalse(r["directional_geometry_available"])
+        for negative,positive in (("y_left_limit","y_left_limit"),("unknown","y_right_limit"),("NOT_CONFIGURED","y_right_limit")):
+            c=copy.deepcopy(self.c);c["y"].update(negative_limit_signal=negative,positive_limit_signal=positive)
+            with self.assertRaisesRegex(ValueError,"Y_LIMIT_BINDING_UNKNOWN"):
+                OperationalGeofence(c,self.s)
+
+    def test_x_geometry_does_not_infer_hardware_limit_knownness(self):
+        for value in (None,False,True):
+            x=dict(self.x,positive_limit=value,negative_limit=value)
+            r=self.g.evaluate(x,self.y,self.d)
+            self.assertTrue(r["x_positive"] and r["x_negative"])
+            self.assertFalse(r["valid_for_control"] or r["production_control_eligible"])
+        x=dict(self.x);x.pop("positive_limit");x.pop("negative_limit")
+        self.assertTrue(self.g.evaluate(x,self.y,self.d)["x_positive"])
+        self.assertNotIn("negative_limit_signal",self.c["x"])
+        self.assertNotIn("positive_limit_signal",self.c["x"])
+        c=copy.deepcopy(self.c);c["x"]["positive_limit_signal"]="NOT_CONFIGURED"
+        with self.assertRaisesRegex(ValueError,"X_LIMIT_CONFIG_OUTSIDE_GEOFENCE"):
+            OperationalGeofence(c,self.s)
+
     def test_template_fail_closed_and_does_not_copy_pit(self):
         import yaml
         c=yaml.safe_load((ROOT/"config/safety/pit_operational_geofence.template.yaml").read_text(encoding="utf-8"))
@@ -87,19 +146,19 @@ class GeofenceTests(unittest.TestCase):
         for changes,reason in ((dict(left_limit=True,right_limit=True),"Y_LIMIT_CONFLICT"),
              (dict(left_limit=True),"Y_POSITION_LIMIT_MISMATCH"),
              (dict(position_m=-2.2),"Y_EXPECTED_LIMIT_NOT_ASSERTED"),
-             (dict(known_signals=[]),"Y_LIMIT_UNKNOWN")):
+             (dict(known_signals=[]),"Y_LIMIT_BINDING_UNKNOWN")):
             y=dict(self.y,**changes)
             r=self.g.evaluate(self.x,y,self.d)
             self.assertIn(reason,r["reasons"])
-            self.assertFalse(r["automatic_eligibility"])
+            self.assertFalse(r["directional_geometry_available"])
 
     def test_servo_stale_unhomed_fault_calibration_and_stop_gate(self):
         for change in (dict(homed=False),dict(communication_ok=False),dict(fault=True),
                        dict(evidence_age_sec=.3),dict(calibration_id="wrong"),dict(position_m=float("nan"))):
             r=self.g.evaluate(dict(self.x,**change),self.y,self.d)
             self.assertFalse(r["x_geometry_eligible"])
-            self.assertFalse(r["automatic_eligibility"])
-        self.assertFalse(self.g.evaluate(self.x,self.y,self.d,age_x=.3)["automatic_eligibility"])
+            self.assertFalse(r["directional_geometry_available"])
+        self.assertFalse(self.g.evaluate(self.x,self.y,self.d,age_x=.3)["directional_geometry_available"])
 
     def test_map_axis_identity_gate(self):
         for key in ("map_id","semantic_version","pit_id","x_calibration_id","calibration_id"):
@@ -111,7 +170,7 @@ class GeofenceTests(unittest.TestCase):
         s=copy.deepcopy(self.s);s["track"]["valid_x_range_m"]=[-1,1]
         g=OperationalGeofence(self.c,s)
         self.x["position_m"]=1.2
-        self.assertFalse(g.evaluate(self.x,self.y,self.d)["automatic_eligibility"])
+        self.assertFalse(g.evaluate(self.x,self.y,self.d)["directional_geometry_available"])
         self.x["position_m"]=.95
         result=g.evaluate(self.x,self.y,self.d)
         self.assertFalse(result["x_positive"])
@@ -138,7 +197,7 @@ class GeofenceTests(unittest.TestCase):
             d=dict(self.d,**changes);snapshot=copy.deepcopy(d)
             r=self.g.evaluate(self.x,self.y,d)
             self.assertTrue(r["inside"])
-            self.assertFalse(r["automatic_eligibility"])
+            self.assertFalse(r["directional_geometry_available"])
             self.assertEqual(snapshot,d)
 
     def test_physical_requires_field_axis_and_stop_proof(self):
@@ -150,5 +209,5 @@ class GeofenceTests(unittest.TestCase):
         x=copy.deepcopy(self.x);y=copy.deepcopy(self.y)
         x["evidence"]["source_type"]=y["evidence"]["source_type"]="PHYSICAL"
         r=g.evaluate(x,y,self.d)
-        self.assertFalse(r["automatic_eligibility"])
+        self.assertFalse(r["directional_geometry_available"])
         self.assertIn("STOP_MODEL_NOT_CONFIGURED",r["reasons"])
