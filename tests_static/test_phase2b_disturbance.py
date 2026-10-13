@@ -7,6 +7,7 @@ from unittest.mock import patch
 import numpy as np
 from shapely.geometry import Polygon
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/'tests_static'))
 sys.path.insert(0,str(ROOT/'src/chili_crane_control/src'))
 sys.path.insert(0,str(ROOT/'src/chili_crane_perception/src'))
 from chili_crane_perception.pit_surface import PitSurfaceGrid

@@ -53,10 +53,12 @@ rosdep check --from-paths src --ignore-src --rosdistro humble
 colcon --log-base "$run_dir/log" build --base-paths "$workspace/src" \
   --build-base "$run_dir/build" --install-base "$run_dir/install" \
   --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
+package_test_status=0
 colcon --log-base "$run_dir/log" test --base-paths "$workspace/src" \
   --build-base "$run_dir/build" --install-base "$run_dir/install" \
-  --return-code-on-test-failure
+  --return-code-on-test-failure || package_test_status=$?
 colcon test-result --test-result-base "$run_dir/build" --verbose
+[ "$package_test_status" = 0 ]
 set +u
 . "$run_dir/install/setup.bash"
 set -u
@@ -74,10 +76,12 @@ colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$
   set +u
   . "$run_dir/symlink-install/setup.bash"
   set -u
+  package_test_status=0
   colcon --log-base "$run_dir/symlink-log" test --base-paths "$workspace/src" \
     --build-base "$run_dir/symlink-build" --install-base "$run_dir/symlink-install" \
-    --return-code-on-test-failure
+    --return-code-on-test-failure || package_test_status=$?
   colcon test-result --test-result-base "$run_dir/symlink-build" --verbose
+  [ "$package_test_status" = 0 ]
   for package in chili_crane_slam chili_crane_hardware chili_crane_control chili_crane_perception; do
     ros2 pkg executables "$package"
   done

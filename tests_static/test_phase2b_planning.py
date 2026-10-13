@@ -6,6 +6,7 @@ import sys
 import unittest
 import numpy as np
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/'tests_static'))
 sys.path.insert(0,str(ROOT/'src/chili_crane_control/src'))
 from chili_crane_control.geofence import OperationalGeofence
 from chili_crane_control.grasp_planning import GraspPlanner

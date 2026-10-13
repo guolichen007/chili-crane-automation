@@ -124,16 +124,26 @@ def main():
             disturbed=received['snapshot']
             from shapely.geometry import Polygon,box
             disturbed_polygon=Polygon([(p.x,p.y) for p in event.footprint.points]).buffer(c['planning']['disturbance_dilation_m'])
+            disturbed_indices=[]
             for cell in disturbed.cells:
                 row,col=divmod(cell.index,disturbed.width);r=c['resolution_m']
                 cell_poly=box(disturbed.origin_x_m+col*r,disturbed.origin_y_m+row*r,
                     disturbed.origin_x_m+(col+1)*r,disturbed.origin_y_m+(row+1)*r)
-                if cell_poly.intersects(disturbed_polygon):assert not cell.observed
-            wait(lambda:bool(received['proposal'].selected_candidate_id),timeout=8.,frames=True)
+                if cell_poly.intersects(disturbed_polygon):
+                    assert not cell.observed
+                    disturbed_indices.append(cell.index)
+            assert disturbed_indices,'disturbance did not affect any planning cells'
+            wait(lambda:bool(received['proposal'].selected_candidate_id)
+                and all(received['snapshot'].cells[i].observed
+                        and seconds(received['snapshot'].cells[i].last_observed_epoch)>seconds(event.header.stamp)
+                        for i in disturbed_indices),timeout=8.,frames=True)
             # Independent spatial mismatch is not rehabilitated by an attractive pile.
             send_frame(True)
             wait(lambda:not received['proposal'].selected_candidate_id,timeout=3.,frames=True,bad_map=True)
             wait(lambda:bool(received['proposal'].selected_candidate_id),timeout=8.,frames=True)
+            # Drain the last already-published generation before stopping input.
+            # Otherwise a queued newer scan, not a heartbeat, can legitimately advance epoch.
+            wait(lambda:received['snapshot'].status.evidence.source_counter==counter,timeout=3.)
             epoch=copy.deepcopy(received['snapshot'].status.header.stamp)
             wait(lambda:not received['proposal'].selected_candidate_id and not received['status'].spatial_eligible,timeout=3.)
             assert received['snapshot'].status.header.stamp==epoch,'expiry renewed measurement epoch'

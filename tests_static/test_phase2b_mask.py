@@ -5,6 +5,7 @@ from pathlib import Path
 import unittest
 import numpy as np
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/'tests_static'))
 sys.path.insert(0,str(ROOT/'src/chili_crane_perception/src'))
 from chili_crane_perception.surface_mask import GrabMask, PitSurfaceBuilder
 from test_phase2b_surface import fixture, cloud
