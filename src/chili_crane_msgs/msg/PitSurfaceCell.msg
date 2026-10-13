@@ -1,0 +1,16 @@
+uint32 index
+bool observed
+uint32 sample_count
+uint32 frame_count
+uint8 sensor_support_mask
+builtin_interfaces/Time last_observed_epoch
+float64 z_median
+float64 z_lower_bound
+float64 z_upper_bound
+float64 roughness_m
+float64 slope_rad
+float64 height_uncertainty_m
+float64 neighborhood_coverage
+uint32 neighborhood_support
+uint8 validity
+string reason

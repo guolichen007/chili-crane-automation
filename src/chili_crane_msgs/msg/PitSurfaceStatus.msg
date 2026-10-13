@@ -16,3 +16,15 @@ float64 robust_min_z_m
 float64 robust_max_z_m
 float64 evidence_age_sec
 chili_crane_msgs/EvidenceMetadata evidence
+# Phase2B: bounded summary, never the complete planning grid.
+string map_id
+string semantic_version
+string snapshot_id
+uint64 surface_generation
+builtin_interfaces/Time window_start
+builtin_interfaces/Time window_end
+string transform_id
+string spatial_calibration_id
+string config_sha256
+bool spatial_eligible
+bool valid_for_control

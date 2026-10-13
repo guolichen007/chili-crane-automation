@@ -1,5 +1,14 @@
 # Project Context
 
+## Phase2B 新阶段（2026-10-13）
+
+用户已授权基于d6f846f1f98e621f18e2f6a124253e083ee68bae建立独立Phase2B分支。
+PHASE2A_FINAL_SOFTWARE_STATUS=PASS_SOFTWARE_SHADOW_NOT_FIELD；PHASE2A_FURTHER_SYNTHETIC_EXPANSION=STOP。
+七包保持；perception料面/mask/扰动，control纯提议；Geofence v2/PTP/vendor/V1及Grab主算法冻结。
+explicit spatial chain+observed-only格网+footprint hard gates+proxy/ranking；所有输出valid_for_control=false。
+PIT_SURFACE_FIELD_STATUS/GRASP_PROPOSAL_FIELD_STATUS/MATERIAL_VOLUME_PROXY_FIELD_STATUS=NOT_RUN。
+实测kernel/CAD/进入深度/生产门槛仍NOT_CONFIGURED；payload留Phase2C。接口与验收见ADR0011和算法文档。
+
 ## Phase2A-R1.1 合同收口（2026-10-13）
 
 基线5a121f8；分支codex/phase2a-r1-1-contract-closeout。保持既有R1感知算法。

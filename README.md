@@ -1,5 +1,10 @@
 # 辣椒地池行车自动抓取框架
 
+当前Phase2B：observed-only料面建模与保守抓取提议（shadow，不下发动作）。
+Phase2A-R1.1以d6f846f正式软件封板，进一步Grab synthetic算法扩展STOP。
+入口：[Phase2B算法/接口](docs/algorithms/Phase2B料面建模与抓取候选.md)、[ADR0011](docs/decisions/0011-phase2b-observed-surface-grasp-proposal.md)。
+生产料面/空间链/抓取kernel与所有现场状态仍NOT_CONFIGURED/NOT_RUN；volume仅proxy。
+
 R1.1 为基于5a121f8的窄合同收口：Y限位可配置解析、X几何职责独立、Clearance内外age一致。
 配置v2和directional_geometry_available需显式迁移；不改变R1算法、现场状态或控制禁用边界。
 入口：[R1.1合同验收](docs/validation/Phase2A-R1.1合同收口验收.md)。

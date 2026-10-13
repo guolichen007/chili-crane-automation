@@ -117,7 +117,12 @@ class GraspPlanner:
             return self._empty(snapshot,"SPATIAL_CONTEXT_STALE_OR_INVALID")
         if (snapshot.config_sha256 != self.config_hash or snapshot.resolution != self.config["resolution_m"]
                 or len(snapshot.cells) != snapshot.width*snapshot.height or len(snapshot.cells) > self.config["maximum_grid_cells"]
-                or any(c.index != i for i,c in enumerate(snapshot.cells))):
+                or any(c.index != i for i,c in enumerate(snapshot.cells))
+                or tuple(snapshot.origin) != tuple(g.polygon.bounds[:2])
+                or snapshot.width != math.ceil((g.polygon.bounds[2]-snapshot.origin[0])/snapshot.resolution)
+                or snapshot.height != math.ceil((g.polygon.bounds[3]-snapshot.origin[1])/snapshot.resolution)
+                or not 0 < snapshot.window_start <= snapshot.window_end
+                or abs(snapshot.context.measurement_epoch-snapshot.window_end) > self.config['epoch_tolerance_sec']):
             return self._empty(snapshot,"GRID_CAPACITY_OR_LAYOUT_INVALID")
         candidates = []
         distance_field = None
@@ -164,7 +169,13 @@ class GraspPlanner:
                                                          current.roughness,current.slope,current.height_uncertainty))
                     fresh=0 <= now-current.last_observed_epoch <= self.config["surface_ttl_sec"]
                     if (current.observed and fresh and finite and current.z_lower_bound <= current.z_median <= current.z_upper_bound
-                            and current.height_uncertainty <= self.config["max_height_dispersion_m"]):
+                            and current.height_uncertainty <= self.config["max_height_dispersion_m"]
+                            and current.sample_count >= self.config['minimum_cell_samples']
+                            and current.frame_count >= self.config['minimum_cell_frames']
+                            and current.sensor_support_mask in (1,2,3) and current.validity in ('VALID','DEGRADED')
+                            and snapshot.window_start <= current.last_observed_epoch <= snapshot.window_end
+                            and current.neighborhood_support >= 3
+                            and current.neighborhood_coverage >= self.config['minimum_neighborhood_coverage']):
                         supported.append((current,area))
             observed_area=sum(a for _,a in supported)
             coverage=min(1.,observed_area/fp.area)

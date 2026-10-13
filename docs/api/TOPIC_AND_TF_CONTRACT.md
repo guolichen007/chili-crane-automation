@@ -1,5 +1,16 @@
 # Topic and TF Contract
 
+## Phase2B shadow additions
+
+Under `/crane_01`: `planning/spatial_context` proves cloud-to-map identity; no implicit TF.
+`lidar/merged_points` plus `perception/pit_surface_input_evidence` feed the surface node.
+Existing GrabGeometrySafetyState/GrabClearanceState remain independent masking evidence.
+`perception/pit_surface_snapshot` carries a bounded typed planning grid; status is summary only.
+`perception/pit_surface_observed_debug` and `pit_surface_unknown_debug` are read-only visualizations.
+`planning/grasp_proposal_shadow` is NOT GraspTarget or a control intent. All control flags remain false.
+`planning/surface_disturbance_shadow` accepts synthetic/replay events only, not physical execution.
+`perception/pit_surface_markers` and `planning/grasp_proposal_markers` label SHADOW/NOT FOR CONTROL.
+
 ## Namespace rule
 
 All per-crane topics are relative and launched under `/crane_<id>`. Phase 1

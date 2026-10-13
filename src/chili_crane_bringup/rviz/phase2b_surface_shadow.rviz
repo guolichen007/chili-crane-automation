@@ -1,0 +1,48 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Fixed Frame: map
+    Background Color: 40; 40; 40
+  Displays:
+    - Class: rviz_default_plugins/PointCloud2
+      Name: SHADOW Observed height (NOT FOR CONTROL)
+      Enabled: true
+      Topic: {Value: /crane_01/perception/pit_surface_observed_debug, Reliability Policy: Best Effort, Durability Policy: Volatile}
+      Color Transformer: AxisColor
+      Axis: Z
+      Size (m): 0.12
+    - Class: rviz_default_plugins/PointCloud2
+      Name: UNKNOWN no-return (not empty)
+      Enabled: true
+      Topic: {Value: /crane_01/perception/pit_surface_unknown_debug, Reliability Policy: Best Effort, Durability Policy: Volatile}
+      Color Transformer: FlatColor
+      Color: 180; 180; 180
+      Size (m): 0.1
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Observed roughness
+      Enabled: false
+      Topic: {Value: /crane_01/perception/pit_surface_observed_debug, Reliability Policy: Best Effort, Durability Policy: Volatile}
+      Color Transformer: Intensity
+      Channel Name: roughness
+      Size (m): 0.12
+    - Class: rviz_default_plugins/PointCloud2
+      Name: Observed neighborhood coverage
+      Enabled: false
+      Topic: {Value: /crane_01/perception/pit_surface_observed_debug, Reliability Policy: Best Effort, Durability Policy: Volatile}
+      Color Transformer: Intensity
+      Channel Name: coverage
+      Size (m): 0.12
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Fixed pit and independent Grab envelope
+      Enabled: true
+      Topic: {Value: /crane_01/perception/pit_surface_markers, Reliability Policy: Best Effort, Durability Policy: Volatile}
+    - Class: rviz_default_plugins/MarkerArray
+      Name: Geofence top-N and selected SHADOW proposal
+      Enabled: true
+      Topic: {Value: /crane_01/planning/grasp_proposal_markers, Reliability Policy: Best Effort, Durability Policy: Volatile}
+  Views:
+    Current: {Class: rviz_default_plugins/Orbit, Distance: 12}
+Window Geometry: {Width: 1280, Height: 800}

@@ -48,6 +48,7 @@ python3 -m unittest discover -s tests_static -p "test_*.py"
 python3 tools/validate_architecture_scenarios.py | tee "$run_dir/architecture-scenarios.json"
 python3 tools/validate_phase2a_synthetic.py --output "$run_dir/phase2a-monte-carlo.json"
 timeout 600s python3 tools/validate_phase2a_r1.py --output "$run_dir/phase2a-r1-sequences.json"
+timeout 600s python3 tools/validate_phase2b_synthetic.py --output "$run_dir/phase2b-sequences.json"
 rosdep check --from-paths src --ignore-src --rosdistro humble
 colcon --log-base "$run_dir/log" build --base-paths "$workspace/src" \
   --build-base "$run_dir/build" --install-base "$run_dir/install" \
@@ -64,6 +65,8 @@ timeout 35s python3 tools/validate_ptp_timescale_ros.py | tee "$run_dir/ptp-time
 timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-dir "$run_dir/phase1c" | tee "$run_dir/installation-capture-synthetic-ros.json"
 bash scripts/validation/rviz_installation_smoke.sh "$workspace" "$run_dir/rviz" | tee "$run_dir/rviz-smoke-result.txt"
 timeout 45s python3 tools/validate_phase2a_ros.py --evidence-dir "$run_dir/phase2a-normal" | tee "$run_dir/phase2a-normal-result.json"
+timeout 65s python3 tools/validate_phase2b_ros.py --evidence-dir "$run_dir/phase2b-normal" | tee "$run_dir/phase2b-normal-result.json"
+sh scripts/validation/rviz_phase2b_smoke.sh "$workspace" "$run_dir/phase2b-rviz"
 # Independent install tree catches executable modes hidden by normal install copies.
 colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$workspace/src" \
   --build-base "$run_dir/symlink-build" --install-base "$run_dir/symlink-install"
@@ -80,6 +83,7 @@ colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$
   done
   timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-dir "$run_dir/symlink-phase1c"
   timeout 45s python3 tools/validate_phase2a_ros.py --evidence-dir "$run_dir/phase2a-symlink"
+  timeout 65s python3 tools/validate_phase2b_ros.py --evidence-dir "$run_dir/phase2b-symlink"
 ) 2>&1 | tee "$run_dir/symlink-executables-and-transport.log"
 ros2 launch chili_crane_bringup mock_system.launch.py > "$run_dir/mock-launch.log" 2>&1 &
 launch_pid=$!

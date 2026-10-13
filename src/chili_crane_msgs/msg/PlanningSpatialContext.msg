@@ -1,0 +1,22 @@
+# Explicit source->map proof. PHYSICAL needs FIELD chain; identity TF is not implied.
+std_msgs/Header header
+uint8 validity
+string reason
+string source_frame
+string target_frame
+string map_id
+string semantic_version
+string pit_id
+string transform_id
+string calibration_id
+string transform_state
+string source_type
+float64[16] transform_row_major
+float64 uncertainty_m
+string[2] sensor_calibration_ids
+bool platform_motion_stable
+string motion_evidence_id
+string field_extrinsic_id
+string axis_to_map_id
+string crane_pose_evidence_id
+chili_crane_msgs/EvidenceMetadata evidence

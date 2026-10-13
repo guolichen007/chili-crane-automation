@@ -122,6 +122,15 @@ GrabGeometry新增model/version/extrinsic ID/state与时延；GrabClearance另�
 消费者须重建消息，读取defined/inside/risk，不得沿用“负数=穿透深度”的判断。
 NOT_CONFIGURED/STALE/DEGRADED/UNKNOWN分开，始终fail-closed且valid_for_control=false。
 
+## Phase2B 增量合同
+
+PitSurfaceStatus扩展snapshot/generation/map/transform/window摘要；完整有界格网独立PitSurfaceSnapshot。
+PlanningSpatialContext明确cloud→map与measurement/来源/标定；无FIELD链的PHYSICAL不能融合。
+UNKNOWN cell数值不可授予资格；planner逐格校验sample/frame/sensor/邻域support、TTL和height bounds。
+GraspCandidate/GraspProposal只含几何/proxy/评分证据，不含方向命令或DO；valid_for_control永远false。
+SurfaceDisturbance仅synthetic/replay，旧generation立即失效，新observed前不恢复。
+这些新增/扩展消息需ROS消费者完整重建；旧GraspTarget不发布、不改变既有安全授权合同。
+
 ## R1.1 合同更正
 
 Geofence配置v2删除X limit signal死字段，拒绝旧版本/旧字段；X只输出方向几何诊断。

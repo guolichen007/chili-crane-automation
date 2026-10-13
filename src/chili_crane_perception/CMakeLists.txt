@@ -6,7 +6,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_python REQUIRED)
 ament_python_install_package(${PROJECT_NAME} PACKAGE_DIR src/${PROJECT_NAME})
-install(PROGRAMS scripts/grab_perception_node.py scripts/grab_clearance_node.py DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS scripts/grab_perception_node.py scripts/grab_clearance_node.py
+  scripts/pit_surface_shadow_node.py DESTINATION lib/${PROJECT_NAME})
 find_package(chili_crane_core REQUIRED)
 find_package(chili_crane_msgs REQUIRED)
 add_library(${PROJECT_NAME} INTERFACE)
@@ -21,6 +22,10 @@ if(BUILD_TESTING)
   ament_add_pytest_test(phase2a_r1 ../../tests_static/test_phase2a_r1.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_slam/src)
   ament_add_pytest_test(phase2a_r11 ../../tests_static/test_phase2a_r11.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
+  ament_add_pytest_test(phase2b_surface ../../tests_static/test_phase2b_surface.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
+  ament_add_pytest_test(phase2b_mask ../../tests_static/test_phase2b_mask.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(perception_contract_compile_test test/perception_contract_compile_test.cpp)

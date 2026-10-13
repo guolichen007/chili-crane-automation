@@ -1,0 +1,20 @@
+# Pure geometric/material diagnostic. Rejected candidates cannot be selected.
+string candidate_id
+uint8 validity
+string reason
+geometry_msgs/Point target_suspension_map
+geometry_msgs/Polygon footprint
+bool hard_gates_passed
+string[] rejection_reasons
+float64 observed_area_fraction
+float64 unknown_area_fraction
+float64 surface_nominal_m
+float64 surface_lower_m
+float64 surface_upper_m
+float64 roughness_m
+float64 slope_rad
+float64 material_volume_proxy_m3
+float64 material_volume_proxy_lower_bound_m3
+float64 wall_clearance_m
+float64 recent_grab_penalty
+bool valid_for_control
