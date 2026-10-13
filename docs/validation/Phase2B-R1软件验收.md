@@ -6,12 +6,12 @@
 
 ## 当前证据边界
 
-CODE_SHA=643008abc1b39e46a36327b31289decf658a706d；WINDOWS_STATUS=PASS_STATIC_NATIVE。
+CODE_SHA=cabd809b8ed98c8cb926b9b0f9fb5429feb05278；WINDOWS_STATUS=PASS_STATIC_NATIVE。
 PHASE2B_R1_STATUS=PASS_SOFTWARE_SHADOW_NOT_FIELD；GITHUB_ACTIONS_STATUS=PASS_FOR_CODE_SHA。
-[Static 38378081528](https://github.com/guolichen007/chili-crane-automation/actions/runs/38378081528)与
-[ROS/vendor 38378081685](https://github.com/guolichen007/chili-crane-automation/actions/runs/38378081685)精确绑定CODE_SHA，均通过。
+[Static 38381824199](https://github.com/guolichen007/chili-crane-automation/actions/runs/38381824199)与
+[ROS/vendor 38381824123](https://github.com/guolichen007/chili-crane-automation/actions/runs/38381824123)精确绑定CODE_SHA，均通过。
 Ubuntu22/Humble normal/symlink七包、A/B installed shadow、旧双雷达/PTP/Phase1C/Capture/RViz/mock/vendor均实跑通过。
-文档归档及验收脚本清理提交的最终HEAD仍需独立CI；不以此历史CODE_SHA自动代替最终HEAD验收。
+本文归档的docs-only最终HEAD仍需独立CI；不以此历史CODE_SHA自动代替最终HEAD验收。
 Windows不能代替ROS构建/消息/CDR/现场验收；Ubuntu容器不等于现场原生主机/真实bag/硬件通过。
 
 首代码406a1ae29926cbc096add87d2a2bdba207775346：Static [38375110250](https://github.com/guolichen007/chili-crane-automation/actions/runs/38375110250)通过，
@@ -26,21 +26,21 @@ R1 installed CDR/performance、Phase2A installed、旧前置入口及vendor通�
 Phase2B installed harness仍按原高频debug同步假设断言，遇到1Hz debug初始空帧而失败，symlink后续未执行。
 修复为独立等待非空observed/UNKNOWN debug，仍保留原非空断言，不修改1Hz设计或任何生产门禁。
 
-Windows完整unittest：370项，366通过、4项无ROS环境跳过；仓库契约/格式通过。
+Windows完整unittest：371项，367通过、4项无ROS环境跳过；仓库契约/格式通过（早期370项属历史记录）。
 旧21场景+64确定性序列×7帧通过，八类旧反证全部0；R1新增五类反证全部0。
-R1专项16项（15通过、1缺ROS跳过），含真实ESDF拒绝减少精确检查，顺序/空坑/活动域/缓存反证。
+R1专项17项（16通过、1缺ROS跳过），含真实ESDF拒绝减少精确检查，顺序/空坑/活动域/缓存与发布龄反证。
 初次真实ESDF fixture未产生拒绝（冻结可达域已排除近墙中心）；改用NON_PRODUCTION大kernel制造真实拒绝，
 没有放松任何门禁或删除断言。此为提交前测试fixture修正，不是现场证据。
 Windows四次workload样本P95：FAST_REJECT 0.60ms、FULL_VALID_PROPOSAL 175.94ms、DENSE_SURFACE 586.36ms。
 最大JSON诊断快照395328bytes，不是DDS载荷；Ubuntu实际CDR见下节。数字仅本机有限样本，不是生产SLA。
 
-Ubuntu构建前unittest：370项，367通过、3项未生成ROS消息跳过；normal与symlink各313项包测试，0错误/失败/跳过。
+Ubuntu构建前unittest：371项，368通过、3项未生成ROS消息跳过；normal与symlink各314项包测试，0错误/失败/跳过。
 R1共时/lineage/jitter/校准链/外参拆分、末端mound/遍历不变、空坑、epsilon带排序、实际ESDF拒绝、L坑coverage、
 稀疏消息往返/CDR与QoS反证通过。老八类计数和新五类计数全部0；21场景/64序列仍保留。
 两个安装树分别验证实际snapshot世代发布、缓存复用、age增长且epoch不变、旧DDS世代不重算，
 扰动ACK/旧观测失效/真实新帧恢复/地图错配/停止输入expiry均通过；A/B各三控制topic消息0。
-软件artifact=11802029859，ZIP SHA256=4f887045b2220651346d0f3388b0a96a126fd704ee01100ca4b3121963f9b960；
-vendor artifact=11801344656。仅通过Actions页面取artifact，临时下载凭证与完整ZIP不入Git。
+软件artifact=11803933214，ZIP SHA256=55d4cc96d157d9a59f503e05d771d89af769d6e6f48fe6c07684e9ac599f7be6；
+vendor artifact=11804050750。仅通过Actions页面取artifact，临时下载凭证与完整ZIP不入Git。
 
 ## 实际CDR性能与容量（CODE_SHA，非生产SLA）
 
@@ -49,9 +49,9 @@ vendor artifact=11801344656。仅通过Actions页面取artifact，临时下载�
 
 | workload | normal P50/P95/MAX ms | symlink P50/P95/MAX ms |
 | --- | --- | --- |
-| FAST_REJECT | 2.43 / 17.76 / 25.96 | 8.81 / 25.03 / 33.66 |
-| FULL_VALID_PROPOSAL | 209.11 / 210.63 / 210.77 | 216.51 / 217.34 / 217.59 |
-| DENSE_SURFACE | 696.09 / 707.15 / 711.40 | 699.81 / 701.84 / 701.93 |
+| FAST_REJECT | 2.97 / 19.52 / 28.40 | 16.00 / 33.07 / 42.17 |
+| FULL_VALID_PROPOSAL | 304.64 / 309.99 / 312.06 | 321.23 / 322.76 / 322.83 |
+| DENSE_SURFACE | 1034.72 / 1040.82 / 1041.70 | 1059.38 / 1070.10 / 1073.60 |
 
 完整三workload逐stage P50/P95/MAX及每样本input/active/observed/serialized cells/bytes、
 scanned/shortlist/ESDF/exact计数在artifact的phase2b-r1-normal.json与phase2b-r1-symlink.json，以下摘要为normal P95。
@@ -59,19 +59,19 @@ scanned/shortlist/ESDF/exact计数在artifact的phase2b-r1-normal.json与phase2b
 
 | stage | FAST_REJECT ms | FULL_VALID_PROPOSAL ms | DENSE_SURFACE ms |
 | --- | --- | --- | --- |
-| transform | 0 | 0.023 | 0.090 |
-| grab mask | 0 | 14.412 | 57.127 |
-| pit filtering | 0 | 13.009 | 52.000 |
-| cell ingest | 0 | 8.218 | 38.488 |
-| temporal fusion | 0 | 6.685 | 26.206 |
-| height bounds | 0 | 1.009 | 3.902 |
-| slope/roughness | 0.013 | 35.575 | 145.490 |
-| snapshot serialization | 2.978 | 2.739 | 10.016 |
-| DDS payload preparation | 13.415 | 2.117 | 4.189 |
-| ESDF reject | 0 | 0.150 | 0.542 |
-| exact candidate geometry | 0 | 68.312 | 146.873 |
-| ranking | 0 | 0.133 | 0.152 |
-| proposal serialization | 0.599 | 4.991 | 5.414 |
+| transform | 0 | 0.040 | 0.124 |
+| grab mask | 0 | 19.572 | 76.664 |
+| pit filtering | 0 | 17.715 | 70.315 |
+| cell ingest | 0 | 13.461 | 64.294 |
+| temporal fusion | 0 | 11.066 | 45.152 |
+| height bounds | 0 | 1.636 | 6.595 |
+| slope/roughness | 0.014 | 56.671 | 228.616 |
+| snapshot serialization | 3.329 | 3.251 | 11.660 |
+| DDS payload preparation | 14.510 | 2.400 | 4.648 |
+| ESDF reject | 0 | 0.245 | 0.863 |
+| exact candidate geometry | 0 | 101.615 | 217.874 |
+| ranking | 0 | 0.157 | 0.182 |
+| proposal serialization | 0.688 | 6.132 | 7.008 |
 
 两安装树最大planning snapshot=109262bytes实际ROS2 CDR（dense observed964/active1024，短名单128）。
 partial容量64/256/1024格分别传30/120/482 observed格，CDR分别4654/14734/55278bytes；UNKNOWN保持隐式。
@@ -81,7 +81,7 @@ FIELD的实际CPU、分辨率、频率、丢包与调度负载仍需实测，不
 
 ## 交付清理
 
-全绿CODE_SHA的退出日志显示own-group SIGINT与launch转发叠加，会二次中断destroy_node。
+历史全绿643008a的退出日志显示own-group SIGINT与launch转发叠加，会二次中断destroy_node。
 收尾仅改为先给launch PID一次SIGINT、超时才对本任务拥有的session group发送SIGTERM，仍有界清理，
 不改变运行算法/门禁/namespace隔离；最终HEAD需要完整CI验证，不能仅凭Windows宣称清理成功。
 
@@ -93,6 +93,10 @@ frame_ttl=2s、surface_ttl=2.5s、window=3s、最多2帧，隔离缓存暂停与
 仍保留停止输入后的expiry/epoch不续期断言。原native fixture的0.7s与旧八类反证不变，FIELD模板仍null，Phase2A门限不变。
 另加publication_gate，在计算结束后用当前源时间与monotonic residence age再次检查surface/独立context TTL；
 计算开始fresh、完成stale必须空提议，保留原epoch。Windows专项增加该反证，最终修复SHA完整CI另核对。
+
+当前CODE_SHA cabd809已完整通过两安装树的314包测试与installed A/B全部反证，实际缓存/aging/expiry明确分开验证。
+发布后龄复核专项通过；normal/symlink两个Phase2B退出日志均无Traceback/KeyboardInterrupt/ERROR。
+此处保留全部失败历史，不通过重跑同一失败SHA掩盖问题；现场状态和控制flags仍不升级。
 
 专项覆盖：lineage与逐帧T、窗口锚点drift、遮罩共时和独立外参、顺序不变有界搜索、
 空坑/底部余量、epsilon带排序、真实ESDF提前拒绝、活动坑coverage、稀疏传输、缓存与QoS。
