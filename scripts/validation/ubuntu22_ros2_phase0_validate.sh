@@ -80,7 +80,7 @@ colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$
   done
   timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-dir "$run_dir/symlink-phase1c"
   timeout 45s python3 tools/validate_phase2a_ros.py --evidence-dir "$run_dir/phase2a-symlink"
-) > "$run_dir/symlink-executables-and-transport.log" 2>&1
+) 2>&1 | tee "$run_dir/symlink-executables-and-transport.log"
 ros2 launch chili_crane_bringup mock_system.launch.py > "$run_dir/mock-launch.log" 2>&1 &
 launch_pid=$!
 cleanup() {

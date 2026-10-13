@@ -87,10 +87,15 @@ def main():
 
         def pump(duration, stationary=None, clock=1, frame=1, collect=False, until_complete=False):
             end, next_pub = time.monotonic() + duration, 0
+            expected_ns, expected_stamp, generation_collected = None, None, True
             while time.monotonic() < end:
-                if time.monotonic() >= next_pub:
+                # Do not overwrite half-delivered synthetic generations. Exercise
+                # actual DDS callbacks, then collect exactly one coherent batch.
+                if time.monotonic() >= next_pub and generation_collected:
                     now = observer.get_clock().now()
                     ns = now.nanoseconds - 20000000
+                    expected_ns, expected_stamp = ns, now.nanoseconds/1e9
+                    generation_collected = not collect
                     for s in ("204", "205"):
                         timing = SensorTimingState()
                         evidence(timing, now.to_msg())
@@ -121,8 +126,19 @@ def main():
                         pubs["rig"].publish(motion)
                     next_pub = time.monotonic() + .08
                 executor.spin_once(timeout_sec=.002)
-                if collect:
+                coherent = (collect and expected_ns is not None
+                    and all(expected_ns in capture.buffers[s]["canonical"]
+                            and expected_ns+37000000000 in capture.buffers[s]["raw"] for s in ("204","205"))
+                    and all(abs(capture.evidence.get(k,{}).get("measurement_at",0)-expected_stamp)<1e-6
+                            for k in ("204","205","dual","rig"))
+                    and all(abs(capture.clock_status.get(s,{}).get("difop_received_at",0)-expected_stamp)<1e-6
+                            for s in ("204","205")))
+                if coherent and not generation_collected:
                     capture.collect()
+                    generation_collected = True
+                elif collect and expected_stamp is not None and observer.get_clock().now().nanoseconds/1e9-expected_stamp > .18:
+                    # Bounded transport drop recovery, NOT an evidence TTL change.
+                    generation_collected = True
                 if until_complete and len(capture.accumulator.rows) == 20 and capture.gate():
                     break
         try:
