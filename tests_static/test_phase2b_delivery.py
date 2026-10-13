@@ -111,3 +111,5 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(result['status'],'PASS')
         self.assertEqual(set(result['counts'].values()),{0})
         self.assertEqual(len(result['scenarios']),21)
+        self.assertEqual(result['sequence_coverage']['moving_grab'],1)
+        self.assertGreater(result['sequence_coverage']['generation_checks'],0)

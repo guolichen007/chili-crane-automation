@@ -30,7 +30,8 @@ Phase2B自己的生产阈值仍null/NOT_CONFIGURED，synthetic参数只在独立
 354项：351通过、3跳过（既有ROS环境依赖、新generated-message roundtrip、新ROS节点bootstrap）。
 ROS build/launch/colcon在Windows均NOT_RUN；typed roundtrip另由Ubuntu package tests执行。
 21场景与64确定性序列×7帧，seed=20261013，全部八计数0；保留全部场景和失败样例数组。
-P50/P95/MAX=106.82/130.61/178.92ms，含场景提议与序列融合/提议的混合采样，不是生产SLA。
+P50/P95/MAX=26.32/142.93/195.72ms，含场景提议与序列融合/提议/快速拒绝的混合采样，不是生产SLA。
+运动Grab64帧、单雷达64帧、dropout64帧、恢复128帧、扰动64次、旧generation核验256次；每个序列候选独立审计。
 静态/native入口证明有限合成合同，不证明真实CAD、空间标定、运动补偿、物料动力学或载荷。
 
 ## 计数和软件边界
@@ -61,6 +62,10 @@ ESDF只有reject路径，最乐观错误场仍需exact polygon；四项控制fla
 - 3d83d26：Static38356263042通过；ROS38356263171七包build、295包测试全部通过，旧Phase2A installed也通过。
   新提议节点启动赋值self.context触及rclpy.Node只读属性，实际launch日志显示AttributeError。
   改用spatial_context_input并新增真实Node bootstrap反证；同步处理新节点SIGINT关闭，不改冻结Phase2A。
+- 3f7ebdd：Static38357790669通过；ROS38357790733七包build、296包测试通过，
+  但旧R1.1单次Geometry反证收到样本不足，clearance进程日志无启动异常。
+  原harness只检查输入订阅图，未确认输出数据链；新增实际初始输出握手后再发唯一Geometry。
+  六秒发现期限、一秒观察窗、原epoch/age/STALE断言和生产TTL均不改；不能标该SHA为全部PASS。
 
 这些SHA不标全部PASS。没有删除失败测试、缩减入口或通过重复重跑掩盖实际缺陷。
 

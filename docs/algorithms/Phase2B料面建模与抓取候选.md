@@ -81,6 +81,7 @@ planning/surface_disturbance_shadow仅接受synthetic/replay，不是执行命�
 RViz显示height/roughness/coverage、UNKNOWN、pit、独立Grab包络、可达域、top-10与selected shadow。
 
 Windows：仓库静态测试和tools/validate_phase2b_synthetic.py；21场景、64确定性序列×7帧。
+序列实际移动Grab footprint，moving/non-compensated帧拒绝融合；每个序列候选独立做墙/可达域/UNKNOWN反证。
 Ubuntu：原验收入口追加normal/symlink installed Phase2B、实际RViz加载；Phase2A和旧双雷达/PTP/Phase1C/vendor不缩减。
 tools/validate_phase2b_ros.py用规范化synthetic Phase2A消息验证传输，不冒充真实Grab CAD或FIELD联机。
 性能P50/P95/MAX分平台记录，不冻结生产时延；所有计数是有限fixture反证，不是现场概率保证。

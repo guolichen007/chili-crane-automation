@@ -28,9 +28,14 @@ def validate_clearance_age(node, config_file, geometry, qos, evidence_dir):
     """One synthetic Geometry publication to a separate INSTALLED clearance node."""
     namespace=node.get_namespace()+"/r11_age_contract"
     samples=[]
+    received_initial_output=[False]
     marker=geometry.evidence.source_counter+10000
+    def observe(m):
+        received_initial_output[0]=True
+        if m.evidence.source_counter==marker and len(samples)<64:
+            samples.append(m)
     sub=node.create_subscription(GrabClearanceState,namespace+"/perception/grab_clearance",
-        lambda m:samples.append(m) if m.evidence.source_counter==marker and len(samples)<64 else None,qos)
+        observe,qos)
     pub=node.create_publisher(GrabGeometrySafetyState,namespace+"/perception/grab_geometry_safety",qos)
     log=(evidence_dir/"clearance-age-contract.log").open("w",encoding="utf-8")
     child=subprocess.Popen(["ros2","run","chili_crane_perception","grab_clearance_node.py","--ros-args",
@@ -38,10 +43,11 @@ def validate_clearance_age(node, config_file, geometry, qos, evidence_dir):
         stdout=log,stderr=subprocess.STDOUT)
     try:
         discovery=time.monotonic()+6
-        while pub.get_subscription_count()==0 and time.monotonic()<discovery:
+        while (pub.get_subscription_count()==0 or not received_initial_output[0]) and time.monotonic()<discovery:
             assert child.poll() is None,"installed clearance age node exited"
             rclpy.spin_once(node,timeout_sec=.02)
         assert pub.get_subscription_count()>0,"clearance age input did not discover"
+        assert received_initial_output[0],"clearance age OUTPUT transport did not become ready"
         sample=copy.deepcopy(geometry)
         sample.header.stamp=node.get_clock().now().to_msg()
         sample.evidence.measurement_stamp=copy.deepcopy(sample.header.stamp)
