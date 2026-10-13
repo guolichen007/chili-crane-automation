@@ -125,6 +125,10 @@ NATIVE_UBUNTU_FIELD_MACHINE_STATUS=NOT_RUN
   但旧R1.1单次Geometry反证收到样本不足，clearance进程日志无启动异常。
   原harness只检查输入订阅图，未确认输出数据链；新增实际初始输出握手后再发唯一Geometry。
   六秒发现期限、一秒观察窗、原epoch/age/STALE断言和生产TTL均不改；不能标该SHA为全部PASS。
+- 4a44249文档HEAD：normal全流程通过，symlink七包/296测试通过，但旧R1.1 epoch不变断言失败。
+  harness的normal/symlink共用namespace，且ros2 run wrapper清理未覆盖独立子节点，存在旧publisher/epoch混入路径。
+  改为每次唯一namespace、确切一个reader/publisher、自建隔离进程组SIGINT/TERM清理；不改算法或原断言。
+  该HEAD不标全部PASS；63576d18代码验收的完整成功事实仍保留，后续HEAD独立复验。
 
 这些SHA不标全部PASS。没有删除失败测试、缩减入口或通过重复重跑掩盖实际缺陷。
 

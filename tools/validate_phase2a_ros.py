@@ -3,11 +3,14 @@
 import argparse
 import copy
 import json
+import os
 from pathlib import Path
 import subprocess
+import signal
 import sys
 import tempfile
 import time
+import uuid
 import numpy as np
 import yaml
 import rclpy
@@ -26,7 +29,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def validate_clearance_age(node, config_file, geometry, qos, evidence_dir):
     """One synthetic Geometry publication to a separate INSTALLED clearance node."""
-    namespace=node.get_namespace()+"/r11_age_contract"
+    # normal/symlink invocations must not share a retained source or publisher.
+    namespace=node.get_namespace()+"/r11_age_contract_"+uuid.uuid4().hex[:12]
     samples=[]
     received_initial_output=[False]
     marker=geometry.evidence.source_counter+10000
@@ -40,7 +44,7 @@ def validate_clearance_age(node, config_file, geometry, qos, evidence_dir):
     log=(evidence_dir/"clearance-age-contract.log").open("w",encoding="utf-8")
     child=subprocess.Popen(["ros2","run","chili_crane_perception","grab_clearance_node.py","--ros-args",
         "-r","__ns:="+namespace,"-r","__node:=clearance_age_contract","-p","config_file:="+str(config_file)],
-        stdout=log,stderr=subprocess.STDOUT)
+        stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
     try:
         discovery=time.monotonic()+6
         while (pub.get_subscription_count()==0 or not received_initial_output[0]) and time.monotonic()<discovery:
@@ -48,6 +52,8 @@ def validate_clearance_age(node, config_file, geometry, qos, evidence_dir):
             rclpy.spin_once(node,timeout_sec=.02)
         assert pub.get_subscription_count()>0,"clearance age input did not discover"
         assert received_initial_output[0],"clearance age OUTPUT transport did not become ready"
+        assert pub.get_subscription_count()==1,"multiple clearance input readers in isolated namespace"
+        assert node.count_publishers(namespace+"/perception/grab_clearance")==1,"multiple clearance publishers"
         sample=copy.deepcopy(geometry)
         sample.header.stamp=node.get_clock().now().to_msg()
         sample.evidence.measurement_stamp=copy.deepcopy(sample.header.stamp)
@@ -75,11 +81,20 @@ def validate_clearance_age(node, config_file, geometry, qos, evidence_dir):
                     CLEARANCE_MEASUREMENT_EPOCH_UNCHANGED="PASS",CLEARANCE_EVENTUALLY_STALE="PASS",
                     geometry_publications=1,clearance_samples=len(samples))
     finally:
-        child.send_signal(2)
+        # ros2 run is a wrapper process. Signal its OWN isolated group, including
+        # the executable child, rather than leaving a stale timer node behind.
+        try:
+            os.killpg(child.pid,signal.SIGINT)
+        except ProcessLookupError:
+            pass
         try:
             child.wait(timeout=8)
         except subprocess.TimeoutExpired:
-            child.terminate();child.wait(timeout=5)
+            try:
+                os.killpg(child.pid,signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            child.wait(timeout=5)
         log.close()
         node.destroy_subscription(sub)
         node.destroy_publisher(pub)

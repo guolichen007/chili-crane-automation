@@ -51,6 +51,10 @@ class DeliveryTests(unittest.TestCase):
         self.assertIn('[<=100000] cells',(msgs/'PitSurfaceSnapshot.msg').read_text())
         self.assertNotIn('PitSurfaceCell',(msgs/'PitSurfaceStatus.msg').read_text())
         self.assertIn('[<=4096] candidates',(msgs/'GraspProposal.msg').read_text())
+        transport=(ROOT/'tools/validate_phase2a_ros.py').read_text(encoding='utf-8')
+        self.assertIn('start_new_session=True',transport)
+        self.assertIn('os.killpg(child.pid,signal.SIGINT)',transport)
+        self.assertIn('uuid.uuid4().hex',transport)
 
     def test_interpolated_or_unproven_cells_cannot_rank(self):
         from dataclasses import replace
