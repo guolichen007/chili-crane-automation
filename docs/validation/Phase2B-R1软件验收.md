@@ -85,6 +85,15 @@ FIELD的实际CPU、分辨率、频率、丢包与调度负载仍需实测，不
 收尾仅改为先给launch PID一次SIGINT、超时才对本任务拥有的session group发送SIGTERM，仍有界清理，
 不改变运行算法/门禁/namespace隔离；最终HEAD需要完整CI验证，不能仅凭Windows宣称清理成功。
 
+cdc2e7ece085f1e99f1cce7f2328c1c056a9392d的[Static 38380150855](https://github.com/guolichen007/chili-crane-automation/actions/runs/38380150855)与vendor通过；
+[ROS 38380150802](https://github.com/guolichen007/chili-crane-automation/actions/runs/38380150802)的normal七包/313测试/前置入口通过，
+在installed旧世代重放的缓存暂停中，共享runner延迟使原0.7秒输入TTL到期，runtime正确fail-closed，测试等待cache命中超时。
+因此最后HEAD未通过，不能以历史643全绿替代。修复installed专用NON_PRODUCTION profile：
+frame_ttl=2s、surface_ttl=2.5s、window=3s、最多2帧，隔离缓存暂停与合法窗口淘汰；
+仍保留停止输入后的expiry/epoch不续期断言。原native fixture的0.7s与旧八类反证不变，FIELD模板仍null，Phase2A门限不变。
+另加publication_gate，在计算结束后用当前源时间与monotonic residence age再次检查surface/独立context TTL；
+计算开始fresh、完成stale必须空提议，保留原epoch。Windows专项增加该反证，最终修复SHA完整CI另核对。
+
 专项覆盖：lineage与逐帧T、窗口锚点drift、遮罩共时和独立外参、顺序不变有界搜索、
 空坑/底部余量、epsilon带排序、真实ESDF提前拒绝、活动坑coverage、稀疏传输、缓存与QoS。
 运行tools/validate_phase2b_r1.py保存逐stage原始统计；workloads分开，不将mixed P95包装为生产SLA。

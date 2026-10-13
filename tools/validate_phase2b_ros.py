@@ -36,6 +36,11 @@ def main():
     for package,name in (('chili_crane_perception','pit_surface_shadow_node.py'),('chili_crane_perception','grasp_proposal_shadow_node.py')):
         assert name in subprocess.check_output(['ros2','pkg','executables',package],text=True)
     c,s,gc,ctx,grab=fixture(ROOT/'config/safety/pit_operational_geofence.template.yaml')
+    # Explicit NON_PRODUCTION installed-test profile. Isolate cache reuse from
+    # legitimate sample-window expiration on shared runners. The original .7 s
+    # fixture and all native expiry counterexamples remain unchanged; installed
+    # source expiry and unchanged epoch are still independently asserted below.
+    c.update(frame_ttl_sec=2.,surface_ttl_sec=2.5,window_sec=3.,maximum_window_frames=2)
     with tempfile.TemporaryDirectory(prefix='phase2b-synthetic-') as tmp:
         tmp=Path(tmp)
         semantic=tmp/'semantic.yaml';geofence=tmp/'geofence.yaml';config=tmp/'surface.yaml'

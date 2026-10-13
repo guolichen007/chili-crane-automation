@@ -129,6 +129,17 @@ class GraspPlanner:
         return GraspProposal(f"{snapshot.snapshot_id}:none",snapshot.snapshot_id,snapshot.generation,snapshot.window_end,
             (),None,reason,snapshot.context,self.geofence.provenance(),self.kernel.kernel_id)
 
+    def publication_gate(self, proposal, snapshot, now, age, context):
+        """Recheck after expensive computation, not just when computation started."""
+        if (not math.isfinite(age) or not 0 <= age <= self.config['surface_ttl_sec']
+                or not math.isfinite(now) or not 0 <= now-snapshot.window_end <= self.config['surface_ttl_sec']):
+            return self._empty(snapshot,'SURFACE_STALE_AT_PUBLICATION')
+        try:
+            context.validate(self.config,self.geofence.semantic,context.source_frame,context.measurement_epoch,now)
+        except (ValueError,TypeError,KeyError,AttributeError):
+            return self._empty(snapshot,'SPATIAL_CONTEXT_STALE_AT_PUBLICATION')
+        return proposal
+
     def plan(self, snapshot, now, expected_context, expected_generation, recent=None):
         """A caller MUST bind latest generation and independently current spatial context."""
         g, p = self.geofence, self.config["planning"]

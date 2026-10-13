@@ -104,7 +104,9 @@ class GraspProposalShadowNode(Node):
             snapshot=self.decoded_snapshot
             ctx=context_from_message(ctx_msg)
             result=self.planner.plan(snapshot,now,ctx,self.generation_floor,self.recent)
-            age=max(now-snapshot.window_end,message.status.evidence_age_sec+time.monotonic()-arrival)
+            publish_now=source_now(self,self.config)
+            age=max(publish_now-snapshot.window_end,message.status.evidence_age_sec+time.monotonic()-arrival)
+            result=self.planner.publication_gate(result,snapshot,publish_now,age,ctx)
             if result is not self.last_result:
                 tick=time.perf_counter()
                 self.serialized_proposal=proposal_to_message(result,message,age)

@@ -209,6 +209,20 @@ class ReadinessTests(unittest.TestCase):
                     'minimum_conservative_material_height_above_pit_bottom_m','volume_equivalence_epsilon'):
             self.assertIsNone(c['planning'][key])
 
+    def test_publication_rechecks_age_after_slow_compute_without_renewing_epoch(self):
+        _,snap=self.populated();planner=GraspPlanner(self.c,self.geo)
+        result=planner.plan(snap,10.06,snap.context,snap.generation)
+        self.assertIsNotNone(result.selected)
+        self.assertIs(planner.publication_gate(result,snap,10.07,.02,snap.context),result)
+        # Time advances while computing; source epoch is not changed to hide delay.
+        for now,age,reason in ((10.07,.6,'SURFACE_STALE_AT_PUBLICATION'),
+                               (10.3,.25,'SPATIAL_CONTEXT_STALE_AT_PUBLICATION'),
+                               (10.07,float('nan'),'SURFACE_STALE_AT_PUBLICATION')):
+            rejected=planner.publication_gate(result,snap,now,age,snap.context)
+            self.assertIsNone(rejected.selected)
+            self.assertEqual(rejected.measurement_epoch,result.measurement_epoch)
+            self.assertEqual(rejected.reason,reason)
+
     def test_ros_qos_and_sparse_cdr_bounds(self):
         try:
             import rclpy

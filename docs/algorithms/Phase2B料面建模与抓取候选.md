@@ -127,6 +127,8 @@ surface缓存fusion snapshot；仅generation变化做重序列化/CDR准备/DDS�
 observed/unknown debug和marker独立1Hz，非planning transport。planner cache绑定snapshot_id/generation/
 disturbance_counter/lineage/config hash及recent counter；同不可变snapshot不重解，map/pose/TTL仍每次验证。
 ROS adapter只解码新snapshot一次，拒绝倒序/重复世代，不重置arrival。proposal心跳不更新source epoch/counter。
+耗时规划完成后publication_gate再次检查当前源时间、surface TTL与独立context TTL，避免开始fresh、发布时stale；
+包含monotonic residence age，不通过改header或measurement epoch隐藏耗时。
 同世代recent penalty固定为计算时的诊断值，过期后只在下次新世代重排；不能当作新观测。
 QoS分型和可靠性/最新状态/迟加入取舍见ADR0011，不把DDS reliability等同于实时或安全保证。
 
@@ -145,3 +147,5 @@ Windows byte count为NATIVE_JSON_DIAGNOSTIC_NOT_DDS；Ubuntu installed测实际R
 64/256/1024格partial容量检查UNKNOWN隐式，CDR边界16384+192×serialized_cells用于当前有界synthetic身份，
 不是任意超长字符串/任意生产配置的通用DDS保证；FIELD尺寸、频率、CPU、网络必须独立验收。
 旧八类安全计数和新增五类反证均要求0；ROS installed另验证世代快照静默、缓存age增长、旧DDS世代不重算。
+installed专用NON_PRODUCTION时间profile为frame TTL 2s/surface TTL 2.5s/window 3s/最多2帧，
+将共享runner中的缓存暂停与自然窗口淘汰分开；停止输入expiry仍单独断言。native原0.7s与FIELD null不变。
