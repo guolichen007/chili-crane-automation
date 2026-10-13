@@ -8,7 +8,8 @@ from unittest.mock import patch
 import numpy as np
 from shapely.geometry import Point, Polygon
 ROOT=Path(__file__).resolve().parents[1]
-sys.path[:0]=[str(ROOT/'tests_static'),str(ROOT/'src/chili_crane_control/src'),str(ROOT/'src/chili_crane_perception/src')]
+sys.path[:0]=[str(ROOT/'tests_static'),str(ROOT/'src/chili_crane_control/src'),str(ROOT/'src/chili_crane_perception/src'),
+             str(ROOT/'src/chili_crane_slam/src')]
 from test_phase2b_planning import planning_fixture
 from test_phase2b_surface import cloud,add
 from test_phase2b_mask import mask_fixture
@@ -78,6 +79,7 @@ class ReadinessTests(unittest.TestCase):
         self.assertFalse(b.ingest(p,sensors,frame,ctx,replace(grab,epoch=9.9),10.01))
         self.assertEqual(b.grid.reason,'GRAB_MASK_TIME_ALIGNMENT_REJECTED')
         self.assertFalse(b.grid.frames)
+        self.assertEqual(b.grid.snapshot(10.02).reason,'GRAB_MASK_TIME_ALIGNMENT_REJECTED')
 
     def test_distinct_chain_and_extrinsic_correct_but_mismatch_rejected(self):
         c,s,ctx,grab=mask_fixture();ctx=replace(ctx,calibration_id='full-chain',field_extrinsic_id=grab.calibration_id)

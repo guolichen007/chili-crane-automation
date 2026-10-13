@@ -279,7 +279,7 @@ class PitSurfaceGrid:
             changed = True
         if changed:
             self.generation += 1
-        if not self.frames:
+        if not self.frames and changed:
             self.reason = "SURFACE_STALE"
 
     def invalidate(self, polygon, event_epoch):

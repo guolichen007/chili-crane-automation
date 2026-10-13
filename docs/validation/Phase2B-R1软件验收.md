@@ -10,6 +10,12 @@ CODE_SHA=PENDING_COMMIT；WINDOWS_STATUS=PASS_STATIC_NATIVE；GITHUB_ACTIONS_STA
 Ubuntu22/Humble normal/symlink七包、A/B installed shadow、旧双雷达/PTP/Phase1C/Capture/RViz/mock/vendor
 须由同一精确SHA的CI实跑确认。Windows不能代替ROS构建/消息/CDR/现场验收。
 
+首代码406a1ae29926cbc096add87d2a2bdba207775346：Static [38375110250](https://github.com/guolichen007/chili-crane-automation/actions/runs/38375110250)通过，
+[ROS 38375110164](https://github.com/guolichen007/chili-crane-automation/actions/runs/38375110164)失败；vendor通过、normal七包构建通过，
+313包测试中R1独立pytest缺slam源路径而失败（包含CTest包装失败），没有执行后续installed验收。
+修复仅R1测试自身源路径；不放松断言/核心/Phase2A门限。新SHA完整CI必须重新执行。
+同时保留具体hard-reject reason，不再被无观测snapshot泛化为SURFACE_STALE；增加遮罩共时原因持久反证。
+
 Windows完整unittest：370项，366通过、4项无ROS环境跳过；仓库契约/格式通过。
 旧21场景+64确定性序列×7帧通过，八类旧反证全部0；R1新增五类反证全部0。
 R1专项16项（15通过、1缺ROS跳过），含真实ESDF拒绝减少精确检查，顺序/空坑/活动域/缓存反证。
