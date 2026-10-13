@@ -7,6 +7,8 @@ install(PROGRAMS scripts/fail_safe_safety_supervisor.py
   scripts/mock_servo_csv_publisher.py scripts/action_executor.py DESTINATION lib/${PROJECT_NAME})
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(operational_geofence ../../tests_static/test_operational_geofence.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
   ament_add_pytest_test(architecture_contracts test/test_architecture.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_hardware/src)
 endif()
