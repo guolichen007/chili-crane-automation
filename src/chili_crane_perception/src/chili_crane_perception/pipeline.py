@@ -22,6 +22,7 @@ NUMERIC_PARAMETERS += ("model_gate_band_m", "lost_hold_gate_factor", "maximum_mo
                        "model_gate_normal_cosine", "model_gate_plane_band_m")
 INTEGER_PARAMETERS = {"maximum_input_points": (32, 200000), "maximum_candidate_points": (32, 20000),
     "registration_retry_count": (0, 2),
+    "diagnostic_registration_iterations": (1, 100),
     "minimum_candidate_points": (20, 20000), "maximum_candidates": (1, 8), "normal_neighbors": (5, 50),
     "registration_iterations": (1, 100), "robust_iterations": (1, 20),
     "minimum_support_sectors": (1, 8), "confirmation_frames": (2, 20)}
@@ -40,6 +41,8 @@ def policy_from_config(config):
         raise ValueError("INVALID_SUPPORT_POLICY")
     if p["model_gate_normal_cosine"] > 1 or p["lost_hold_gate_factor"] < 1:
         raise ValueError("INVALID_MODEL_GATE_POLICY")
+    if p["diagnostic_registration_iterations"] > p["registration_iterations"]:
+        raise ValueError("DIAGNOSTIC_BUDGET_EXCEEDS_PRIMARY")
     from chili_crane_slam.pointcloud import crop, CANONICAL
     crop(np.zeros(0, dtype=CANONICAL), p.get("search_bounds_m"))
     for key in ("stable_enter", "stable_exit"):
@@ -135,13 +138,18 @@ class GrabPerceptionPipeline:
                 _, vectors = np.linalg.eigh(np.cov(xyz[:, :2].T))
                 yaw = float(np.arctan2(vectors[1, -1], vectors[0, -1]))
                 angles = [yaw, yaw + np.pi / 2]
+            if is_diagnostic and observations:
+                # Alternate opening remains a real bounded native solve. Once
+                # primary pose exists it does not need another global yaw search.
+                base = min(observations, key=lambda o:o[0])[2].copy()
+                angles = [0.]
             for geometry_opening in [geometry_opening]:
                 for yaw in angles:
                     seed = base.copy()
                     seed[:3, :3] = seed[:3, :3] @ Rotation.from_rotvec([0, 0, yaw]).as_matrix()
                     try:
                         registration_start = time.perf_counter()
-                        measured = self.registration.register(candidate, seed, geometry_opening)
+                        measured = self.registration.register(candidate, seed, geometry_opening, diagnostic=is_diagnostic)
                         registration_seconds += time.perf_counter()-registration_start
                         validation_start = time.perf_counter()
                         status, reasons, canonical_pose = self.validator.evaluate(

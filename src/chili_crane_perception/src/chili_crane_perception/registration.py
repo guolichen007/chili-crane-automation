@@ -162,10 +162,13 @@ class GrabModelRegistration:
                 levels.append((cloud, tree, xyz, normals, cKDTree(xyz)))
             self.cached[opening] = levels
 
-    def register(self, candidate, seed, opening):
+    def register(self, candidate, seed, opening, diagnostic=False):
         observed = np.column_stack([candidate[k] for k in ("x", "y", "z")]).astype(float)
         inverse = np.linalg.inv(rigid(seed))
-        cfg, converged = self.policy, False
+        cfg, converged = dict(self.policy), False
+        if diagnostic:
+            cfg["registration_iterations"] = cfg["diagnostic_registration_iterations"]
+            cfg["registration_retry_count"] = 0
         for level, voxel in zip(self.cached[opening], self.voxels[opening]):
             source, _ = self.native.preprocess_points(observed, voxel, cfg["normal_neighbors"], 1)
             if source.size() < cfg["normal_neighbors"]:
@@ -234,10 +237,6 @@ class GrabModelRegistration:
         source_xyz, source_normals = source.points()[:,:3], source.normals()[:,:3]
         _, source_ids = cKDTree(source_xyz).query(observed[keep])
         observed_normals = source_normals[source_ids]
-        j = np.hstack([observed_normals, np.cross(mp, observed_normals @ pose[:3, :3])])
-        h = j.T @ (weights[:, None] * j)
-        physical_values, eigenvectors = np.linalg.eigh((h + h.T) / 2)
-        floor = max(physical_values.max() * cfg["information_eigen_ratio"], 1e-12)
         support_center = (model_points.min(axis=0) + model_points.max(axis=0)) / 2
         characteristic_length = max(float(np.sqrt(np.mean(np.sum(
             (model_points-support_center)**2, axis=1)))), 1e-9)
@@ -245,7 +244,8 @@ class GrabModelRegistration:
         normalized_j = np.hstack([observed_normals, np.cross(
             (mp-support_center)/characteristic_length, observed_normals @ pose[:3,:3])])
         normalized_h = normalized_j.T @ (weights[:,None] * normalized_j)
-        eigenvalues = np.linalg.eigvalsh((normalized_h + normalized_h.T)/2)
+        eigenvalues, eigenvectors = np.linalg.eigh((normalized_h + normalized_h.T)/2)
+        floor = max(eigenvalues.max()*cfg["information_eigen_ratio"],1e-12)
         sectors = len(np.unique((mp >= support_center).astype(int) @ np.array([1, 2, 4])))
         extent = float(np.min(np.ptp(mp, axis=0) / np.maximum(np.ptp(model_points, axis=0), 1e-12)))
         support = max(float(keep.mean()) * max(sectors / 8, 1e-3), 1e-3)
@@ -253,7 +253,13 @@ class GrabModelRegistration:
         variance = max(cfg["sensor_noise_m"]**2, float(np.median(np.abs(residual)))**2) / support
         if len(sensors) == 1:
             variance *= cfg["single_sensor_covariance_factor"]
-        uncertainty = (eigenvectors * (variance / np.maximum(physical_values, floor))) @ eigenvectors.T
+        normalized_cov = (eigenvectors * (variance / np.maximum(eigenvalues, floor))) @ eigenvectors.T
+        # Undo normalized length AND displaced support origin, preserving physical
+        # world-translation / body-radian covariance with full cross blocks.
+        inverse_basis = np.eye(6)
+        inverse_basis[:3,3:] = pose[:3,:3] @ skew(support_center) / characteristic_length
+        inverse_basis[3:,3:] /= characteristic_length
+        uncertainty = inverse_basis @ normalized_cov @ inverse_basis.T
         return Observation(rigid(pose), uncertainty, opening, converged, float(keep.mean()),
             float(np.percentile(np.abs(residual), 50)), float(np.percentile(np.abs(residual), 95)),
             sectors, extent, sensors, eigenvalues,

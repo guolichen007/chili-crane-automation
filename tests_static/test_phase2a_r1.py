@@ -80,6 +80,10 @@ class R1TrackingTests(unittest.TestCase):
             scene(c["model"],pose,10),seed,"CLOSED")
         self.assertEqual(original.sectors,translated.sectors)
         self.assertAlmostEqual(original.condition,translated.condition,delta=original.condition*.1)
+        from chili_crane_slam.extrinsic_solver import skew
+        basis=np.eye(6);basis[:3,3:]=-translated.pose[:3,:3]@skew(offset)
+        centered=basis@translated.covariance@basis.T
+        np.testing.assert_allclose(centered,original.covariance,rtol=.25,atol=1e-8)
 
     def test_core_transition_longer_than_timeout_and_missing_fallback(self):
         c=core_fixture();p=GrabPerceptionPipeline(c);pose=np.eye(4);pose[2,3]=2

@@ -1,5 +1,14 @@
 # System Architecture and Roadmap
 
+## Phase2A-R1 当前架构边界（2026-10-13）
+
+基线dc42fb16；ADR0010。core定义Geofence引用/纯诊断契约，control实现独立XY纯策略，
+perception加固Grab模型门控、core TRANSITION、状态epoch和动态墙距/身份。
+OperationalGeofence引用SemanticMap V1而非复制坑坐标，经FIELD axis-to-map核验悬挂点域。
+硬接坑方向限位、拉绳/伺服标定与制动能力均现场待确认；任何合成PASS不升级现场状态。
+本轮仍无PitSurface/GraspPlanner/production NDT/伺服动作/DO输出/VALID SafetyPermit。
+软件验收和后续路线见docs/项目进展.md及docs/validation/Phase2A-R1软件验收.md。
+
 ## 1. Design goal
 
 The framework must survive hardware and protocol changes without rewriting

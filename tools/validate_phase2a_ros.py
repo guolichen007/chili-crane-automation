@@ -80,8 +80,8 @@ def main():
                 assert process.poll() is None, "shadow launch exited"
                 assert preview.poll() is None, "installed preview exited"
                 if time.monotonic() >= next_frame:
-                    stamp = node.get_clock().now().nanoseconds/1e9-.07
-                    points = scene(config["model"],truth,stamp)
+                    stamp = node.get_clock().now().nanoseconds/1e9-.015
+                    points = scene(config["model"],truth,stamp,span=.02)
                     cloud = cloud_message(Cloud(stamp,time.monotonic(),"map",points))
                     meta = EvidenceMetadata()
                     meta.header = cloud.header
@@ -91,7 +91,7 @@ def main():
                     meta.source_counter = counter
                     meta.validity,meta.source_type = meta.VALID,meta.SOURCE_SYNTHETIC
                     meta.calibration_id,meta.config_version = "synthetic-extrinsic","synthetic-ci-v1"
-                    meta.evidence_age_sec = .07
+                    meta.evidence_age_sec = .015
                     io = GrabIoState(validity=GrabIoState.VALID,closed_limit=True,evidence_age_sec=0.)
                     evidence.publish(meta)
                     io_pub.publish(io)

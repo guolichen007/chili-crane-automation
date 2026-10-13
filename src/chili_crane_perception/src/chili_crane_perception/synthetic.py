@@ -48,6 +48,7 @@ def fixture():
         maximum_input_points=10000, maximum_candidate_points=8000, minimum_candidate_points=40,
         maximum_candidates=3, normal_neighbors=10, registration_iterations=35, robust_iterations=5,
         registration_retry_count=1,
+        diagnostic_registration_iterations=12,
         minimum_support_sectors=4, confirmation_frames=3,
         search_bounds_m=[-6, 6, -6, 6, 0, 8], self_masks=[],
         stable_enter=[.03, .08, .03, .02], stable_exit=[.06, .15, .06, .04])

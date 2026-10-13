@@ -215,9 +215,14 @@ GEOMETRY_IO_OPEN/CLOSED_CONFLICT，拒绝测量。TRANSITION安全包络永远OP
 TRACKING_CORE必须是经CAD/实测证明的不变机构，不得用插值斗瓣或随意盒子替代真实模型。
 core使用独立owner配置coarse/fine voxel尺度，不能将大抓斗尺度直接套给细小不变机构。
 原生迭代可配置0..2次有界续算，但未收敛永远拒绝，绝不放宽阈值或篡改converged。
+另开度诊断有独立更小迭代预算、无续算；主假设已有位姿时复用该seed，不重复全局yaw搜索。
+normalized covariance经特征长度和support origin完整基变换返回m/rad与cross blocks，
+不对混合单位的physical Hessian施加相对特征值floor。模型平移反证同时验证回到同一参考点的R。
 
 GrabState/GrabGeometry header保持LiDAR MID_SCAN；GrabClearance继承其epoch。
 发布/处理延迟独立诊断。失效心跳沿用最后epoch（无测量时0），不能刷新测量时间。
+installed ROS合成输入是20ms扫描、MID_SCAN早于发送约15ms，再人为加入10ms处理延迟；
+这只定义软件transport fixture，不代表现场帧率/延迟。evidence deadline保持原值，超时仍STALE。
 clearance_defined=false时0值不可用于排序、距离门禁或当作“仅刚触壁”。
 新增消息字段须全量重建ROS消费者；不兼容旧的负距离语义，详见ADR0010。
 

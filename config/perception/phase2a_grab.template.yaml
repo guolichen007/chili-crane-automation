@@ -35,6 +35,7 @@
     "normal_neighbors": null,
     "registration_iterations": null,
     "registration_retry_count": null,
+    "diagnostic_registration_iterations": null,
     "robust_iterations": null,
     "minimum_support_sectors": null,
     "confirmation_frames": null,
