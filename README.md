@@ -1,6 +1,14 @@
 # 辣椒地池行车自动抓取框架
 
-当前Phase2B-R1.1：observed-only料面与保守抓取提议，已软件shadow封板（非现场、不下发动作）。
+当前 Phase2C：不可变抓点、抓取交互/稳态载荷证据、局部料面失效/新点刷新与独立本地调试监控台。
+已交付 Windows 静态/纯算法代码，Ubuntu安装态交工控机22.04验收；不是完整软件封板或生产控制。
+入口：[交付与待验记录](docs/validation/Phase2C软件交付与工控机待验.md)、
+[使用手册](docs/deployment/Phase2C抓取交互与调试监控台手册.md)、
+[ADR0012](docs/decisions/ADR0012_Phase2C抓取交互证据与料面生命周期.md)、
+[ADR0013](docs/decisions/ADR0013_调试控制台与台架输出隔离.md)。
+FIELD/BENCH/FULL_AUTO 全部 NOT_RUN，物理/自动/相机控制禁用；新消息全体消费者必须同SHA重建。
+
+历史Phase2B-R1.1：observed-only料面与保守抓取提议，已软件shadow封板（非现场、不下发动作）。
 Phase2A-R1.1以d6f846f正式软件封板，进一步Grab synthetic算法扩展STOP。
 入口：[Phase2B算法/接口](docs/algorithms/Phase2B料面建模与抓取候选.md)、[ADR0011](docs/decisions/0011-phase2b-observed-surface-grasp-proposal.md)。
 软件验收：[R1.1封板精确SHA记录](docs/validation/Phase2B-R1.1软件封板验收.md)，SEALED_SOFTWARE_SHADOW_NOT_FIELD。
@@ -75,20 +83,21 @@ Y/Z分别支持可调速与固定低速策略契约，现场能力及停车验�
 R1补充命令只接收一次的执行上下文、短输出租约、模式转换矩阵、独立Z上下 readiness；
 24DI只维护物理点表，标定出处绑定sensor_id。见[ADR0005](docs/decisions/0005-phase05-r1-execution-lifecycle.md)。
 当前包含 ADAM/拉绳只读适配、固定 SHA 的官方 ER1 驱动安装入口和双雷达核心；
-不含 NDT、料面识别或抓斗跟踪算法，也未执行现场动作。
+Phase0.5该历史阶段不含NDT、料面识别或抓斗跟踪算法；后续A/B/C实现见上方入口，NDT仍待迁移，现场动作未执行。
 详见[接口契约](docs/api/PHASE05_CONTRACTS.md)与[验收矩阵](docs/api/phase05_acceptance.yaml)。
 
-## 七包边界
+## 当前八包边界
 
 | 包 | 职责 |
 |---|---|
 | chili_crane_msgs | ROS2 rosidl 消息 |
 | chili_crane_core | 硬件无关状态、地图、几何、任务契约 |
 | chili_crane_slam | 双雷达/轨道定位接口；NDT 待迁移 |
-| chili_crane_perception | 地池表面、抓取目标、抓斗接口；算法待实现 |
-| chili_crane_control | 安全、仲裁、任务与 QoS，不含设备寄存器 |
+| chili_crane_perception | 已实现抓斗状态、observed-only地池表面、局部交互生命周期；仍待FIELD验收 |
+| chili_crane_control | 安全、仲裁、原TaskCycles、保守提议和抓取交互证据；不含设备寄存器 |
 | chili_crane_hardware | ADAM、拉绳、MVS 相机时间适配、标准化状态、mock、隔离台架工具 |
 | chili_crane_bringup | 安装后的配置与 launch.py 组合 |
+| chili_crane_commissioning | localhost只读监控、隔离模拟、记录和显式门禁台架工具；production不反向依赖/默认启动 |
 
 ## 检查与启动
 

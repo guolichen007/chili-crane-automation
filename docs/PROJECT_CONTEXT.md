@@ -2,6 +2,13 @@
 
 ## Phase2C 抓取交互证据与调试台（2026-10-14，当前授权）
 
+当前代码4af2bb0378c134800d34de6178b004b6fa4d8f6e：C0-C4与加固已完成，C5交付归档。
+最新用户指令：无需本轮Ubuntu安装/测试，交工控机Ubuntu22.04；最终提交skip CI防自动发起作业，保留全部验证入口/门禁。
+Windows425项=419PASS/6缺ROS跳过，pytest同数；diff/合同/compileall/46架构场景通过。
+状态WINDOWS_STATIC_PASS_UBUNTU_ACCEPTANCE_PENDING，不能称整体软件封板。历史0f8正常八包/372包测试通过，
+installedC稳定提升payload/updated-clear等待timeout未定位，最终代码补诊断/反证，由工控机按最终SHA确认。
+详见[交付与待验记录](validation/Phase2C软件交付与工控机待验.md)及[手册](deployment/Phase2C抓取交互与调试监控台手册.md)。
+
 BASE_SHA=077d0bfe44d8fe34fc7572f52cff65362cbc83d8；分支codex/phase2c-grasp-interaction-evidence-v1。
 Phase2A、Phase2B已软件shadow封板；本轮新增证据层，不重写其核心，也不另造TaskCycles。
 项目处理生产豆瓣酱的辣椒酱/辣椒物料，不按刚性固体料堆假定。抓斗侵入、闭合、取料会导致塌陷、重排或局部流动。
