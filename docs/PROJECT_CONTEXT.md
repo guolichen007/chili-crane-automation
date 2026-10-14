@@ -7,8 +7,11 @@
 HEADER继续FIRST_POINT身份；MID_SCAN从合并点timestamp的min/max计算，不改dual LiDAR/PTP/vendor。
 surface_session_id进入status/snapshot/proposal/cache；新session先清空旧状态，再验证新鲜空间证明。
 所有冻结算法、Phase2A门限、SemanticMap V1、Geofence v2保持不变；不扩搜索/ESDF/payload/performance算法。
-当前实施与精确SHA CI验收见[Phase2B-R1.1软件封板验收](validation/Phase2B-R1.1软件封板验收.md)。
-只有两安装树与完整旧回归全部通过才标SEALED_SOFTWARE_SHADOW_NOT_FIELD；不继续Phase2B-R1.2。
+9f497a20664cd2146ef4865bd54e9d3f260b6743已通过Static/Ubuntu normal+symlink七包、各326测试、
+A/B/R1.1 installed反证及所有旧入口/vendor，三控制topics各0；新进程独立probe及12份日志核验通过。
+PHASE2B_SOFTWARE_STATUS=SEALED_SOFTWARE_SHADOW_NOT_FIELD；证据见[软件封板验收](validation/Phase2B-R1.1软件封板验收.md)。
+同runner精确base前后配对无明显性能回归，非现场SLA；归档后的最终HEAD仍按精确SHA完整验CI。
+不继续Phase2B-R1.2。
 剩余任务仅FIELD gate或另行授权的Phase2C。PHYSICAL disturbance仍不接入，四控制flags保持false。
 
 ## Phase2B-R1 FIELD-readiness（2026-10-13）
