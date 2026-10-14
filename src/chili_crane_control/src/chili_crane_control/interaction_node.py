@@ -172,7 +172,11 @@ class InteractionShadowNode(Node):
                     or (cycle.run_id,cycle.task_id,cycle.cycle_id,cycle.cycle_index)!=(b.run_id,b.task_id,b.cycle_id,b.cycle_index)):
                 raise ValueError('CYCLE_STATE_STALE_OR_BINDING_CONFLICT')
             geometry,ge=self.input('geometry');grab,se=self.input('grab')
-            if (geometry.header!=grab.header or ge.counter!=se.counter
+            # Independent DDS topics can arrive on opposite sides of a timer
+            # callback. Wait for a common observation before comparing content.
+            if (ge.epoch_ns,ge.counter)!=(se.epoch_ns,se.counter):
+                raise ValueError('GRAB_GEOMETRY_OBSERVATION_PAIR_PENDING')
+            if (geometry.header!=grab.header
                     or geometry.opening_state!= {0:'UNKNOWN',1:'OPEN',2:'CLOSED',3:'TRANSITION',4:'CONFLICT'}.get(grab.opening_state)):
                 raise ValueError('GRAB_GEOMETRY_STATE_IDENTITY_CONFLICT')
             g=GrabObservation(ge,geometry.bottom_lower_bound_m,geometry.bottom_upper_bound_m,geometry.top_upper_bound_m,
@@ -211,7 +215,7 @@ class InteractionShadowNode(Node):
             context,live=self.input('context',post_exit)
             live_fresh=live is not None and live.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type'])
             if not post_exit and (not live_fresh or not context.platform_motion_stable):
-                raise ValueError('LIVE_SPATIAL_LINEAGE_STALE_OR_CONFLICT')
+                raise ValueError('LIVE_SPATIAL_CONTEXT_STALE_OR_UNSTABLE')
             # A historical pit exit does not need a fresh pit planning transform
             # at the unload station. Any fresh conflicting lineage still rejects.
             if live_fresh and (context.target_frame!=b.evidence.frame_id or context.source_type!=self.config['source_type']

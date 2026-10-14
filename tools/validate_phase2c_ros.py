@@ -61,7 +61,7 @@ class InstalledRun:
             (self.directory/(name+'.yaml')).write_text(yaml.safe_dump(value),encoding='utf-8')
         self.node=Node('phase2c_installed_acceptance',namespace=self.namespace)
         self.received={};self.forbidden=[];self.subscriptions=[];self.history=[]
-        self.snapshot_history=[];self.invalidation_generation=None
+        self.snapshot_history=[];self.invalidation_generation=None;self.source_epochs=[]
         for kind,topic,key,qos in (
             (PitSurfaceSnapshot,'perception/pit_surface_snapshot','snapshot',SNAPSHOT_QOS),
             (GraspProposal,'planning/grasp_proposal_shadow','proposal',PROPOSAL_QOS),
@@ -127,6 +127,15 @@ class InstalledRun:
             else:self.spin()
             if condition():return
         diagnostics={k:getattr(v,'reason','received') for k,v in self.received.items()}
+        transitions=[]
+        for m in self.history:
+            identity=(m.task_cycle_state,m.reason,m.abort_required)
+            if not transitions or identity!=transitions[-1]['identity']:
+                transitions.append(dict(identity=identity,stamp=seconds(m.header.stamp),
+                    counter=m.evidence.source_counter,gates=json.loads(m.gate_diagnostics_json or '{}'),
+                    load=json.loads(m.load_features_json or '{}')))
+        diagnostics['state_transitions']=transitions[-128:]
+        diagnostics['source_epoch_gaps_sec']=[b-a for a,b in zip(self.source_epochs,self.source_epochs[1:])][-256:]
         state=self.received.get('state')
         if state is not None:
             diagnostics.update(task_cycle_state=state.task_cycle_state,contact_state=state.contact.state,
@@ -180,6 +189,7 @@ class InstalledRun:
             timing=scan_epochs(seconds(cloud.header.stamp),merged.points['timestamp'],merged.points['sensor_id'])
             assert abs(timing.header_epoch-max(s.stamp for s in scans))<1e-6
         epoch=timing.mid_epoch
+        self.source_epochs.append(epoch)
         context=context_to_message(replace(self.ctx,measurement_epoch=timing.header_epoch))
         context.header=copy.deepcopy(cloud.header);context.evidence.header=copy.deepcopy(cloud.header)
         context.evidence.measurement_stamp=copy.deepcopy(cloud.header.stamp);context.evidence.source_counter=self.counter
@@ -218,7 +228,9 @@ class InstalledRun:
             if key=='cloud' and (self.hold_post_cloud or not scans):continue
             if key=='context' and self.hold_pit_context:continue
             self.pubs[key].publish(message);self.last_messages[key]=message
-        self.spin(.1)
+        # Publish normalized fixture evidence at 20 Hz, independently of the
+        # runtime's unchanged 0.2s maximum load gap and 9s success waits.
+        self.spin(.05)
 
     def initialize(self):
         self.wait(lambda:all(p.get_subscription_count()>0 for key,p in self.pubs.items() if key!='binding'))
@@ -317,6 +329,16 @@ class InstalledRun:
         assert (r.affected_cell_count,r.refreshed_cell_count,r.unknown_cell_count)==(9,2,7)
         assert state.payload.state==2 and state.lift.pit_exit_confirmed
         assert not state.lift.clear_of_updated_surface and not state.next_cycle_surface_ready
+        # Independent DDS arrivals wait for pairing; no mixed observation can
+        # revoke the exit or create new evidence. Same-observation conflicts
+        # remain fatal in the node.
+        delayed=copy.deepcopy(self.last_messages['grab']);self.counter+=1
+        delayed.evidence.source_counter=self.counter
+        self.pubs['grab'].publish(delayed)
+        self.wait(lambda:self.received['state'].reason=='GRAB_GEOMETRY_OBSERVATION_PAIR_PENDING',timeout=2.)
+        assert not self.received['state'].abort_required
+        self.wait(lambda:self.received['state'].lift.pit_exit_confirmed and self.received['state'].payload.state==2,
+            send=lambda:self.send('RAISE',opening=2,closed=True,opened=False,value=101.))
         assert self.owner_admission() and self.cycles.state==CycleState.MOVE_TO_UNLOAD
         self.hold_post_cloud=True;self.hold_pit_context=True
         for _ in range(25):self.send(opening=2,closed=True,opened=False,value=101.)

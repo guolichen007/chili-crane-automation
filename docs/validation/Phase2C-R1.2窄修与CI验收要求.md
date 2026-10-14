@@ -56,6 +56,17 @@ real local recovery -> new generation / actual B hard-gate candidate -> new bind
 
 ## 最终 GitHub 与工控机分层
 
+首轮提交 `485f080dc175ea6143cafeedbdddff6a05384516` 的 Static SUCCESS，
+[ROS2 run 38587908707](https://github.com/guolichen007/chili-crane-automation/actions/runs/38587908707)
+normal 八包 build、388 项 colcon test、vendor PASS，但 installed C 首场景 RAISE timeout，symlink 未到达。
+artifact 11907871168 SHA256 `cd3d7cc508b0b5170fbc2d3ca963232b8e2fe7dbb676d2c6a4b92e0bc5f96b2a`。
+事件确认 PIT_EXIT 曾成立；此前 load baseline 已无效，随后永久 evidence conflict。
+该日志未保存首次冲突，不能唯一归因。后续 timeout 保留有界状态转变与发布 epoch gap 以定位。
+DDS grab/geometry 不同观测计数仅等待配对，不生成新事实、不撤销历史事件；相同观测内容冲突仍 abort。
+缺失/过期 live context 返回 UNKNOWN，不作为 lineage 冲突；有效 lineage 冲突仍 abort。
+合成 normalized 输入改为 20Hz，保留原 0.2s load gap、所有载荷/刷新阈值、9s/10s 成功条件。
+新增 installed 配对延迟反证；软件失败按真实阶段记录，不能写为 pending 或 infra。
+
 本提交必须正常 push，然后等待相同 exact SHA 的 Static 与 ROS2 workflows 完成，
 读取 jobs 和 artifacts，最终回传分开列 normal build、colcon、installed C、symlink、vendor。
 新提交的最终结果以同 SHA 的 GitHub 记录和回传为准，不用本机 PASS 替代 ROS。
