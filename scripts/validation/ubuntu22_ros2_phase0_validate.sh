@@ -70,6 +70,16 @@ bash scripts/validation/rviz_installation_smoke.sh "$workspace" "$run_dir/rviz" 
 timeout 45s python3 tools/validate_phase2a_ros.py --evidence-dir "$run_dir/phase2a-normal" | tee "$run_dir/phase2a-normal-result.json"
 timeout 65s python3 tools/validate_phase2b_ros.py --evidence-dir "$run_dir/phase2b-normal" | tee "$run_dir/phase2b-normal-result.json"
 timeout 150s python3 tools/validate_phase2b_r11_ros.py --evidence-dir "$run_dir/phase2b-r11-normal" | tee "$run_dir/phase2b-r11-normal-result.json"
+# Cross-run shared-runner P95 is not a regression comparison. Read the frozen
+# exact base into an owned temporary evidence directory (never another project
+# or Git worktree), then bracket current timing with baseline on the same host.
+# Both use the same installed ROS type support; old messages leave new session
+# fields empty. This is software workload timing, not old/new DDS compatibility.
+baseline_dir="$(mktemp -d "$run_dir/phase2b-r11-baseline-XXXXXX")"
+git archive 8ee41886dfb8d084b2b01d505b770c98bf2fefde config src tools/validate_phase2b_r1.py | tar -x -C "$baseline_dir"
+timeout 180s python3 "$baseline_dir/tools/validate_phase2b_r1.py" --output "$run_dir/phase2b-r11-base-before.json"
+timeout 180s python3 tools/validate_phase2b_r1.py --output "$run_dir/phase2b-r11-current-paired.json"
+timeout 180s python3 "$baseline_dir/tools/validate_phase2b_r1.py" --output "$run_dir/phase2b-r11-base-after.json"
 sh scripts/validation/rviz_phase2b_smoke.sh "$workspace" "$run_dir/phase2b-rviz"
 # Independent install tree catches executable modes hidden by normal install copies.
 colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$workspace/src" \

@@ -6,9 +6,15 @@
 
 ## 当前状态
 
-CODE_SHA=PENDING_COMMIT；PHASE2B_SOFTWARE_STATUS=PENDING_EXACT_SHA_CI。
+CODE_SHA=9ed69a3ecc112ce95f6bfebf5d24f789b7b5e6c6；PHASE2B_SOFTWARE_STATUS=PENDING_PAIRED_PERFORMANCE_CI。
 WINDOWS_STATUS=PASS_STATIC_NATIVE；382项测试，377通过、5项缺ROS环境跳过。
-ROS2_NORMAL_STATUS/ROS2_SYMLINK_STATUS/ROS2_PHASE2B_SHADOW_STATUS/VENDOR_STATUS/GITHUB_ACTIONS_STATUS=PENDING。
+该CODE_SHA的[Static 38499327447](https://github.com/guolichen007/chili-crane-automation/actions/runs/38499327447)与
+[ROS/vendor 38499327449](https://github.com/guolichen007/chili-crane-automation/actions/runs/38499327449)全部通过。
+normal/symlink各七包、各326 tests无错误/失败/跳过；构建前382项，378通过、4项缺生成消息跳过。
+两安装树A/B和R1.1 installed全部通过，三种重启、TL无新snapshot恢复、旧session/世代重放反证通过，三控制topic各0。
+PTP/dual LiDAR/Phase1C/Capture/全部RViz/mock/vendor旧入口全部通过。
+ROS2_NORMAL_STATUS/ROS2_SYMLINK_STATUS/ROS2_PHASE2B_SHADOW_STATUS/VENDOR_STATUS=PASS_FOR_CODE_SHA。
+GITHUB_ACTIONS_STATUS=PASS_FOR_CODE_SHA；新增同runner性能验证及最终归档HEAD仍需完整精确CI。
 不能用Windows或历史8ee CI代替本轮ROS构建、installed重启与最终HEAD CI。
 只有全部反证与旧回归通过才标SEALED_SOFTWARE_SHADOW_NOT_FIELD；不继续Phase2B-R1.2。
 
@@ -38,6 +44,16 @@ installed独立测试必须证明surface-only、planner-only TL无新snapshot、
 FAST_REJECT/FULL_VALID_PROPOSAL/DENSE_SURFACE原instrumentation不扩优化，P95与实际CDR待Ubuntu归档。
 search completeness != safety eligibility；SEARCH_TRUNCATED/GLOBAL_OPTIMUM_NOT_PROVEN保持。
 truncated candidate控制准入留未来policy，本轮不决定。
+
+9ed69a3 normal P95 FAST/FULL/DENSE=23.46/368.13/1222.52ms；symlink=35.45/389.99/1252.41ms。
+最大实际CDR=109374bytes；partial64/256/1024格传30/120/482 observed格，4766/14846/55390bytes。
+相对旧CDR增加112bytes属于session身份字段；不是扩展格网或候选算法。
+Windows同机P95=.580/176.834/583.464ms；旧R1Windows约.598/175.942/586.364ms，基本一致。
+但共享Ubuntu runner的跨run dense数字高于8ee的856.19ms，不能直接宣称没有性能回归。
+增加只读精确base archive的同runner base-before/current/base-after八样本对比，等待实际配对结果。
+旧版本使用同一已安装ROS类型支持，新增session字段为空；该对比不是新旧wire混跑兼容性验证。
+artifact11865238700，SHA256=e05cb8a8425f241c95aa4f00ec254e6f61b0c35cb61cc6b0aac870f7c1a65b57；
+vendor artifact11865256450。临时下载凭证/原始ZIP只存忽略目录，不能提交。
 
 ## FIELD与执行边界
 
