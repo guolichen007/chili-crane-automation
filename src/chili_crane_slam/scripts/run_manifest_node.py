@@ -14,13 +14,22 @@ class ManifestNode(Node):
         super().__init__("run_manifest")
         self.declare_parameter("manifest_file", "")
         self._data = yaml.safe_load(Path(self.get_parameter("manifest_file").value).read_text())
+        self._started_stamp = self.get_clock().now().to_msg()
         self._publisher = self.create_publisher(RunManifest, "system/run_manifest", state_qos())
         self._timer = self.create_timer(1, self._publish)
 
     def _publish(self):
         msg = RunManifest()
         msg.header.stamp = self.get_clock().now().to_msg()
+        msg.started_stamp = self._started_stamp
         msg.validity = msg.DEGRADED
+        msg.schema_version = "RUN_MANIFEST_V2"
+        msg.phase = self._data.get("phase", "1A")
+        recording = self._data.get("recording", {})
+        msg.recording_profile = recording.get("profile", "state_only")
+        msg.recording_enabled = recording.get("enabled") is True
+        msg.rosbag_storage_id = recording.get("storage_id", "NOT_CONFIGURED")
+        msg.recording_capacity_configured = recording.get("capacity_configured") is True
         msg.reason = "PHASE1" + self._data.get("phase", "A").removeprefix("1") + "_CAPTURE_NOT_PRODUCTION_ACCEPTANCE"
         for field in ("run_id", "git_sha", "config_hash"):
             setattr(msg, field, self._data[field])

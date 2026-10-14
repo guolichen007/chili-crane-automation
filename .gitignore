@@ -30,3 +30,4 @@ Thumbs.db
 
 # Desktop Codex working memory (local-only; never commit)
 /LOCAL_PROJECT_CONTEXT.md
+/runs/

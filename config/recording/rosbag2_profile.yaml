@@ -4,6 +4,13 @@ enabled: false
 crane_namespace: crane_01
 storage_id: NOT_CONFIGURED
 output_directory: NOT_CONFIGURED
+max_bag_size_bytes: null
+max_bag_duration_sec: null
+max_total_storage_bytes: null
+max_recording_duration_sec: null
+high_bandwidth:
+  config_state: NOT_CONFIGURED
+  enabled: false
 # Relative topics; prefix the confirmed namespace when recording is authorized.
 topics:
   - task/status
@@ -21,3 +28,91 @@ topics:
   - perception/grasp_target
   - hardware/trolley_state
   - localization/pose
+  - system/run_manifest
+  - commissioning/run_manifest
+  - perception/grab_geometry_safety
+  - perception/pit_surface_status
+  - perception/pit_surface_snapshot
+  - planning/grasp_proposal_shadow
+  - phase2c/target_binding
+  - phase2c/interaction_state
+  - phase2c/contact_evidence
+  - phase2c/interaction_evidence
+  - phase2c/closure_evidence
+  - phase2c/payload_evidence
+  - phase2c/lift_evidence
+  - phase2c/unload_evidence
+  - perception/surface_refresh_evidence
+  - hardware/grab_io_state
+  - hardware/hoist_state
+  - hardware/load_state
+  - hardware/remote_control_state
+  - hardware/control_board_state
+  - commissioning/simulation/remote_control_state
+  - commissioning/simulation/expected_output
+  - commissioning/bench/do_readback
+profiles:
+  state_only:
+    topics:
+      - run/manifest
+      - system/run_manifest
+      - commissioning/run_manifest
+      - task/status
+      - task/cycle_status
+      - system/mode
+      - system/readiness
+      - perception/grab_state
+      - perception/pit_surface_status
+      - planning/grasp_proposal_shadow
+      - phase2c/target_binding
+      - phase2c/interaction_state
+      - phase2c/contact_evidence
+      - phase2c/interaction_evidence
+      - phase2c/closure_evidence
+      - phase2c/payload_evidence
+      - phase2c/lift_evidence
+      - phase2c/unload_evidence
+      - perception/surface_refresh_evidence
+      - hardware/grab_io_state
+      - hardware/hoist_state
+      - hardware/load_state
+      - hardware/remote_control_state
+      - commissioning/simulation/remote_control_state
+      - commissioning/simulation/expected_output
+      - commissioning/bench/do_readback
+      - safety/event
+      - control/execution_state
+  event_debug:
+    topics:
+      - run/manifest
+      - system/run_manifest
+      - commissioning/run_manifest
+      - task/status
+      - task/cycle_status
+      - system/mode
+      - system/readiness
+      - perception/grab_state
+      - perception/grab_geometry_safety
+      - perception/pit_surface_status
+      - perception/pit_surface_snapshot
+      - planning/grasp_proposal_shadow
+      - phase2c/target_binding
+      - phase2c/interaction_state
+      - phase2c/contact_evidence
+      - phase2c/interaction_evidence
+      - phase2c/closure_evidence
+      - phase2c/payload_evidence
+      - phase2c/lift_evidence
+      - phase2c/unload_evidence
+      - perception/surface_refresh_evidence
+      - hardware/grab_io_state
+      - hardware/hoist_state
+      - hardware/load_state
+      - hardware/remote_control_state
+      - hardware/control_board_state
+      - commissioning/simulation/remote_control_state
+      - commissioning/simulation/expected_output
+      - commissioning/bench/do_readback
+      - safety/event
+      - safety/fault_event
+      - control/execution_state

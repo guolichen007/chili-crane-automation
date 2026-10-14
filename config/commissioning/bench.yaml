@@ -1,0 +1,15 @@
+config_state: NOT_CONFIGURED
+config_version: commissioning-bench-v1
+source_type: PHYSICAL
+physical_output_enabled: false
+automatic_control_enabled: false
+host: null
+port: 502
+unit_id: null
+timeout_sec: 0.5
+acceptance:
+  ADAM_FSV_CONFIGURED: false
+  ADAM_WATCHDOG_CONFIGURED: false
+  ADAM_SAFE_OUTPUT_VERIFIED: false
+  watchdog_timeout_sec: null
+  verification_evidence: NOT_CONFIGURED

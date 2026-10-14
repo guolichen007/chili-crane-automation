@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>chili_crane_commissioning</name>
+  <version>0.3.0</version>
+  <description>本地调试监控、隔离SIL与严格门禁台架工具，不参与生产控制依赖</description>
+  <maintainer email="maintainer@example.invalid">Chili Crane Team</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>ament_cmake_python</buildtool_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>chili_crane_msgs</exec_depend>
+  <exec_depend>chili_crane_control</exec_depend>
+  <exec_depend>chili_crane_hardware</exec_depend>
+  <exec_depend>chili_crane_perception</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

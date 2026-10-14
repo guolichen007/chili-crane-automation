@@ -67,7 +67,7 @@ class LoadFeatureEstimator:
         required='FIELD_VALIDATED' if evidence.source_type=='PHYSICAL' else 'SYNTHETIC_VALIDATED'
         return (self.config.get('calibration_state')==required
                 and evidence.calibration_id==self.config.get('calibration_id')
-                and self.config.get('load_polarity') in (-1,1)
+                and type(self.config.get('load_polarity')) is int and self.config.get('load_polarity') in (-1,1)
                 and configured_number(self.config,'contact_abs_threshold',True)
                 and configured_number(self.config,'payload_abs_threshold',True))
 

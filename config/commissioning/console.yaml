@@ -1,0 +1,11 @@
+config_state: SOFTWARE_SHADOW_ONLY
+config_version: commissioning-v1
+mode: ROS_SHADOW
+bind: 127.0.0.1
+physical_output_enabled: false
+automatic_control_enabled: false
+camera_control_authority: false
+maximum_events: 512
+maximum_plot_samples: 256
+simulation_lease_sec: 0.35
+recording_profile: state_only

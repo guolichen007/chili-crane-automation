@@ -52,7 +52,8 @@ def main():
     watchdog = acceptance.get("watchdog_timeout_sec")
     if type(watchdog) not in (int, float) or not math.isfinite(watchdog) or not 0 < watchdog <= 2:
         raise PermissionError("verified watchdog timeout must be >0 and <=2 seconds")
-    if acceptance.get("verification_evidence") in (None, "", "NOT_CONFIGURED"):
+    if (not isinstance(acceptance.get("verification_evidence"), str)
+            or acceptance.get("verification_evidence") in ("", "NOT_CONFIGURED", "UNKNOWN")):
         raise PermissionError("device OFF/watchdog evidence must be recorded")
     if not 1 <= args.duration_ms <= 1000 or not 0 <= args.channel <= 7:
         parser.error("channel 0..7 and duration 1..1000ms are required")

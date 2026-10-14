@@ -306,7 +306,7 @@ class GraspInteractionEngine:
         if closure=='CLOSURE_CONFLICT':payload='PAYLOAD_CONFLICT'
         elif self.committed and closure=='CLOSURE_CONFIRMED' and rise_order and features.baseline_valid and features.fresh:
             payload='PAYLOAD_CANDIDATE'
-            calibrated=features.calibration_confirmed_for_source
+            calibrated=features.calibration_confirmed_for_source and configured_number(c['load'],'payload_normalized_threshold',True)
             if settled and updated_clear and calibrated:
                 delta=features.delta*c['load']['load_polarity']
                 loaded=delta>=c['load']['payload_abs_threshold'] and features.normalized_delta*c['load']['load_polarity']>=c['load']['payload_normalized_threshold']
@@ -331,7 +331,8 @@ class GraspInteractionEngine:
             elif zone_ok and cart_ok and pit_clear and self.loaded_baseline is not None:
                 unload='UNLOAD_READY'
                 open_ok=io_ok and io.open_limit and not io.closed_limit and grab.opening_state=='OPEN'
-                if phase in ('OPEN_GRAB','VERIFY_EMPTY') and open_ok and settled and features.calibration_confirmed_for_source:
+                if (phase in ('OPEN_GRAB','VERIFY_EMPTY') and open_ok and settled and features.calibration_confirmed_for_source
+                        and configured_number(c['load'],'unload_abs_threshold',True)):
                     unload_delta=(self.loaded_baseline-features.short_median)*c['load']['load_polarity']
                     duration_unload=self.persistence['unload'].observe(unload_delta>=c['load']['unload_abs_threshold'],epoch)
                     if duration_unload>=c['unload_persistence_sec']:unload='UNLOAD_CONFIRMED'

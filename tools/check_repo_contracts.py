@@ -20,6 +20,9 @@ TEXT_SUFFIXES = {
     ".cpp",
     ".h",
     ".hpp",
+    ".html",
+    ".css",
+    ".js",
     ".json",
     ".in",
     ".launch",
@@ -49,11 +52,13 @@ EXCLUDED_DIRECTORIES = {
     "devel",
     "install",
     "logs",
+    "runs",
     "log",
     ".local-data",
 }
 EXPECTED_PACKAGES = {
     "chili_crane_bringup",
+    "chili_crane_commissioning",
     "chili_crane_control",
     "chili_crane_core",
     "chili_crane_hardware",
@@ -140,7 +145,7 @@ def check_text_contract(root: Path, errors: List[str]) -> None:
 
 
 def check_no_runtime_windows_paths(root: Path, errors: List[str]) -> None:
-    drive_path = re.compile(r"[A-Za-z]:[\\/]")
+    drive_path = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]")
     hardcoded_home = re.compile(r"/home/[A-Za-z0-9_.-]+/")
     workspace_backslash = re.compile(r"\\workspace\\", re.IGNORECASE)
     for base in ("src", "config", "scripts"):

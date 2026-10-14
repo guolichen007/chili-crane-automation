@@ -37,6 +37,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/LiftEvidence.msg"
   "msg/UnloadEvidence.msg"
   "msg/GraspInteractionState.msg"
+  "msg/CommissioningShadowOutput.msg"
+  "msg/BenchOutputEvidence.msg"
   "msg/RemoteControlState.msg"
   "msg/SafetyPermit.msg"
   "msg/SensorHealth.msg"
