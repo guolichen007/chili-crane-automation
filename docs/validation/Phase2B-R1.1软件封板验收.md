@@ -17,6 +17,8 @@ normal/symlink各七包、各326 tests无错误/失败/跳过；构建前382项�
 修复验收callback保存Humble DDS source_timestamp，仅用于证明publication发生于新进程启动之后，
 不替换任何measurement epoch/arrival/freshness。planner-only先等旧publisher退出图，再接纳新DDS publication。
 最终SHA必须重新跑完整CI与检查节点日志；历史全绿不隐藏验收漏洞。
+旧session/同session倒序重放改变generation时同步重建合法snapshot identity，保留真实旧epoch；
+保证反证不是被不匹配ID偶然拒绝，而是真正检验retired session或代际门禁。
 PTP/dual LiDAR/Phase1C/Capture/全部RViz/mock/vendor旧入口全部通过。
 ROS2_NORMAL_STATUS/ROS2_SYMLINK_STATUS/ROS2_PHASE2B_SHADOW_STATUS/VENDOR_STATUS=PASS_FOR_CODE_SHA。
 GITHUB_ACTIONS_STATUS=PASS_FOR_CODE_SHA_ONLY；新publication-origin反证/同runner性能及最终HEAD仍需完整精确CI。

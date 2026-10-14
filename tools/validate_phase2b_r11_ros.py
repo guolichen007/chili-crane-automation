@@ -22,7 +22,8 @@ from chili_crane_perception.phase2b_synthetic import fixture,scene
 from chili_crane_perception.pit_surface import PitSurfaceGrid
 from chili_crane_perception.surface_runtime import QOS,SNAPSHOT_QOS,PROPOSAL_QOS
 from chili_crane_perception.surface_time import scan_epochs
-from chili_crane_perception.surface_transport import context_to_message,polygon,stamp,seconds
+from chili_crane_perception.surface_transport import context_to_message,context_from_message,polygon,stamp,seconds
+from chili_crane_perception.surface_session import snapshot_identity
 from chili_crane_slam.dual_lidar import Cloud,DualLidarMerger,Extrinsic
 from chili_crane_slam.dual_lidar_node import cloud_message
 from chili_crane_slam.pointcloud import CANONICAL
@@ -190,6 +191,8 @@ def main():
             wait(lambda:replay.get_subscription_count()>=2,timeout=3.,frames=True)
             drain_valid_generation()
             baseline=copy.deepcopy(received['proposal']);old.status.surface_generation=baseline.surface_generation
+            old.status.snapshot_id=snapshot_identity(old.surface_session_id,old.status.surface_generation,
+                old.status.config_sha256,context_from_message(old.spatial_context).lineage_key)
             history=len(snapshot_history);replay.publish(old)
             wait(lambda:len(snapshot_history)>history,timeout=2.,context_only=True)
             wait(lambda:selected() and received['proposal'].surface_session_id==new_id
@@ -203,6 +206,8 @@ def main():
             drain_valid_generation()
             baseline=copy.deepcopy(received['proposal']);latest=copy.deepcopy(received['snapshot'])
             latest.status.surface_generation=max(0,baseline.surface_generation-1)
+            latest.status.snapshot_id=snapshot_identity(latest.surface_session_id,latest.status.surface_generation,
+                latest.status.config_sha256,context_from_message(latest.spatial_context).lineage_key)
             history=len(snapshot_history);replay.publish(latest)
             wait(lambda:len(snapshot_history)>history,timeout=2.,context_only=True)
             wait(lambda:selected() and received['proposal'].planning_cache_hit_count>baseline.planning_cache_hit_count,context_only=True)
