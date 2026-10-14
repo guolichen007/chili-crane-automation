@@ -60,6 +60,27 @@ class Harness:
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_calibrated_contact_requires_joint_overlap_descent_and_persistence(self):
+        a=Harness();a.warm()
+        states=[]
+        for i in range(32):
+            r=a.step('LOWER',z=1.08-.003*i,motion='DOWN',value=101.,stable=False)
+            states.append(r.contact['state'])
+        self.assertIn('CONTACT_CONFIRMED',states)
+        self.assertTrue(r.contact['overlap'])
+        self.assertTrue(r.contact['descending'])
+        self.assertTrue(r.contact['load_change'])
+        self.assertTrue(r.interaction['invalidate'])
+
+    def test_sensor_fault_and_stale_source_cannot_preserve_payload_confirmation(self):
+        a=Harness();a.warm();a.interact();a.lift()
+        self.assertEqual(a.result.payload['state'],'PAYLOAD_CONFIRMED')
+        for _ in range(8):
+            r=a.step('RAISE',opening='CLOSED',closed=True,opened=False,value=101.,refresh=True,load_validity=1)
+        self.assertNotEqual(r.payload['state'],'PAYLOAD_CONFIRMED')
+        self.assertFalse(r.load_features.fresh)
+        self.assertFalse(a.engine.load.current(a.t+2.).fresh)
+
     def test_geometry_alone_possible_and_load_spike_without_overlap_not_confirmed(self):
         a=Harness();a.warm()
         for i in range(12):r=a.step('LOWER',z=1.1-.01*i,motion='DOWN',stable=False)

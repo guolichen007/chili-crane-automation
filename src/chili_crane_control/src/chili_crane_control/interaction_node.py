@@ -45,7 +45,7 @@ class InteractionShadowNode(Node):
         self.binding_pub=self.create_publisher(TargetBinding,'phase2c/target_binding',BIND_QOS)
         kinds=(('contact',ContactEvidence),('interaction',SurfaceInteractionEvidence),('closure',ClosureEvidence),
                ('payload',PayloadEvidence),('lift',LiftEvidence),('unload',UnloadEvidence))
-        self.publishers={name:self.create_publisher(kind,'phase2c/'+name+'_evidence',STATE_QOS) for name,kind in kinds}
+        self.evidence_publishers={name:self.create_publisher(kind,'phase2c/'+name+'_evidence',STATE_QOS) for name,kind in kinds}
         self.create_subscription(TargetBinding,'phase2c/binding_request',self.bind,STATE_QOS)
         self.create_subscription(CycleStatus,'task/cycle_status',self.cycle,QOS)
         for key,kind,topic,qos in (
@@ -133,6 +133,7 @@ class InteractionShadowNode(Node):
                         'spatial_calibration_id','geofence_id','geofence_version','geofence_config_sha256','kernel_id'))
             context,live=self.input('context')
             if (not live.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type'])
+                    or context.target_frame!=b.evidence.frame_id or context.source_type!=self.config['source_type']
                     or (context.map_id,context.semantic_version,context.pit_id,context.calibration_id)!=
                        (b.map_id,b.semantic_version,b.pit_id,b.spatial_calibration_id)):
                 raise ValueError('LIVE_SPATIAL_LINEAGE_STALE_OR_CONFLICT')
@@ -140,7 +141,7 @@ class InteractionShadowNode(Node):
             derived=replace(ge,calibration_id=b.spatial_calibration_id,config_version=self.config['config_version'])
             state=result_to_message(result,b,derived,self.config)
             self.state_pub.publish(state)
-            for key,publisher in self.publishers.items():publisher.publish(getattr(state,key))
+            for key,publisher in self.evidence_publishers.items():publisher.publish(getattr(state,key))
         except (ValueError,TypeError,KeyError,AttributeError) as exc:
             state=GraspInteractionState(validity=1,reason=str(exc),valid_for_control=False,
                 abort_required='CONFLICT' in str(exc))

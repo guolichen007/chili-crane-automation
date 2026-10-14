@@ -125,6 +125,15 @@ class CommissioningTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):RunRecorder(self.temp.name,'test-run','a'*40,'b'*64)
         with self.assertRaises(ValueError):self.recorder.read('../../manifest')
 
+    def test_surface_invalidation_and_refresh_are_recorded_once_per_binding(self):
+        backend=ConsoleBackend(self.config,self.recorder)
+        summary=dict(binding_id='binding-1',invalidation_acknowledged=True,observation_enabled=True,
+                     refresh_ready=True,surface_generation=2,reason='SYNTHETIC_ONLY')
+        for _ in range(4):backend.mirror('perception/surface_refresh_evidence',summary,'SYNTHETIC',10.)
+        events=[json.loads(line)['event_type'] for line in self.recorder.read('events').splitlines()]
+        for name in ('SURFACE_INVALIDATED','SURFACE_REFRESH_STARTED','SURFACE_REFRESH_READY'):
+            self.assertEqual(events.count(name),1)
+
     def test_bounded_backend_and_no_runtime_enable_flags(self):
         c=dict(self.config,maximum_events=3,maximum_plot_samples=3)
         backend=ConsoleBackend(c,self.recorder)

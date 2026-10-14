@@ -92,7 +92,7 @@ class InstalledRun:
             self.start(package,executable,['--ros-args','-r','__ns:=/'+self.namespace]+arguments)
         self.start('chili_crane_commissioning','commissioning_console.py',[
             '--config',str(ROOT/'config/commissioning/console.yaml'),'--git-sha',subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
-            '--run-id','installed-'+name,'--runs-directory',str(self.directory/'runs'),
+            '--run-id','installed-run','--runs-directory',str(self.directory/'runs'),
             '--crane-namespace',self.namespace,'--host','127.0.0.1','--port','0'])
 
     def start(self,package,executable,arguments):
@@ -147,6 +147,7 @@ class InstalledRun:
         context=context_to_message(replace(self.ctx,measurement_epoch=timing.header_epoch))
         context.header=copy.deepcopy(cloud.header);context.evidence.header=copy.deepcopy(cloud.header)
         context.evidence.measurement_stamp=copy.deepcopy(cloud.header.stamp);context.evidence.source_counter=self.counter
+        context.evidence.config_version=self.c['config_version'];context.evidence.receive_stamp=self.node.get_clock().now().to_msg()
         context.evidence.evidence_age_sec=now-timing.header_epoch
         meta=EvidenceMetadata(validity=4,source_type=4,source_counter=self.counter,calibration_id=self.ctx.calibration_id,
             config_version=self.c['config_version'],evidence_age_sec=now-timing.header_epoch)

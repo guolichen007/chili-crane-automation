@@ -13,6 +13,12 @@ sys.path[:0]=[str(ROOT/'src/chili_crane_perception/src'),str(ROOT/'src/chili_cra
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_ros_node_does_not_overwrite_rclpy_read_only_properties(self):
+        tree=ast.parse((ROOT/'src/chili_crane_control/src/chili_crane_control/interaction_node.py').read_text(encoding='utf-8'))
+        for n in ast.walk(tree):
+            if isinstance(n,ast.Attribute) and isinstance(n.ctx,ast.Store) and isinstance(n.value,ast.Name) and n.value.id=='self':
+                self.assertNotIn(n.attr,{'context','publishers','subscriptions','timers','clients','services','guards'})
+
     def test_four_integrated_scenarios_use_actual_grid_and_planner(self):
         spec=importlib.util.spec_from_file_location('phase2c_acceptance',ROOT/'tools/validate_phase2c_synthetic.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
