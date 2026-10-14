@@ -79,6 +79,17 @@ class ZoneObservation:
 
 
 @dataclass(frozen=True)
+class PitExitConfirmation:
+    run_id: str
+    cycle_id: str
+    binding_id: str
+    binding_digest: str
+    lineage: tuple
+    geometry_provenance: tuple
+    evidence: Evidence
+
+
+@dataclass(frozen=True)
 class InteractionResult:
     phase: str
     reason: str
@@ -137,6 +148,7 @@ class GraspInteractionEngine:
         self.lower_min_z=None;self.loaded_baseline=None;self.last_payload='PAYLOAD_UNKNOWN'
         self.once_events=set()
         self.last_refresh=None
+        self.pit_exit=None;self.evidence_conflict=False;self.evidence_phase=None
         for name in ('contact','closure','payload','unload'):setattr(self,'_last_'+name,None)
         self.motion=VerticalMotionEstimator(self.config['motion'])
 
@@ -147,9 +159,11 @@ class GraspInteractionEngine:
             raise ValueError('BINDING_EVENT_TIME_INVALID')
         if self.active_cycle and binding.run_id!=self.active_run_id:
             self.session_conflict=True
+            self.invalidate_pit_exit()
             raise ValueError('RUN_SWAP_DURING_ACTIVE_CYCLE_ABORT_REQUIRED')
         if self.active_cycle and binding.surface_session_id!=self.surface_session_id:
             self.session_conflict=True
+            self.invalidate_pit_exit()
             raise ValueError('SURFACE_RESTART_DURING_ACTIVE_CYCLE_ABORT_REQUIRED')
         if self.active_cycle:
             raise ValueError('ACTIVE_CYCLE_CANNOT_REBIND')
@@ -189,6 +203,7 @@ class GraspInteractionEngine:
             self.surface_session_id=session;return False
         if self.active_cycle:
             self.session_conflict=True
+            self.invalidate_pit_exit()
             raise ValueError('SURFACE_RESTART_DURING_ACTIVE_CYCLE_ABORT_REQUIRED')
         if any(v.surface_session_id==session for v in self.ledger.bindings.values()):
             raise ValueError('RETIRED_SURFACE_SESSION_REJECTED')
@@ -199,6 +214,23 @@ class GraspInteractionEngine:
         # Keep the terminal binding for audit/identity, never compare generations
         # across sessions. It is not an active binding after the terminal state.
         return True
+
+    def invalidate_pit_exit(self):
+        """Invalidate this cycle's historical event on conflict, never authorize motion."""
+        if self.pit_exit is not None:self.evidence_conflict=True
+        self.pit_exit=None
+
+    def consider_refresh(self,refresh,now):
+        """Fresh next-scan evidence may arrive after the old owner is terminal."""
+        b,c=self.binding,self.config
+        valid=(b is not None and refresh is not None and (refresh.generation_ready or refresh.ready)
+            and refresh.binding_id==b.binding_id and refresh.binding_digest==b.binding_digest_sha256
+            and refresh.lineage==b.lineage and refresh.surface_session_id==b.surface_session_id
+            and refresh.surface_generation>b.surface_generation and refresh.evidence.epoch>self.commit_epoch
+            and refresh.evidence.calibration_id==b.spatial_calibration_id and refresh.evidence.frame_id==b.evidence.frame_id
+            and refresh.evidence.fresh(now,c['evidence_ttl_sec'],c['source_type']))
+        self.last_refresh=refresh if valid else None
+        return bool(valid)
 
     def _fresh(self,observation,now,geometry=False):
         c=self.config
@@ -242,10 +274,12 @@ class GraspInteractionEngine:
         return True
 
     def _empty(self,phase,reason,abort=False):
+        if abort:self.invalidate_pit_exit()
         diagnostic_keys=('closure_confirmed','interaction_committed','bound_clear','raise_seen','vertical_velocity',
             'vertical_acceleration','vertical_settled','load_sensor_valid','load_sensor_fresh','load_baseline_valid',
             'load_source_calibration_allowed','load_delta','normalized_delta','robust_zscore','settling_window_valid',
-            'payload_gate_pass','refresh_generation','affected_cell_count','refreshed_cell_count','unknown_cell_count',
+            'payload_delta_gate_pass','payload_gate_pass','pit_rim_clear','safe_lift_height','pit_exit_confirmed',
+            'surface_refresh_ready','next_plan_ready','refresh_generation','affected_cell_count','refreshed_cell_count','unknown_cell_count',
             'refresh_observed_fraction','updated_clear','source_type','source_counter')
         diagnostics=dict.fromkeys(diagnostic_keys,None)
         diagnostics.update(gate_evaluation='NOT_EVALUATED',reason=reason,
@@ -258,7 +292,7 @@ class GraspInteractionEngine:
                  epoch=self.commit_epoch,source_counter=self.commit_counter,invalidate=self.committed,
                  swept=tuple(self.swept)),dict(state='CLOSURE_UNKNOWN'),dict(state='PAYLOAD_UNKNOWN'),
             dict(clear_of_bound_surface=False,clear_of_updated_surface=False,clear_of_material_surface=False,
-                 clear_of_pit=False,safe_lift_height=False,refresh_ready=False),dict(state='UNLOAD_UNKNOWN'),
+                 clear_of_pit=False,safe_lift_height=False,pit_exit_confirmed=False,refresh_ready=False),dict(state='UNLOAD_UNKNOWN'),
             self.load.features,False,(),False,diagnostics)
 
     def evaluate(self,phase,grab,hoist,io,load,now,lineage=None,refresh=None,cart=None,zone=None,next_candidate=None):
@@ -275,11 +309,18 @@ class GraspInteractionEngine:
             if 'CYCLE_ABORTED' not in self.events[start:]:self.events.append('CYCLE_ABORTED')
             return self._empty(phase,'CYCLE_ABORTED',True)
         if self.session_conflict:return self._empty(phase,'SURFACE_OR_RUN_CONFLICT_ABORT_REQUIRED',True)
+        if self.evidence_conflict:return self._empty(phase,'CYCLE_EVIDENCE_CONFLICT_ABORT_REQUIRED',True)
+        if self.pit_exit is not None and self.evidence_phase is not None and CycleState[phase]<CycleState[self.evidence_phase]:
+            return self._empty(phase,'CYCLE_EVIDENCE_PHASE_REGRESSION_CONFLICT',True)
+        self.evidence_phase=phase
         required=('maximum_evidence_skew_sec','contact_persistence_sec','penetration_depth_m','penetration_persistence_sec',
                   'collapse_margin_m','bound_clearance_margin_m','updated_clearance_margin_m','minimum_observed_rise_m',
                   'maximum_stable_velocity_mps','maximum_stable_acceleration_mps2','payload_settling_sec',
                   'closure_persistence_sec','unload_persistence_sec')
         if not all(configured_number(c,k,True) for k in required):return self._empty(phase,'INTERACTION_PARAMETERS_NOT_CONFIGURED')
+        if grab is not None and (grab.extrinsic_id!=c.get('geometry_calibration_id')
+                or grab.evidence.frame_id!=b.evidence.frame_id or grab.evidence.source_type!=c.get('source_type')):
+            return self._empty(phase,'GRAB_GEOMETRY_PROVENANCE_CONFLICT',True)
         if not self._fresh(grab,now,True) or not self._fresh(hoist,now):return self._empty(phase,'GRAB_OR_HOIST_STALE_UNKNOWN')
         if (not self._ordered('grab',grab,(grab.bottom_lower,grab.bottom_upper,grab.z,grab.opening_state,grab.footprint))
                 or not self._ordered('hoist',hoist,(hoist.motion,))):
@@ -351,19 +392,12 @@ class GraspInteractionEngine:
                     and rise>=c['minimum_observed_rise_m'])
         bound_clear=(self.committed and rise_order and hoist.motion in ('UP','STOPPED')
                      and grab.bottom_lower-b.surface_upper_m>=c['bound_clearance_margin_m'])
-        generation_ok=(refresh is not None and (refresh.generation_ready or refresh.ready) and refresh.binding_id==b.binding_id
-                    and refresh.binding_digest==b.binding_digest_sha256 and refresh.lineage==b.lineage
-                    and refresh.surface_session_id==b.surface_session_id and refresh.surface_generation>b.surface_generation
-                    and refresh.evidence.epoch>self.commit_epoch
-                    and refresh.evidence.calibration_id==b.spatial_calibration_id
-                    and refresh.evidence.frame_id==b.evidence.frame_id
-                    and refresh.evidence.fresh(now,c['evidence_ttl_sec'],c['source_type']))
+        generation_ok=self.consider_refresh(refresh,now)
         refresh_ok=(generation_ok and refresh.ready
                     and all(math.isfinite(v) for v in (refresh.lower,refresh.nominal,refresh.upper))
                     and refresh.lower<=refresh.nominal<=refresh.upper)
         updated_clear=(bound_clear and refresh_ok and refresh.unknown_cell_count==0
                        and grab.bottom_lower-refresh.upper>=c['updated_clearance_margin_m'])
-        self.last_refresh=refresh if generation_ok else None
         next_plan_ready=bool(generation_ok and next_candidate is not None
             and next_candidate.lineage==b.lineage and next_candidate.run_id==b.run_id
             and next_candidate.cycle_id!=b.cycle_id and next_candidate.surface_generation>=refresh.surface_generation
@@ -373,8 +407,22 @@ class GraspInteractionEngine:
         pit_elevation=self._pit_elevation()
         pit_config=(c.get('pit_geometry_state')==pit_state and pit_elevation is not None
                     and configured_number(c,'pit_clearance_margin_m',True) and configured_number(c,'safe_lift_height_m',True))
-        pit_clear=bool(pit_config and updated_clear and grab.bottom_lower-pit_elevation>=c['pit_clearance_margin_m'])
+        pit_clear=bool(pit_config and bound_clear and grab.bottom_lower>pit_elevation+c['pit_clearance_margin_m'])
         safe_height=bool(pit_clear and grab.bottom_lower>=c['safe_lift_height_m'])
+        exit_provenance=(pit_state,c.get('pit_geometry_state'),pit_elevation,c.get('pit_clearance_margin_m'),
+                         c.get('safe_lift_height_m'),c.get('geometry_calibration_id'))
+        if self.pit_exit is not None and self.pit_exit.geometry_provenance!=exit_provenance:
+            return self._empty(phase,'PIT_EXIT_PROVENANCE_CONFLICT_ABORT_REQUIRED',True)
+        pit_chronology=bool(self.lower_started is not None and self.close_started is not None and self.raise_started is not None
+            and b.binding_epoch_ns/1e9<=self.lower_started<=self.commit_epoch<=self.raise_started
+            and self.lower_started<=self.close_started<=self.raise_started)
+        if phase=='RAISE' and safe_height and pit_chronology and self.pit_exit is None:
+            self.pit_exit=PitExitConfirmation(b.run_id,b.cycle_id,b.binding_id,b.binding_digest_sha256,b.lineage,
+                                               exit_provenance,grab.evidence)
+            self.events.append('PIT_EXIT_CONFIRMED')
+        exit_confirmed=bool(self.pit_exit is not None and
+            (self.pit_exit.run_id,self.pit_exit.cycle_id,self.pit_exit.binding_id,self.pit_exit.binding_digest,self.pit_exit.lineage)==
+            (b.run_id,b.cycle_id,b.binding_id,b.binding_digest_sha256,b.lineage))
         vertical_settled=(motion.valid and grab.motion_stable and stopped
                  and abs(motion.velocity)<=c['maximum_stable_velocity_mps']
                  and abs(motion.acceleration)<=c['maximum_stable_acceleration_mps2'])
@@ -384,13 +432,18 @@ class GraspInteractionEngine:
         delta=features.delta*c['load']['load_polarity']
         loaded=(delta>=c['load']['payload_abs_threshold']
                 and features.normalized_delta*c['load']['load_polarity']>=c['load']['payload_normalized_threshold'])
+        payload_gate_pass=bool(closure=='CLOSURE_CONFIRMED' and self.committed and rise_order and bound_clear
+            and vertical_settled and settling_window_valid and features.fresh and features.baseline_valid and calibrated and loaded)
         diagnostics=dict(closure_confirmed=closure=='CLOSURE_CONFIRMED',interaction_committed=self.committed,
             gate_evaluation='EVALUATED',
             bound_clear=bound_clear,raise_seen=rise_order,vertical_velocity=motion.velocity,
             vertical_acceleration=motion.acceleration,vertical_settled=vertical_settled,
             load_sensor_valid=features.fresh,load_sensor_fresh=features.fresh,load_baseline_valid=features.baseline_valid,
             load_source_calibration_allowed=calibrated,load_delta=features.delta,normalized_delta=features.normalized_delta,
-            robust_zscore=features.normalized_delta,settling_window_valid=settling_window_valid,payload_gate_pass=loaded,
+            robust_zscore=features.normalized_delta,settling_window_valid=settling_window_valid,
+            payload_delta_gate_pass=loaded,payload_gate_pass=payload_gate_pass,
+            pit_rim_clear=pit_clear,safe_lift_height=safe_height,pit_exit_confirmed=exit_confirmed,
+            pit_exit_chronology_valid=pit_chronology,
             surface_session_id=b.surface_session_id,bound_generation=b.surface_generation,
             refresh_generation=refresh.surface_generation if refresh else None,
             affected_cell_count=refresh.affected_cell_count if refresh else 0,
@@ -423,7 +476,7 @@ class GraspInteractionEngine:
                      and z0<=grab.bottom_lower<=grab.top_upper<=z1)
             cart_ok=cart.present and cart.aligned and not cart.full and not cart.overflow
             if cart.full or cart.overflow:unload='UNLOAD_CONFLICT'
-            elif zone_ok and cart_ok and pit_clear and self.loaded_baseline is not None:
+            elif zone_ok and cart_ok and exit_confirmed and self.loaded_baseline is not None:
                 unload='UNLOAD_READY'
                 open_ok=io_ok and io.open_limit and not io.closed_limit and grab.opening_state=='OPEN'
                 if (phase in ('OPEN_GRAB','VERIFY_EMPTY') and open_ok and settled and features.calibration_confirmed_for_source
@@ -451,7 +504,10 @@ class GraspInteractionEngine:
             dict(state=payload,velocity=motion.velocity,acceleration=motion.acceleration,**{'rise':rise}),
             dict(clear_of_bound_surface=bound_clear,clear_of_updated_surface=updated_clear,clear_of_material_surface=updated_clear,
                  updated_clear_state='CLEAR' if updated_clear else 'NOT_CLEAR' if refresh_ok and refresh.unknown_cell_count==0 else 'UNKNOWN',
-                 clear_of_pit=pit_clear,safe_lift_height=safe_height,refresh_ready=refresh_ok,observed_rise=rise,
+                 clear_of_pit=pit_clear,safe_lift_height=safe_height,pit_exit_confirmed=exit_confirmed,
+                 pit_exit_epoch_ns=self.pit_exit.evidence.epoch_ns if exit_confirmed else 0,
+                 pit_exit_source_counter=self.pit_exit.evidence.counter if exit_confirmed else 0,
+                 refresh_ready=refresh_ok,observed_rise=rise,
                  bound_clearance=grab.bottom_lower-b.surface_upper_m,updated_clearance=grab.bottom_lower-refresh.upper if refresh_ok else 0.,
                  pit_clearance=grab.bottom_lower-pit_elevation if pit_config else 0.,
                  refreshed_snapshot_id=refresh.snapshot_id if refresh_ok else '',refreshed_generation=refresh.surface_generation if refresh_ok else 0),
@@ -471,8 +527,7 @@ def evidence_allows_advance(cycles,result):
     if state==CycleState.VERIFY_LOAD:
         return result.closure['state']=='CLOSURE_CONFIRMED' and result.interaction['state']=='INTERACTION_COMMITTED'
     if state==CycleState.RAISE:
-        return (result.payload['state']=='PAYLOAD_CONFIRMED' and result.lift['safe_lift_height']
-                and result.lift['clear_of_updated_surface'])
-    if state==CycleState.VERIFY_EMPTY:return result.unload['state']=='UNLOAD_CONFIRMED' and result.next_cycle_surface_ready
+        return result.payload['state']=='PAYLOAD_CONFIRMED' and result.lift.get('pit_exit_confirmed',False)
+    if state==CycleState.VERIFY_EMPTY:return result.unload['state']=='UNLOAD_CONFIRMED'
     # Other states still require their existing owner readiness/positioning policy.
     return False

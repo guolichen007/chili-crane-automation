@@ -17,6 +17,10 @@ string updated_clear_state
 bool clear_of_material_surface
 bool clear_of_pit
 bool safe_lift_height
+# Historical event bound to run/cycle/binding/digest above; not a control permit.
+bool pit_exit_confirmed
+builtin_interfaces/Time pit_exit_stamp
+uint64 pit_exit_source_counter
 float64 observed_rise_m
 float64 bound_clearance_m
 float64 updated_clearance_m

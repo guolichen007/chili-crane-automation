@@ -172,6 +172,7 @@ class CommissioningTests(unittest.TestCase):
         with self.assertRaises(PermissionError):recorder.command('state_only')
         c=dict(config_state='VALID',enabled=True,storage_id='sqlite3',max_bag_size_bytes=1000000,max_bag_duration_sec=20,
             global_recording_budget_bytes=10000000,minimum_free_space_bytes=0,retention_policy='STOP_ONLY',
+            storage_check_interval_sec=1.,
             max_total_storage_bytes=2000000,max_recording_duration_sec=30,profiles={'state_only':{'topics':['phase2c/interaction_state']}})
         recorder=BagRecorder(c,self.recorder,'crane_01',executable='ros2')
         command=recorder.command('state_only');self.assertIn('--max-bag-size',command);self.assertIn('--max-bag-duration',command)
@@ -206,7 +207,7 @@ class CommissioningTests(unittest.TestCase):
             self.assertIn(event,javascript)
         import xml.etree.ElementTree as ET
         for package in (ROOT/'src').glob('*/package.xml'):
-            if package.parent.name=='chili_crane_commissioning':continue
+            if package.parent.name in ('chili_crane_commissioning','chili_crane_bringup'):continue
             self.assertNotIn('chili_crane_commissioning',{n.text for n in ET.parse(package).getroot()})
         for path in (ROOT/'src/chili_crane_bringup/launch').glob('*production*'):
             self.assertNotIn('commissioning',path.read_text(encoding='utf-8'))

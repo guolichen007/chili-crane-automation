@@ -192,6 +192,7 @@ class StorageTests(unittest.TestCase):
         return dict(config_state='VALID',enabled=True,storage_id='sqlite3',max_bag_size_bytes=1000000,
             max_bag_duration_sec=20,max_total_storage_bytes=2000000,max_recording_duration_sec=30,
             minimum_free_space_bytes=0,global_recording_budget_bytes=10000000,retention_policy='STOP_ONLY',
+            storage_check_interval_sec=1.,
             profiles={'state_only':{'topics':['phase2c/interaction_state']}})
 
     def test_global_recording_quota_stops_new_and_current_bag_preserves_all_history(self):
@@ -201,7 +202,8 @@ class StorageTests(unittest.TestCase):
             bag.start('state_only');self.assertTrue(bag.status()['rosbag_process_alive'])
             history=Path(root)/'pinned-fault-evidence';history.mkdir();evidence=history/'evidence.bin'
             evidence.write_bytes(b'x'*config['global_recording_budget_bytes'])
-            bag.tick();self.assertFalse(process.alive);self.assertTrue(evidence.exists())
+            with patch('chili_crane_commissioning.bag.time.monotonic',return_value=bag.next_storage_check):bag.tick()
+            self.assertFalse(process.alive);self.assertTrue(evidence.exists())
             self.assertIn(b'STORAGE_LIMIT_GLOBAL_BUDGET',recorder.read('events'))
             with self.assertRaisesRegex(PermissionError,'STORAGE_LIMIT'):bag.start('state_only')
             self.assertEqual(len(process.signals),1)

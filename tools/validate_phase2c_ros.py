@@ -37,6 +37,9 @@ from chili_crane_perception.surface_transport import context_to_message,polygon,
 from chili_crane_perception.surface_time import scan_epochs
 from chili_crane_control.interaction_transport import binding_from_proposal,binding_to_message
 from chili_crane_control.interaction_node import STATE_QOS,BIND_QOS
+from chili_crane_control.cycle import TaskCycles,CycleState
+from chili_crane_control.grasp_interaction import evidence_allows_advance
+from types import SimpleNamespace
 from chili_crane_slam.dual_lidar import Cloud,DualLidarMerger,Extrinsic
 from chili_crane_slam.dual_lidar_node import cloud_message
 from chili_crane_slam.pointcloud import CANONICAL
@@ -45,9 +48,10 @@ ROOT=Path(__file__).resolve().parents[1]
 
 
 class InstalledRun:
-    def __init__(self,directory,name):
+    def __init__(self,directory,name,owner_driven=False):
         self.directory=directory/name;self.directory.mkdir()
         self.namespace='phase2c_'+uuid.uuid4().hex[:12];self.name=name
+        self.cycles=TaskCycles('installed-run','installed-task') if owner_driven else None
         self.c,self.semantic,self.gc,self.ctx,self.initial_grab=fixture(ROOT/'config/safety/pit_operational_geofence.template.yaml')
         self.c.update(frame_ttl_sec=2.,surface_ttl_sec=2.5,window_sec=3.,maximum_window_frames=4)
         self.ic=yaml.safe_load((ROOT/'config/algorithms/phase2c_interaction.synthetic.yaml').read_text(encoding='utf-8'))
@@ -92,6 +96,7 @@ class InstalledRun:
         self.merger=DualLidarMerger(*extrinsics);self.counter=0;self.binding=None;self.last_messages={}
         self.processes=[];self.logs=[];self.url=None
         self.hold_post_cloud=False;self.visibility='full';self.chains={}
+        self.hold_pit_context=False
         log=(self.directory/'commissioning_console.py.log').open('w',encoding='utf-8');self.logs.append(log)
         self.processes.append(subprocess.Popen(['ros2','launch','chili_crane_bringup','phase2c_shadow_stack.launch.py',
             'namespace:='+self.namespace,'surface_config_file:='+str(self.directory/'surface.yaml'),
@@ -149,7 +154,9 @@ class InstalledRun:
         if hasattr(message,'evidence_age_sec'):message.evidence_age_sec=e.evidence_age_sec
         return message
 
-    def send(self,phase='WAIT_STABLE',z=4.,motion=0,opening=1,closed=False,opened=True,value=100.,stable=True,empty=False):
+    def send(self,phase=None,z=4.,motion=0,opening=1,closed=False,opened=True,value=100.,stable=True,empty=False):
+        phase=phase or (self.cycles.state.name if self.cycles is not None else 'WAIT_STABLE')
+        if self.cycles is not None:assert phase==self.cycles.state.name
         self.counter+=1;now=self.node.get_clock().now().nanoseconds/1e9;first=now-.04
         scans=[];points=self.xyz.copy()
         if self.binding and 'refresh' in self.received and self.received['refresh'].observation_enabled:
@@ -199,7 +206,9 @@ class InstalledRun:
         hoist=self.annotate(HoistState(motion=motion,running=motion!=0),epoch,'synthetic-hoist')
         io=self.annotate(GrabIoState(open_limit=opened,closed_limit=closed,known_signals=['open_limit','closed_limit']),epoch,'synthetic-io')
         load=self.annotate(LoadState(value=value,unit='raw',calibration_id='synthetic-load',load_state=1 if empty else 3),epoch,'synthetic-load')
-        cycle=self.annotate(CycleStatus(run_id='installed-run',task_id='installed-task',cycle_id='installed-cycle:1',cycle_index=1,
+        cycle_id=self.cycles.cycle_id if self.cycles is not None else 'installed-cycle:1'
+        cycle_index=self.cycles.cycle_index if self.cycles is not None else 1
+        cycle=self.annotate(CycleStatus(run_id='installed-run',task_id='installed-task',cycle_id=cycle_id,cycle_index=cycle_index,
             state=getattr(CycleStatus,phase)),epoch,'synthetic-cycle')
         cart=self.annotate(UnloadingCartState(station_id='synthetic-only',present=True,aligned=True,full=False,overflow=False),epoch,'synthetic-cart')
         zone=self.annotate(UnloadSafeZone(frame_id='map',x_min=-3.,x_max=3.,y_min=-3.,y_max=3.,z_min=3.5,z_max=5.,
@@ -207,31 +216,57 @@ class InstalledRun:
         for key,message in (('meta',meta),('context',context),('geometry',geometry),('clearance',clearance),('grab',grab),
             ('hoist',hoist),('io',io),('load',load),('cycle',cycle),('cart',cart),('zone',zone),('cloud',cloud)):
             if key=='cloud' and (self.hold_post_cloud or not scans):continue
+            if key=='context' and self.hold_pit_context:continue
             self.pubs[key].publish(message);self.last_messages[key]=message
         self.spin(.1)
 
     def initialize(self):
         self.wait(lambda:all(p.get_subscription_count()>0 for key,p in self.pubs.items() if key!='binding'))
         self.wait(lambda:'proposal' in self.received and bool(self.received['proposal'].selected_candidate_id),send=self.send)
-        self.binding=binding_from_proposal(self.received['proposal'],'installed-run','installed-task','installed-cycle:1',1,
+        cycle_id=self.cycles.cycle_id if self.cycles is not None else 'installed-cycle:1'
+        self.binding=binding_from_proposal(self.received['proposal'],'installed-run','installed-task',cycle_id,1,
                                            self.node.get_clock().now().nanoseconds/1e9)
         self.pubs['binding'].publish(binding_to_message(self.binding))
+        self.initial_binding=self.binding
         self.wait(lambda:'binding' in self.received,send=self.send)
         assert self.received['binding'].binding_digest_sha256==self.binding.binding_digest_sha256
         for _ in range(18):self.send(empty=True)
         self.wait(lambda:self.received['state'].validity==3,send=lambda:self.send(empty=True))
         features=json.loads(self.received['state'].load_features_json);assert features['baseline_valid'],features
+        if self.cycles is not None:
+            assert self.cycles.accept_scan(self.received['proposal'].evidence.source_counter,fresh=True)
+
+    def owner_admission(self):
+        state=self.received['state']
+        result=SimpleNamespace(phase=state.task_cycle_state,abort_required=state.abort_required or state.validity!=3,
+            payload=dict(state=state.payload.reason),interaction=dict(state=state.interaction.reason),
+            closure=dict(state=state.closure.reason),unload=dict(state=state.unload.reason),
+            lift=dict(pit_exit_confirmed=state.lift.pit_exit_confirmed))
+        return self.cycles.advance(evidence_verified=evidence_allows_advance(self.cycles,result))
 
     def interact(self):
+        if self.cycles is not None:
+            assert self.cycles.advance(evidence_verified=True)  # mock positioning policy
+            self.send(empty=True)
+            assert self.cycles.advance(evidence_verified=True)
+            self.send(empty=True)
+            assert self.cycles.advance(evidence_verified=True)
+            self.send()
+            assert self.cycles.advance(evidence_verified=self.last_messages['io'].open_limit)
         for i in range(22):self.send('LOWER',z=4.-3.2*(i+1)/22,motion=-1,stable=False)
         for i in range(6):self.send('LOWER',z=.8-.006*i,motion=-1,stable=False)
         self.wait(lambda:'refresh' in self.received and self.received['refresh'].invalidation_acknowledged,send=lambda:
                   self.send('LOWER',z=.76,motion=-1,stable=False))
         assert self.received['refresh'].affected_cell_count>0
         assert not self.received['refresh'].refresh_ready,'old disturbed observations rehabilitated before lift'
+        if self.cycles is not None:assert self.owner_admission()
         for _ in range(8):self.send('CLOSE',z=.76,opening=2,closed=True,opened=False)
         self.wait(lambda:self.received['state'].closure.state==self.received['state'].closure.CLOSURE_CONFIRMED,send=lambda:
                   self.send('CLOSE',z=.76,opening=2,closed=True,opened=False))
+        if self.cycles is not None:
+            assert self.owner_admission()
+            self.send('VERIFY_LOAD',z=.76,opening=2,closed=True,opened=False)
+            assert self.owner_admission()
 
     def lift(self,value=101.,acceleration=False):
         for i in range(25):
@@ -276,9 +311,47 @@ class InstalledRun:
         assert not self.received['state'].lift.clear_of_updated_surface
         self.chains.update(SURFACE_REFRESH_CHAIN='PASS',NEXT_PLAN_CHAIN='PASS')
 
+    def complete_partial_current_cycle(self):
+        for _ in range(35):self.send('RAISE',opening=2,closed=True,opened=False,value=101.)
+        state=self.received['state'];r=self.received['refresh']
+        assert (r.affected_cell_count,r.refreshed_cell_count,r.unknown_cell_count)==(9,2,7)
+        assert state.payload.state==2 and state.lift.pit_exit_confirmed
+        assert not state.lift.clear_of_updated_surface and not state.next_cycle_surface_ready
+        assert self.owner_admission() and self.cycles.state==CycleState.MOVE_TO_UNLOAD
+        self.hold_post_cloud=True;self.hold_pit_context=True
+        for _ in range(25):self.send(opening=2,closed=True,opened=False,value=101.)
+        state=self.received['state'];assert state.lift.pit_exit_confirmed and not state.lift.surface_refresh_ready
+        assert self.cycles.advance(evidence_verified=True)  # mock transport arrival
+        self.send(opening=2,closed=True,opened=False,value=101.)
+        assert self.cycles.advance(evidence_verified=self.received['state'].unload.aligned)
+        self.send(opening=2,closed=True,opened=False,value=101.)
+        assert self.cycles.advance(evidence_verified=self.received['state'].unload.in_safe_zone)
+        self.send(value=100.)
+        assert self.cycles.advance(evidence_verified=self.received['state'].unload.open_confirmed)
+        self.wait(lambda:self.received['state'].unload.state==self.received['state'].unload.UNLOAD_CONFIRMED,
+                  timeout=10.,send=lambda:self.send(value=100.))
+        assert not self.received['state'].next_cycle_surface_ready and self.owner_admission()
+        self.send(value=100.);assert self.cycles.state==CycleState.COMPLETE
+        assert self.cycles.next_cycle(continue_task=True) and self.cycles.state==CycleState.SCAN
+        old=self.binding;now_ns=self.node.get_clock().now().nanoseconds
+        attempt=replace(old,cycle_id=self.cycles.cycle_id,cycle_index=self.cycles.cycle_index,binding_id='old-next-attempt',
+            evidence=replace(old.evidence,epoch_ns=now_ns,reported_age=0.),binding_epoch_ns=now_ns,binding_digest_sha256='')
+        self.pubs['binding'].publish(binding_to_message(attempt));self.spin(.2)
+        assert self.received['binding'].binding_digest_sha256==old.binding_digest_sha256
+        self.hold_post_cloud=False;self.hold_pit_context=False;self.visibility='recovery'
+        self.wait(lambda:self.received['proposal'].surface_generation>old.surface_generation
+                  and bool(self.received['proposal'].selected_candidate_id),send=lambda:self.send(value=100.))
+        fresh=binding_from_proposal(self.received['proposal'],old.run_id,old.task_id,self.cycles.cycle_id,
+            self.cycles.cycle_index,self.node.get_clock().now().nanoseconds/1e9)
+        self.pubs['binding'].publish(binding_to_message(fresh))
+        self.wait(lambda:self.received['binding'].binding_digest_sha256==fresh.binding_digest_sha256,send=lambda:self.send(value=100.))
+        self.binding=fresh
+        self.chains.update(RAISE_CURRENT_CYCLE_ADVANCE='PASS',UNLOAD_WITH_STALE_REFRESH='PASS',
+            COMPLETE_WITHOUT_NEXT_PLAN='PASS',NEXT_BIND_WITHOUT_NEW_B_PROPOSAL='REJECTED',NEXT_BIND_WITH_NEW_B_PROPOSAL='PASS')
+
     def old_sample_reuse_count(self):
         assert self.invalidation_generation is not None
-        region=Polygon(self.binding.capture_footprint).buffer(self.ic['collapse_margin_m']/math.cos(math.pi/64),resolution=16)
+        region=Polygon(self.initial_binding.capture_footprint).buffer(self.ic['collapse_margin_m']/math.cos(math.pi/64),resolution=16)
         affected={i for i,active in enumerate(self.grid.pit_active_cell_mask)
                   if active and region.intersects(self.grid.cell_polygon(i))}
         boundary=self.received['refresh'].observation_after_epoch
@@ -335,8 +408,8 @@ def main():
     args.evidence_dir.mkdir(parents=True,exist_ok=True);rclpy.init();results=[]
     try:
         for name in ('SUCCESSFUL_GRASP','FAILED_GRASP_AFTER_INTERACTION','LOAD_ACCELERATION_FALSE_POSITIVE',
-                     'PARTIAL_POST_GRAB_VISIBILITY','POST_GRAB_OCCLUSION_THEN_RECOVERY'):
-            run=InstalledRun(args.evidence_dir,name)
+                     'PARTIAL_POST_GRAB_VISIBILITY','POST_GRAB_OCCLUSION_THEN_RECOVERY','PARTIAL_REFRESH_CURRENT_CYCLE_EXIT'):
+            run=InstalledRun(args.evidence_dir,name,owner_driven=name=='PARTIAL_REFRESH_CURRENT_CYCLE_EXIT')
             try:
                 run.initialize()
                 old_cycle=copy.deepcopy(run.last_messages['cycle'])
@@ -351,8 +424,8 @@ def main():
                 run.pubs['binding'].publish(binding_to_message(attack));run.spin(.2)
                 assert run.received['binding'].binding_digest_sha256==run.binding.binding_digest_sha256
                 run.interact()
-                if name in ('PARTIAL_POST_GRAB_VISIBILITY','POST_GRAB_OCCLUSION_THEN_RECOVERY'):
-                    run.visibility='partial' if name=='PARTIAL_POST_GRAB_VISIBILITY' else 'occluded'
+                if name in ('PARTIAL_POST_GRAB_VISIBILITY','POST_GRAB_OCCLUSION_THEN_RECOVERY','PARTIAL_REFRESH_CURRENT_CYCLE_EXIT'):
+                    run.visibility='partial' if name in ('PARTIAL_POST_GRAB_VISIBILITY','PARTIAL_REFRESH_CURRENT_CYCLE_EXIT') else 'occluded'
                 run.lift(value=100. if name=='FAILED_GRASP_AFTER_INTERACTION' else 101.,
                     acceleration=name=='LOAD_ACCELERATION_FALSE_POSITIVE')
                 payload=run.received['state'].payload.state
@@ -363,6 +436,7 @@ def main():
                 elif name=='LOAD_ACCELERATION_FALSE_POSITIVE':
                     assert not run.received['refresh'].refresh_ready
                     assert payload!=run.received['state'].payload.PAYLOAD_CONFIRMED
+                elif name=='PARTIAL_REFRESH_CURRENT_CYCLE_EXIT':run.complete_partial_current_cycle()
                 else:
                     if name in ('PARTIAL_POST_GRAB_VISIBILITY','POST_GRAB_OCCLUSION_THEN_RECOVERY'):run.visibility_recovery()
                 assert not run.forbidden

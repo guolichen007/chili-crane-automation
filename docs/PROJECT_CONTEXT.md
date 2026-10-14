@@ -1,5 +1,19 @@
 # Project Context
 
+## Phase2C-R1.2 最终窄修（2026-10-14，当前授权）
+
+BASE_SHA=7389e88a4f45268b302320e0f805ca5da953c166；新分支 codex/phase2c-r1-2-final-closeout。
+R1.1 accepted 项冻结；当前 cycle 的 PAYLOAD、PIT_EXIT 与下一 cycle 的 NEXT_PLAN 分离。
+RAISE 消费 payload+本 binding 的历史 pit exit；VERIFY_EMPTY 只用 unload 确认当前完成。
+过期/缺失 pit refresh 不取消合法离坑历史，当前 unload 观测仍要新鲜；来源/时序/静态几何冲突 fail closed。
+磁盘扫描按显式 1~5s 周期限频、FIELD interval=null；budget/STOP_ONLY 门禁保留。
+bringup 补 commissioning exec dependency，production 默认不启动；CTest delivery 明确 TIMEOUT 180，不改内部成功条件。
+更正 R1.1 上轮回传遗漏：7389e88 GitHub static PASS；Ubuntu22/Humble 八包 normal build PASS；
+colcon test 的 phase2c_delivery 在 60s CTest 超时 FAIL，installed/symlink NOT_REACHED，vendor PASS。
+IPC exact-SHA/FIELD NOT_RUN。不能再将该 CI 失败笼统写成 Ubuntu pending。
+本轮要求正常 push 并等待最终 exact SHA CI，按 job/artifact 分阶段回传；CI 与 IPC/现场分别报告。
+见 [R1.2合同](api/PHASE2C_R12_CONTRACTS.md)；不 merge main、不改 R1.1 分支、不进入 Phase2D。
+
 ## Phase2C-R1.1 窄修（2026-10-14，当前授权）
 
 BASE_SHA=1c14ac89d6429a31fa1cfcd3253b9eb7feabe56a；新分支 codex/phase2c-r1-1-closeout。

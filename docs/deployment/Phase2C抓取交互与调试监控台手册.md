@@ -1,5 +1,12 @@
 # Phase2C 抓取交互证据与调试监控台使用手册
 
+R1.2 当前契约见 [current-cycle closeout](../api/PHASE2C_R12_CONTRACTS.md)。
+SUPERSEDED：旧 RAISE admission 要求 updated clear；旧 VERIFY_EMPTY 要求下一候选。
+当前 RAISE 用 PAYLOAD_CONFIRMED + PIT_EXIT_CONFIRMED，VERIFY_EMPTY 用 UNLOAD_CONFIRMED。
+PIT_EXIT 是当前 binding 的历史事件；refresh 过期/缺失不取消它，新的来源/时序/几何冲突则清除并阻断。
+下一 cycle 仍从 SCAN 等新 generation 与真实 B proposal，不可复用旧 generation。
+记录配置需显式 storage_check_interval_sec（1~5s），FIELD 未确认保持 null；fast tick 不递归扫描历史根目录。
+
 交付日期：2026-10-14。R1.1 范围以[窄修验收记录](../validation/Phase2C-R1.1软件审查与工控机待验.md)
 及[接口迁移](../api/PHASE2C_R11_CONTRACTS.md)为准；原交付记录保留历史，不升级其 Ubuntu 状态。
 
@@ -21,7 +28,7 @@ Python 3.10 / GCC 11 / C++17。Windows 仅编辑、静态/纯算法测试及 Git
 | hardware | 既有 ADAM 驱动、独占会话、OFF/WDT/latch 与脉冲门禁 | 接受网页提供的 gate 或任意寄存器写入 |
 
 只有 TaskCycles 的既有 owner 可以推进状态。`evidence_allows_advance()` 是 shadow admission：
-VERIFY_LOAD 仅检查已经交互、闭合且无矛盾；RAISE 出口才要求稳定最终 payload、更新料面 clear 和安全提升。
+VERIFY_LOAD 仅检查已经交互、闭合且无矛盾；RAISE 出口要求稳定最终 payload 与可靠历史安全离坑。
 其他定位/限位/姿态/任务条件仍由原 owner 决定。没有引入新的周期状态机，也未接通真实 actuation。
 
 新增消息：TargetBinding、ContactEvidence、SurfaceInteractionEvidence、ClosureEvidence、PayloadEvidence、

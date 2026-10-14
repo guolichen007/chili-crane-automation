@@ -12,6 +12,9 @@ if(BUILD_TESTING)
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
   ament_add_pytest_test(phase2c_evidence ../../tests_static/test_phase2c_evidence.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
+  ament_add_pytest_test(phase2c_r12 ../../tests_static/test_phase2c_r12.py
+    TIMEOUT 180
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_perception/src)
   ament_add_pytest_test(operational_geofence ../../tests_static/test_operational_geofence.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
   ament_add_pytest_test(phase2b_planning ../../tests_static/test_phase2b_planning.py

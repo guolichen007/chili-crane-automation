@@ -19,7 +19,7 @@ class DeliveryTests(unittest.TestCase):
             if isinstance(n,ast.Attribute) and isinstance(n.ctx,ast.Store) and isinstance(n.value,ast.Name) and n.value.id=='self':
                 self.assertNotIn(n.attr,{'context','publishers','subscriptions','timers','clients','services','guards'})
 
-    def test_four_integrated_scenarios_use_actual_grid_and_planner(self):
+    def test_six_integrated_scenarios_use_actual_grid_and_planner(self):
         spec=importlib.util.spec_from_file_location('phase2c_acceptance',ROOT/'tools/validate_phase2c_synthetic.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
         result=module.validate()

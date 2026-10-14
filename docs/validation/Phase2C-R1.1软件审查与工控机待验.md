@@ -1,5 +1,17 @@
 # Phase2C-R1.1 软件审查与工控机待验
 
+## 事后 CI 更正（2026-10-14，R1.2 审查）
+
+最终 SHA `7389e88a4f45268b302320e0f805ca5da953c166` push 后实际自动运行了 CI。
+[Static 38547579632](https://github.com/guolichen007/chili-crane-automation/actions/runs/38547579632) SUCCESS。
+[ROS2 38547579625](https://github.com/guolichen007/chili-crane-automation/actions/runs/38547579625) FAILURE：
+依赖安装 PASS、normal 八包 build PASS、colcon test FAIL_PHASE2C_DELIVERY_CTEST_60S_TIMEOUT；
+installed Phase2C 和 symlink NOT_REACHED；vendor wrapper PASS。不是网络失败。
+artifact 11885623187，SHA256 `4351acd5950ef19616511276d1a6f46bfc9efab7eff51272c11c13a71f0a2841`。
+同 runner 的此前 native 六场景已经通过，失败是测试 runner 总预算，非 installed stable-lift 根因证明。
+上轮回传遗漏了这些自动 CI 事实；下方提交时 Windows/IPC 待验记录保留历史，不代表该 SHA CI 未运行。
+R1.1 当前 SOFTWARE_SEAL=NOT_APPROVED；先做 R1.2 并验最终 exact SHA CI，再交工控机。
+
 日期：2026-10-14。BASE_SHA=`1c14ac89d6429a31fa1cfcd3253b9eb7feabe56a`。
 分支 `codex/phase2c-r1-1-closeout`，在 Windows 原 checkout 建立；原 C 分支未修改。
 最终 OUTPUT_SHA 以交付回传及 `git rev-parse HEAD` 为准，避免报告自引用 SHA。

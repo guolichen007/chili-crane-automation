@@ -109,7 +109,7 @@ def main():
             for name in ('contact','interaction','closure','payload','lift','unload'):
                 if hasattr(m,name):
                     v=getattr(m,name);summary[name]={key:getattr(v,key) for key in ('state','reason','clear_of_bound_surface',
-                        'clear_of_updated_surface','clear_of_pit','safe_lift_height') if hasattr(v,key)}
+                        'clear_of_updated_surface','clear_of_pit','safe_lift_height','pit_exit_confirmed') if hasattr(v,key)}
             if hasattr(m,'status'):
                 summary.update(validity=m.status.validity,reason=m.status.reason,surface_generation=m.status.surface_generation,
                                surface_session_id=m.status.surface_session_id)

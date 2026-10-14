@@ -69,16 +69,25 @@ class InteractionShadowNode(Node):
         if self.engine is None:return
         try:
             b=self.engine.binding
+            e=observation_evidence(m)
+            if b is not None and self.engine.active_cycle and m.surface_session_id!=b.surface_session_id:
+                import re
+                if re.fullmatch('[0-9a-f]{32}',m.surface_session_id or ''):
+                    self.engine.session_conflict=True;self.engine.invalidate_pit_exit()
+                    raise ValueError('SURFACE_RESTART_DURING_ACTIVE_CYCLE_ABORT_REQUIRED')
+            if not e.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type']):
+                raise ValueError('SURFACE_SESSION_STATUS_STALE_OR_INVALID')
             if b is not None and (m.map_id,m.semantic_version,m.pit_id,m.spatial_calibration_id,m.header.frame_id)!=(
                     b.map_id,b.semantic_version,b.pit_id,b.spatial_calibration_id,b.evidence.frame_id):
                 raise ValueError('SURFACE_STATUS_LINEAGE_CONFLICT')
-            changed=self.engine.observe_surface_session(m.surface_session_id,observation_evidence(m),self.now())
+            changed=self.engine.observe_surface_session(m.surface_session_id,e,self.now())
             if changed:
                 for key in ('refresh','proposal'):self.inputs.pop(key,None)
                 self.proposal_history.clear()
                 self.refresh_generation_floor=0
                 self.error='NEW_SESSION_FULL_RESCAN_REQUIRED'
         except ValueError as exc:
+            if 'CONFLICT' in str(exc) or 'ABORT_REQUIRED' in str(exc):self.engine.invalidate_pit_exit()
             self.error=str(exc)
 
     def proposal(self,m):
@@ -106,6 +115,12 @@ class InteractionShadowNode(Node):
             expected=replace(expected,evidence=b.evidence,binding_digest_sha256='')
             if expected.binding_digest_sha256!=b.binding_digest_sha256:
                 raise ValueError('BINDING_REQUIRES_CURRENT_PHASE2B_HARD_GATE_CANDIDATE')
+            if not self.engine.active_cycle and self.engine.binding is not None:
+                refresh,re=self.input('refresh',True)
+                if refresh is not None:
+                    if refresh.surface_generation<self.refresh_generation_floor:
+                        raise ValueError('REFRESH_GENERATION_REGRESSION_CONFLICT')
+                    self.engine.consider_refresh(replace(refresh_from_message(refresh),evidence=re),self.now())
             self.engine.bind(b,self.now());self.binding_pub.publish(binding_to_message(b))
             self.inputs.pop('refresh',None)
             self.cycle_input=None;self.cycle_error='CYCLE_INPUT_MISSING';self.refresh_generation_floor=b.surface_generation
@@ -130,7 +145,9 @@ class InteractionShadowNode(Node):
             self.phase=CycleState(m.state).name;self.cycle_input=(m,time.monotonic())
             if self.phase in ('COMPLETE','ABORTED'):self.engine.last_phase=self.phase
             self.cycle_error=''
-        except (ValueError,TypeError,KeyError,AttributeError) as exc:self.cycle_error='CYCLE_'+str(exc)
+        except (ValueError,TypeError,KeyError,AttributeError) as exc:
+            if 'CONFLICT' in str(exc) or 'ABORT_REQUIRED' in str(exc):self.engine.invalidate_pit_exit()
+            self.cycle_error='CYCLE_'+str(exc)
 
     def input(self,key,optional=False):
         if key not in self.inputs:
@@ -189,10 +206,15 @@ class InteractionShadowNode(Node):
                 if proposal.validity in (3,4) and proposal.selected_candidate_id:
                     lineage=tuple(getattr(proposal,key) for key in ('map_id','semantic_version','pit_id','surface_session_id',
                         'spatial_calibration_id','geofence_id','geofence_version','geofence_config_sha256','kernel_id'))
-            context,live=self.input('context')
-            if (not live.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type'])
-                    or context.target_frame!=b.evidence.frame_id or context.source_type!=self.config['source_type']
-                    or not context.platform_motion_stable
+            post_exit=(self.engine.pit_exit is not None and self.phase in
+                ('MOVE_TO_UNLOAD','VERIFY_CART','POSITION_UNLOAD','OPEN_GRAB','VERIFY_EMPTY','COMPLETE'))
+            context,live=self.input('context',post_exit)
+            live_fresh=live is not None and live.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type'])
+            if not post_exit and (not live_fresh or not context.platform_motion_stable):
+                raise ValueError('LIVE_SPATIAL_LINEAGE_STALE_OR_CONFLICT')
+            # A historical pit exit does not need a fresh pit planning transform
+            # at the unload station. Any fresh conflicting lineage still rejects.
+            if live_fresh and (context.target_frame!=b.evidence.frame_id or context.source_type!=self.config['source_type']
                     or context.transform_state!=('FIELD_VALIDATED' if self.config['source_type']=='PHYSICAL' else 'SYNTHETIC_VALIDATED')
                     or (context.map_id,context.semantic_version,context.pit_id,context.calibration_id)!=
                        (b.map_id,b.semantic_version,b.pit_id,b.spatial_calibration_id)):
@@ -210,6 +232,8 @@ class InteractionShadowNode(Node):
             self.state_pub.publish(state)
             for key,publisher in self.evidence_publishers.items():publisher.publish(getattr(state,key))
         except (ValueError,TypeError,KeyError,AttributeError) as exc:
+            if self.engine is not None and ('CONFLICT' in str(exc) or 'ABORT_REQUIRED' in str(exc)):
+                self.engine.invalidate_pit_exit()
             state=GraspInteractionState(validity=1,reason=str(exc),valid_for_control=False,
                 abort_required='CONFLICT' in str(exc))
             state.evidence.validity=1;state.evidence.reason=str(exc);state.evidence.evidence_age_sec=1e9

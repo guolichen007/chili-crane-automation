@@ -12,6 +12,7 @@ max_recording_duration_sec: null
 minimum_free_space_bytes: null
 global_recording_budget_bytes: null
 retention_policy: STOP_ONLY
+storage_check_interval_sec: null
 high_bandwidth:
   config_state: NOT_CONFIGURED
   enabled: false

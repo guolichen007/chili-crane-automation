@@ -1,5 +1,6 @@
 """Explicitly configured bounded ROS bag capture, never raw-cloud all-day default."""
 from pathlib import Path
+import math
 import re
 import shutil
 import signal
@@ -14,6 +15,7 @@ class BagRecorder:
         self.executable=executable;self.process_factory=process_factory;self.process=None
         self.started=0.;self.output=None
         self.profile='NOT_RECORDING';self.storage_limited=False
+        self.next_storage_check=0.;self.storage_scan_count=0
         self.sync_manifest()
 
     def status(self):
@@ -23,6 +25,8 @@ class BagRecorder:
         configured=(c.get('config_state')=='VALID' and c.get('storage_id') in ('sqlite3','mcap')
             and all(type(c.get(k)) is int and c[k]>0 for k in numeric)
             and type(c.get('minimum_free_space_bytes')) is int and c['minimum_free_space_bytes']>=0
+            and type(c.get('storage_check_interval_sec')) in (int,float)
+            and math.isfinite(c['storage_check_interval_sec']) and 1.<=c['storage_check_interval_sec']<=5.
             and c.get('retention_policy')=='STOP_ONLY')
         alive=self.process is not None and self.process.poll() is None
         return dict(journal_enabled=True,rosbag_configured=bool(configured),rosbag_enabled=alive,
@@ -37,12 +41,13 @@ class BagRecorder:
         if not self.status()['recording_capacity_configured']:
             raise PermissionError('GLOBAL_STORAGE_NOT_CONFIGURED_OR_RETENTION_UNSUPPORTED')
         root=self.recorder.directory.parent.resolve()
+        self.storage_scan_count+=1
         total=0;count=0
         for path in root.rglob('*'):
             count+=1
+            if count>100000:raise PermissionError('STORAGE_LIMIT_DIRECTORY_BOUND')
             if path.is_symlink() or not path.resolve().is_relative_to(root):continue
             if path.is_file():total+=path.stat().st_size
-            if count>100000:raise PermissionError('STORAGE_LIMIT_DIRECTORY_BOUND')
             if total>=c['global_recording_budget_bytes']:raise PermissionError('STORAGE_LIMIT_GLOBAL_BUDGET')
         if shutil.disk_usage(root).free<c['minimum_free_space_bytes']:
             raise PermissionError('STORAGE_LIMIT_MINIMUM_FREE_SPACE')
@@ -80,11 +85,12 @@ class BagRecorder:
     def start(self,profile):
         if self.process is not None and self.process.poll() is None:raise ValueError('BAG_ALREADY_RECORDING')
         try:command=self.command(profile)
-        except PermissionError as exc:
-            if 'STORAGE_LIMIT' in str(exc):self.storage_event(str(exc))
+        except (PermissionError,OSError) as exc:
+            if 'STORAGE_LIMIT' in str(exc) or isinstance(exc,OSError):self.storage_event(str(exc))
             self.sync_manifest();raise
         self.process=self.process_factory(command,start_new_session=True)
         self.started=time.monotonic()
+        self.next_storage_check=self.started+self.config['storage_check_interval_sec']
         self.profile=profile;self.sync_manifest()
         self.recorder.append('events','ROSBAG_CAPTURE_STARTED',source_type='SOFTWARE',reason='NOT_FIELD_ACCEPTANCE',profile=profile)
         return {'profile':profile,'status':'RECORDING_NOT_FIELD_ACCEPTANCE'}
@@ -95,18 +101,26 @@ class BagRecorder:
             self.process=None;self.profile='NOT_RECORDING';self.sync_manifest()
             self.recorder.append('events','ROSBAG_PROCESS_EXITED',source_type='SOFTWARE',reason='PROCESS_NOT_ALIVE')
             return
-        try:self.storage_gate()
+        now=time.monotonic()
+        if not self.status()['recording_capacity_configured']:
+            try:self.storage_event('GLOBAL_STORAGE_NOT_CONFIGURED_OR_RETENTION_UNSUPPORTED')
+            finally:self.stop()
+            return
+        if now-self.started>=self.config['max_recording_duration_sec']:
+            self.stop();return
+        if now<self.next_storage_check:return
+        self.next_storage_check=now+self.config['storage_check_interval_sec']
+        try:
+            self.storage_gate()
+            if self.output is not None and self.output.exists():
+                total=0
+                for count,path in enumerate(self.output.rglob('*'),1):
+                    if count>10000:raise PermissionError('STORAGE_LIMIT_SINGLE_CAPTURE')
+                    if path.is_file() and not path.is_symlink():total+=path.stat().st_size
+                    if total>=self.config['max_total_storage_bytes']:raise PermissionError('STORAGE_LIMIT_SINGLE_CAPTURE')
         except (PermissionError,OSError) as exc:
             try:self.storage_event(str(exc))
             finally:self.stop()
-            return
-        if time.monotonic()-self.started>=self.config['max_recording_duration_sec']:
-            self.stop();return
-        if self.output is not None and self.output.exists():
-            entries=list(self.output.rglob('*'))
-            total=sum(p.stat().st_size for p in entries if p.is_file() and not p.is_symlink())
-            if len(entries)>10000 or total>=self.config['max_total_storage_bytes']:
-                self.storage_event('STORAGE_LIMIT_SINGLE_CAPTURE');self.stop()
 
     def stop(self):
         if self.process is not None and self.process.poll() is None:

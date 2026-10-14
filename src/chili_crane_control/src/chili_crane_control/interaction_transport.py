@@ -135,7 +135,9 @@ def result_to_message(result,b,e,config):
     payload.calibration_confirmed_for_source=f.calibration_confirmed_for_source
     lift=common(LiftEvidence(),b,e,'SHADOW_LIFT_EVIDENCE')
     for name in ('clear_of_bound_surface','clear_of_updated_surface','clear_of_material_surface','clear_of_pit',
-                 'safe_lift_height'):setattr(lift,name,bool(result.lift.get(name,False)))
+                 'safe_lift_height','pit_exit_confirmed'):setattr(lift,name,bool(result.lift.get(name,False)))
+    lift.pit_exit_stamp=stamp(result.lift.get('pit_exit_epoch_ns',0))
+    lift.pit_exit_source_counter=result.lift.get('pit_exit_source_counter',0)
     lift.surface_refresh_ready=bool(result.lift.get('refresh_ready',False))
     lift.updated_clear_state=result.lift.get('updated_clear_state','UNKNOWN')
     for target,key in (('observed_rise_m','observed_rise'),('bound_clearance_m','bound_clearance'),
