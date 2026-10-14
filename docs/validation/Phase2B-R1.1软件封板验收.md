@@ -14,8 +14,12 @@ normal/symlink各七包、各326 tests无错误/失败/跳过；构建前382项�
 两安装树A/B和R1.1 installed全部通过，三种重启、TL无新snapshot恢复、旧session/世代重放反证通过，三控制topic各0。
 以上是脚本历史回传，不作为最终planner-only证据：归档normal planner-2.log显示在Python初始化时就被中断。
 审计发现旧节点排队proposal可能在received清空后到达，导致planner-only predicate假阳性；软件状态不封板。
-修复验收callback保存Humble DDS source_timestamp，仅用于证明publication发生于新进程启动之后，
-不替换任何measurement epoch/arrival/freshness。planner-only先等旧publisher退出图，再接纳新DDS publication。
+最终验收修复采用每次planner启动独立volatile proposal输出topic/订阅的ROS测试remap，
+只允许当前进程的probe回调，不可能接收旧writer排队proposal。snapshot INPUT topic/QoS不变，仍真实TL恢复。
+planner-only先等旧publisher退出图；不替换任何measurement epoch/arrival/freshness，生产节点接口不改。
+中间1220465的[ROS 38501704940](https://github.com/guolichen007/chili-crane-automation/actions/runs/38501704940)失败：
+normal七包/326 tests与旧入口通过，但Humble公开executor仅传单message参数，两参callback缺info引发TypeError。
+虽然底层take_message含source_timestamp，不能据此假设公开订阅支持metadata callback；移除该不可用API。
 最终SHA必须重新跑完整CI与检查节点日志；历史全绿不隐藏验收漏洞。
 旧session/同session倒序重放改变generation时同步重建合法snapshot identity，保留真实旧epoch；
 保证反证不是被不匹配ID偶然拒绝，而是真正检验retired session或代际门禁。

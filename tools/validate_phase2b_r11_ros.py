@@ -43,16 +43,30 @@ def main():
         c.update(semantic_map_file=str(tmp/'semantic.yaml'),geofence_file=str(tmp/'geofence.yaml'))
         for path,value in ((config,c),(tmp/'semantic.yaml',s),(tmp/'geofence.yaml',gc)):
             path.write_text(yaml.safe_dump(value),encoding='utf-8')
-        processes={};logs=[];launch_counts={'surface':0,'planner':0};planner_started_ns=0
+        processes={};logs=[];launch_counts={'surface':0,'planner':0}
+        proposal_subscription,proposal_topic=None,None
 
         def start(kind):
-            nonlocal planner_started_ns
+            nonlocal proposal_subscription,proposal_topic
             launch_counts[kind]+=1
-            if kind=='planner':planner_started_ns=time.time_ns()
+            remaps=[]
+            if kind=='planner':
+                if proposal_subscription is not None:node.destroy_subscription(proposal_subscription)
+                run=launch_counts[kind]
+                # Acceptance-only ROS remap. A unique volatile output topic and
+                # subscription per process cannot receive the previous writer's
+                # buffered proposal. Snapshot INPUT topic/QoS stay unchanged.
+                proposal_topic='planning/grasp_proposal_shadow_restart_'+str(run)
+                def callback(m):
+                    if run==launch_counts['planner']:
+                        received['proposal']=m;received['proposal_run']=run
+                proposal_subscription=node.create_subscription(GraspProposal,proposal_topic,callback,PROPOSAL_QOS)
+                remaps=['-r','planning/grasp_proposal_shadow:='+proposal_topic]
             name='pit_surface_shadow_node.py' if kind=='surface' else 'grasp_proposal_shadow_node.py'
             log=(args.evidence_dir/(kind+'-'+str(launch_counts[kind])+'.log')).open('w',encoding='utf-8');logs.append(log)
             processes[kind]=subprocess.Popen(['ros2','run','chili_crane_perception',name,'--ros-args',
-                '-r','__ns:=/'+namespace,'-p','config_file:='+str(config)],stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+                '-r','__ns:=/'+namespace,'-p','config_file:='+str(config)]+remaps,
+                stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
 
         def stop(kind):
             child=processes.pop(kind,None)
@@ -67,13 +81,7 @@ def main():
         def snapshot_callback(m):
             received['snapshot']=m
             snapshot_history.append((m.surface_session_id,m.status.surface_generation,m.status.evidence.source_counter))
-        def proposal_callback(m,info):
-            received['proposal']=m
-            # Humble message-info source_timestamp is DDS publication time.
-            # Acceptance-test origin proof ONLY, never a measurement epoch.
-            received['proposal_publication_ns']=info['source_timestamp']
-        subscriptions=[node.create_subscription(PitSurfaceSnapshot,'perception/pit_surface_snapshot',snapshot_callback,SNAPSHOT_QOS),
-            node.create_subscription(GraspProposal,'planning/grasp_proposal_shadow',proposal_callback,PROPOSAL_QOS)]
+        subscriptions=[node.create_subscription(PitSurfaceSnapshot,'perception/pit_surface_snapshot',snapshot_callback,SNAPSHOT_QOS)]
         for kind,topic in ((SafetyPermit,'safety/permit'),(AuthorizedCommand,'control/authorized_command'),
                            (ActuationRequest,'control/actuation_request')):
             subscriptions.append(node.create_subscription(kind,topic,lambda m:forbidden.append(type(m).__name__),QOS))
@@ -151,7 +159,7 @@ def main():
 
         def selected():
             return ('proposal' in received and bool(received['proposal'].selected_candidate_id)
-                    and received.get('proposal_publication_ns',0)>planner_started_ns)
+                    and received.get('proposal_run')==launch_counts['planner'])
 
         def drain_valid_generation():
             # Stop sending before recording replay/cache baselines. Otherwise a
@@ -219,7 +227,7 @@ def main():
             drain_valid_generation()
             stable=copy.deepcopy(received['snapshot']);source_pid=processes['surface'].pid
             before=len(snapshot_history);stop('planner')
-            wait(lambda:node.count_publishers('planning/grasp_proposal_shadow')==0,timeout=3.,context_only=True)
+            wait(lambda:node.count_publishers(proposal_topic)==0,timeout=3.,context_only=True)
             received.pop('proposal',None);start('planner')
             wait(lambda:selected() and received['proposal'].surface_session_id==stable.surface_session_id,
                  timeout=4.,context_only=True)
@@ -236,7 +244,7 @@ def main():
                 OLD_SESSION_REPLAY_REJECTION_STATUS='PASS',SAME_SESSION_REGRESSION_STATUS='PASS',
                 SAME_GENERATION_DIFFERENT_SESSION_STATUS='PASS',SNAPSHOT_ID_UNIQUENESS_STATUS='PASS',
                 PLANNER_TRANSIENT_LOCAL_RESTART_STATUS='PASS_WITHOUT_NEW_SNAPSHOT',
-                RESTART_PUBLICATION_ORIGIN_STATUS='PASS_NEW_DDS_PUBLICATION_AFTER_PROCESS_START',
+                RESTART_PUBLICATION_ORIGIN_STATUS='PASS_UNIQUE_OUTPUT_TOPIC_PER_PROCESS',
                 CACHE_SESSION_ISOLATION_STATUS='PASS',CONTROL_TOPIC_MESSAGES=len(forbidden),
                 PHYSICAL_ACTUATION_STATUS='NOT_RUN',valid_for_control=False)
             (args.evidence_dir/'result.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
