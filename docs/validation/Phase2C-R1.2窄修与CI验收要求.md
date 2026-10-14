@@ -29,8 +29,8 @@ storage interval 是显式有限 [1,5]s，FIELD 保持 null；200 次 fast backe
 bringup 声明可选 commissioning 的 exec dependency，production launch 仍不启动它。
 phase2c_delivery 保留六场景，CTest TIMEOUT 180；仅改 runner 预算，旧内部等待与成功条件不变。
 
-Windows / Python 3.11.9 原生与静态测试：451 项，445 PASS / 6 ROS unavailable SKIP；
-pytest 同数量。新 R1.2 文件含 13 项反证，注册到 colcon CTest（TIMEOUT 180）。
+Windows / Python 3.11.9 原生与静态测试：452 项，446 PASS / 6 ROS unavailable SKIP；
+pytest 同数量。新 R1.2 文件含 14 项反证，注册到 colcon CTest（TIMEOUT 180）。
 compileall、Python 3.10 syntax/repository contracts、secret scan、46 architecture 场景执行。
 Phase2A 25 场景 + 200 R1 sequences、Phase2B 21 场景 + 64 sequences / R1 门禁、
 Phase2C 原六场景与 localhost commissioning headless 保留，违规计数为 0，物理/自动 flags=false。
@@ -66,6 +66,16 @@ DDS grab/geometry 不同观测计数仅等待配对，不生成新事实、不�
 缺失/过期 live context 返回 UNKNOWN，不作为 lineage 冲突；有效 lineage 冲突仍 abort。
 合成 normalized 输入改为 20Hz，保留原 0.2s load gap、所有载荷/刷新阈值、9s/10s 成功条件。
 新增 installed 配对延迟反证；软件失败按真实阶段记录，不能写为 pending 或 infra。
+
+第二轮 `54e863533614a2c7843b27af22f377b46157f847` 的
+[run 38591840864](https://github.com/guolichen007/chili-crane-automation/actions/runs/38591840864)
+仍在 installed 首场景 stable lift 失败；normal build/colcon、Static/vendor PASS。
+新诊断确认 counter 28 -> 29 发布间隔 0.280415773s：28 的 baseline=true，29 变 false/sample_count=1，
+对应 target-swap probe 的 run.spin(.2) 停止传感器发布，触发未修改的 maximum_sample_gap_sec=0.2。
+PIT_EXIT 后续一直 true，closure/bound/rim/height/vertical/settling 通过，只有 baseline/delta/aggregate 被阻止。
+修正 fixture：等待 binding attack 拒绝时持续发布真实 synthetic empty samples，LOWER 前验证 baseline。
+不延长任何等待或放松运行时 gap；真实断流仍失效。第二轮 artifact 11908347990
+SHA256 `a36ef4ec3582557d64c12a39aa92827e70031c127df831bacb57255011a57486`。
 
 本提交必须正常 push，然后等待相同 exact SHA 的 Static 与 ROS2 workflows 完成，
 读取 jobs 和 artifacts，最终回传分开列 normal build、colcon、installed C、symlink、vendor。

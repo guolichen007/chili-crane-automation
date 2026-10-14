@@ -220,6 +220,19 @@ class StorageRateTests(unittest.TestCase):
 
 
 class PackagingTests(unittest.TestCase):
+    def test_probe_pause_invalidates_baseline_but_continuous_empty_stream_preserves_it(self):
+        paused=Harness();paused.warm()
+        paused.step('LOWER',motion='DOWN',stable=False,dt=.280415773)
+        self.assertFalse(paused.result.load_features.baseline_valid)
+        self.assertEqual(paused.result.load_features.sample_count,1)
+        paused.interact();paused.lift(refresh=False)
+        self.assertNotEqual(paused.result.payload['state'],'PAYLOAD_CONFIRMED')
+        continuous=Harness();continuous.warm()
+        for _ in range(4):continuous.step(empty=True)
+        self.assertTrue(continuous.result.load_features.baseline_valid)
+        continuous.interact();continuous.lift(refresh=False)
+        self.assertEqual(continuous.result.payload['state'],'PAYLOAD_CONFIRMED')
+
     def test_bringup_commissioning_dependency_and_production_still_disabled(self):
         dependencies={n.text for n in ET.parse(ROOT/'src/chili_crane_bringup/package.xml').getroot().findall('exec_depend')}
         self.assertIn('chili_crane_commissioning',dependencies)

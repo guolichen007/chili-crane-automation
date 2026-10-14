@@ -443,8 +443,14 @@ def main():
                 now_ns=run.node.get_clock().now().nanoseconds
                 attack=replace(run.binding,candidate_id='swap-attack',binding_epoch_ns=now_ns,
                     evidence=replace(run.binding.evidence,epoch_ns=now_ns,reported_age=0.),binding_digest_sha256='')
-                run.pubs['binding'].publish(binding_to_message(attack));run.spin(.2)
+                run.pubs['binding'].publish(binding_to_message(attack))
+                # Await the rejected attack while the normalized empty sensor
+                # stream continues. A .2s source pause exceeds its configured
+                # maximum gap once publication overhead is included.
+                for _ in range(4):run.send(empty=True)
                 assert run.received['binding'].binding_digest_sha256==run.binding.binding_digest_sha256
+                run.wait(lambda:json.loads(run.received['state'].load_features_json or '{}').get('baseline_valid',False),
+                    send=lambda:run.send(empty=True))
                 run.interact()
                 if name in ('PARTIAL_POST_GRAB_VISIBILITY','POST_GRAB_OCCLUSION_THEN_RECOVERY','PARTIAL_REFRESH_CURRENT_CYCLE_EXIT'):
                     run.visibility='partial' if name in ('PARTIAL_POST_GRAB_VISIBILITY','PARTIAL_REFRESH_CURRENT_CYCLE_EXIT') else 'occluded'
