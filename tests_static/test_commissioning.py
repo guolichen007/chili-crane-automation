@@ -8,6 +8,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 from urllib.request import Request,urlopen
 from urllib.error import HTTPError
 import yaml
@@ -81,6 +82,20 @@ class CommissioningTests(unittest.TestCase):
         for duration in (1,0,-1,1001,500.5,True):
             with self.assertRaises(ValueError):service.pulse('y_left',duration)
 
+    def test_mock_source_cannot_construct_real_transport_or_claim_physical_evidence(self):
+        service=BenchService(bench_config(),self.recorder,True,True,True)
+        with self.assertRaisesRegex(PermissionError,'REAL_TRANSPORT_REQUIRES'):
+            service.pulse('y_left')
+        config=dict(bench_config(),source_type='PHYSICAL')
+        service,transport=self.bench(config)
+        with self.assertRaisesRegex(PermissionError,'MOCK_FACTORY_REQUIRES'):
+            service.pulse('y_left')
+        self.assertFalse(transport.calls)
+
+        service=BenchService(dict(bench_config(),source_type='PHYSICAL'),self.recorder,True,True,True)
+        with self.assertRaisesRegex(PermissionError,'BENCH_PROFILE_NOT_CONFIGURED'):
+            service.pulse('y_left')
+
     def test_exception_always_off_and_record_not_voltage(self):
         service,transport=self.bench();transport.fail_on=True
         with self.assertRaises(IOError):service.pulse('y_left',500,sleeper=lambda seconds:None)
@@ -108,7 +123,11 @@ class CommissioningTests(unittest.TestCase):
 
     def test_release_disconnect_lease_and_shutdown(self):
         config=dict(self.config,simulation_lease_sec=.025);backend=ConsoleBackend(config,self.recorder)
-        backend.remote('y_left',True);time.sleep(.03);backend.tick()
+        with patch('chili_crane_commissioning.backend.time.monotonic',return_value=100.):
+            backend.remote('y_left',True)
+        with patch('chili_crane_commissioning.backend.time.monotonic',return_value=100.024):backend.tick()
+        self.assertEqual(backend.active,'y_left')
+        with patch('chili_crane_commissioning.backend.time.monotonic',return_value=100.026):backend.tick()
         self.assertEqual(backend.active,'stop')
         backend.remote('y_right',True);backend.shutdown();self.assertEqual(backend.active,'stop')
         self.assertIn(b'UI_DISCONNECT_OR_LEASE_EXPIRED',self.recorder.read('events'))
@@ -124,6 +143,13 @@ class CommissioningTests(unittest.TestCase):
         with self.assertRaises(ValueError):RunRecorder(self.temp.name,'../escape','a'*40,'b'*64)
         with self.assertRaises(FileExistsError):RunRecorder(self.temp.name,'test-run','a'*40,'b'*64)
         with self.assertRaises(ValueError):self.recorder.read('../../manifest')
+
+    def test_generated_run_records_are_forbidden_public_delivery(self):
+        import importlib.util
+        spec=importlib.util.spec_from_file_location('delivery_check',ROOT/'tools/check_delivery.py')
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        for name in ('runs/test/manifest.json','runs/test/events.jsonl','runs/test/bench_measurements.jsonl'):
+            self.assertTrue(module.forbidden_path(name),name)
 
     def test_surface_invalidation_and_refresh_are_recorded_once_per_binding(self):
         backend=ConsoleBackend(self.config,self.recorder)

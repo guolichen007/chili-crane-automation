@@ -42,10 +42,12 @@ def main():
     bench=BenchService(bench_config,recorder,args.enable_isolated_bench_output,args.confirm_isolated_bench,args.confirm_exclusive_device_session)
     backend=ConsoleBackend(config,recorder,bench)
     backend.bag=BagRecorder(recording_config,recorder,args.crane_namespace)
-    ros_node=None
+    ros_node=None;shutdown_exceptions=(KeyboardInterrupt,)
     if not args.headless_preview:
         import rclpy
         from rclpy.node import Node
+        from rclpy.executors import ExternalShutdownException
+        shutdown_exceptions+=(ExternalShutdownException,)
         from rclpy.qos import QoSProfile,ReliabilityPolicy,DurabilityPolicy
         from chili_crane_msgs.msg import (RemoteControlState,RunManifest,TaskStatus,CycleStatus,SystemModeStatus,SystemReadiness,
             GrabState,GrabGeometrySafetyState,PitSurfaceStatus,PitSurfaceSnapshot,GraspProposal,TargetBinding,
@@ -156,7 +158,7 @@ def main():
             if ros_node is not None:rclpy.spin_once(ros_node,timeout_sec=.05)
             else:time.sleep(.05)
             backend.tick()
-    except KeyboardInterrupt:pass
+    except shutdown_exceptions:pass
     finally:
         try:backend.shutdown()
         finally:

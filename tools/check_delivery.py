@@ -21,7 +21,7 @@ def title_valid(title):
 def forbidden_path(path):
     parts = Path(path).parts
     return (path == "LOCAL_PROJECT_CONTEXT.md" or ".local-data" in parts
-            or any(p in {"build", "install", "devel", "bags", ".aws"} for p in parts)
+            or any(p in {"build", "install", "devel", "bags", "runs", ".aws"} for p in parts)
             or Path(path).name in {".env", "id_rsa", "id_ed25519"}
             or Path(path).suffix in {".pem", ".key", ".bag", ".db3"})
 

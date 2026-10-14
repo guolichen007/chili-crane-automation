@@ -54,6 +54,13 @@ class BenchService:
     def require(self):
         if self.logging_failed:raise PermissionError('BENCH_LOGGING_FAILED_RECOMMISSION_REQUIRED')
         self.gate.require()
+        source=self.config.get('source_type')
+        if self.driver_factory is None and source!='PHYSICAL':
+            raise PermissionError('REAL_TRANSPORT_REQUIRES_EXPLICIT_PHYSICAL_SOURCE')
+        if self.driver_factory is not None and source!='SYNTHETIC':
+            raise PermissionError('MOCK_FACTORY_REQUIRES_EXPLICIT_SYNTHETIC_SOURCE')
+        if self.driver_factory is None and self.config.get('config_state')!='VALID':
+            raise PermissionError('PHYSICAL_BENCH_PROFILE_NOT_CONFIGURED')
         a=self.config.get('acceptance',{})
         watchdog=a.get('watchdog_timeout_sec')
         if self.exclusive_cli is not True or self.config.get('automatic_control_enabled') is not False:

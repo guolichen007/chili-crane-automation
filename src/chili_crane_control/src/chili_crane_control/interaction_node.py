@@ -134,6 +134,8 @@ class InteractionShadowNode(Node):
             context,live=self.input('context')
             if (not live.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type'])
                     or context.target_frame!=b.evidence.frame_id or context.source_type!=self.config['source_type']
+                    or not context.platform_motion_stable
+                    or context.transform_state!=('FIELD_VALIDATED' if self.config['source_type']=='PHYSICAL' else 'SYNTHETIC_VALIDATED')
                     or (context.map_id,context.semantic_version,context.pit_id,context.calibration_id)!=
                        (b.map_id,b.semantic_version,b.pit_id,b.spatial_calibration_id)):
                 raise ValueError('LIVE_SPATIAL_LINEAGE_STALE_OR_CONFLICT')
