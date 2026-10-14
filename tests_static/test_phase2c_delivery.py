@@ -68,6 +68,9 @@ class DeliveryTests(unittest.TestCase):
         self.assertIn('validate_phase2c_synthetic.py',text)
         self.assertIn('python3 -m compileall',text)
         self.assertIn('python3 -m pytest',text)
+        workflow=(ROOT/'.github/workflows/ros2-humble.yml').read_text(encoding='utf-8')
+        self.assertEqual(workflow.count('Acquire::Retries=3'),2)
+        self.assertEqual(workflow.count('APT::Update::Error-Mode=any'),2)
 
 
 if __name__=='__main__':unittest.main()

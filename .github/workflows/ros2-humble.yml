@@ -24,7 +24,9 @@ jobs:
       - name: Install software dependencies
         shell: bash
         run: |
-          apt-get update
+          # Bounded retry of transient DNS/network errors. An incomplete index
+          # is a hard failure, never a silent fallback to missing packages.
+          apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
           apt-get install -y git gcc g++ python3-pip python3-colcon-common-extensions python3-rosdep lsb-release xvfb xauth libgl1-mesa-dri
           python3 -m pip install -r requirements-dev.txt
           python3 -m pip install -r requirements-calibration.txt
@@ -55,7 +57,7 @@ jobs:
       - name: Install compiler dependencies (no device execution)
         shell: bash
         run: |
-          apt-get update
+          apt-get -o Acquire::Retries=3 -o APT::Update::Error-Mode=any update
           apt-get install -y git gcc g++ python3-pip python3-colcon-common-extensions libyaml-cpp-dev libpcap-dev
           python3 -m pip install -r requirements-dev.txt
       - name: Build exact-SHA official XYZIRT wrapper
