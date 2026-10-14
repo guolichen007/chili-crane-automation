@@ -30,3 +30,4 @@ string cycle_id
 uint64 cycle_index
 uint8 state
 bool needs_new_scan
+chili_crane_msgs/EvidenceMetadata evidence

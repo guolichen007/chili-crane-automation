@@ -21,5 +21,6 @@ chili_crane_msgs/PayloadEvidence payload
 chili_crane_msgs/LiftEvidence lift
 chili_crane_msgs/UnloadEvidence unload
 string load_features_json
+string[] event_types
 bool valid_for_control
 chili_crane_msgs/EvidenceMetadata evidence

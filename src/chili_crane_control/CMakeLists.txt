@@ -5,9 +5,12 @@ find_package(ament_cmake_python REQUIRED)
 ament_python_install_package(${PROJECT_NAME} PACKAGE_DIR src/${PROJECT_NAME})
 install(PROGRAMS scripts/fail_safe_safety_supervisor.py
   scripts/mock_servo_csv_publisher.py scripts/action_executor.py DESTINATION lib/${PROJECT_NAME})
+install(PROGRAMS scripts/grasp_interaction_shadow_node.py DESTINATION lib/${PROJECT_NAME})
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
   ament_add_pytest_test(phase2c_contracts ../../tests_static/test_phase2c_contracts.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
+  ament_add_pytest_test(phase2c_evidence ../../tests_static/test_phase2c_evidence.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
   ament_add_pytest_test(operational_geofence ../../tests_static/test_operational_geofence.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)

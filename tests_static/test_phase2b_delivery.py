@@ -41,7 +41,11 @@ class DeliveryTests(unittest.TestCase):
                     self.assertNotEqual(node.attr,'context','rclpy.Node.context is read-only')
                 if isinstance(node,ast.Call) and isinstance(node.func,ast.Attribute) and node.func.attr=='create_publisher':
                     publishers.add(ast.unparse(node.args[0]))
-        self.assertEqual(publishers,{'PitSurfaceSnapshot','PitSurfaceStatus','PointCloud2','MarkerArray','GraspProposal'})
+        self.assertEqual(publishers,{'PitSurfaceSnapshot','PitSurfaceStatus','PointCloud2','MarkerArray','GraspProposal','SurfaceRefreshEvidence'})
+        # Phase2C extends only an evidence type behind an explicit empty-default
+        # parameter. The original Phase2B launch cannot activate the new layer.
+        surface=(ROOT/'src/chili_crane_perception/src/chili_crane_perception/surface_runtime.py').read_text(encoding='utf-8')
+        self.assertIn("declare_parameter('interaction_config_file','')",surface)
         text=(ROOT/'src/chili_crane_bringup/launch/phase2b_surface_shadow.launch.py').read_text(encoding='utf-8')
         for forbidden in ('action_executor','safety_supervisor','adam_do','mock_system','production.launch'):
             self.assertNotIn(forbidden,text)

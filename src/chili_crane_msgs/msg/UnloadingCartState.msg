@@ -15,3 +15,4 @@ bool overflow
 geometry_msgs/Vector3 offset_m
 float64 confidence
 float64 evidence_age_sec
+chili_crane_msgs/EvidenceMetadata evidence

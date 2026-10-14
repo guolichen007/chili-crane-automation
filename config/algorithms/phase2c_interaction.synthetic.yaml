@@ -1,0 +1,57 @@
+config_state: SYNTHETIC_NON_PRODUCTION
+config_version: phase2c-synthetic-v1
+source_type: SYNTHETIC
+semantic_map_file: null
+physical_output_enabled: false
+automatic_control_enabled: false
+camera_control_authority: false
+valid_for_control: false
+maximum_bindings: 1024
+maximum_events: 2048
+evidence_ttl_sec: 1.0
+maximum_evidence_skew_sec: 0.05
+maximum_sample_gap_sec: 0.2
+geometry_calibration_id: synthetic-extrinsic
+contact_persistence_sec: 0.15
+penetration_depth_m: 0.03
+penetration_persistence_sec: 0.15
+collapse_margin_m: 0.1
+maximum_swept_footprints: 256
+bound_clearance_margin_m: 0.15
+updated_clearance_margin_m: 0.15
+minimum_observed_rise_m: 0.25
+pit_rim_elevation_m: 2.0
+pit_geometry_state: SYNTHETIC_VALIDATED
+pit_clearance_margin_m: 0.1
+safe_lift_height_m: 2.4
+maximum_stable_velocity_mps: 0.05
+maximum_stable_acceleration_mps2: 0.15
+payload_settling_sec: 0.4
+closure_persistence_sec: 0.15
+unload_persistence_sec: 0.2
+load:
+  source_type: SYNTHETIC
+  calibration_state: SYNTHETIC_VALIDATED
+  calibration_id: synthetic-load
+  unit: raw
+  maximum_samples: 128
+  minimum_samples: 3
+  short_window_sec: 0.3
+  long_window_sec: 2.0
+  baseline_ttl_sec: 30.0
+  sensor_ttl_sec: 1.0
+  maximum_sample_gap_sec: 0.2
+  scale_floor: 0.05
+  normalized_enter: 4.0
+  normalized_exit: 2.0
+  debounce_sec: 0.15
+  settle_slope_limit: 0.25
+  load_polarity: 1
+  contact_abs_threshold: 0.2
+  payload_abs_threshold: 0.5
+  payload_normalized_threshold: 4.0
+  unload_abs_threshold: 0.5
+motion:
+  maximum_samples: 128
+  minimum_samples: 5
+  window_sec: 0.8

@@ -50,3 +50,11 @@ class ContractTests(unittest.TestCase):
         for e in (Evidence.at(10.,validity=1),Evidence.at(10.,reported_age=3.),Evidence.at(10.,source_type='UNKNOWN')):
             self.assertFalse(e.fresh(10.1,.3))
         self.assertFalse(Evidence.at(10.).fresh(9.9,.3))
+
+    def test_ros_roundtrip_is_digest_exact(self):
+        try:
+            from chili_crane_control.interaction_transport import binding_to_message,binding_from_message
+        except ImportError:self.skipTest('NOT_RUN: ROS generated messages unavailable')
+        original=binding()
+        decoded=binding_from_message(binding_to_message(original))
+        self.assertEqual(original,decoded)

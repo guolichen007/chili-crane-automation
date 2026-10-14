@@ -3,6 +3,7 @@ import copy
 from pathlib import Path
 import time
 import uuid
+from collections import deque
 import numpy as np
 import yaml
 import rclpy
@@ -97,6 +98,24 @@ class PitSurfaceShadowNode(Node):
         self.last_snapshot_message=None
         self.last_published_generation=-1
         self.next_debug=0.
+        self.interaction_lifecycle=None
+        self.frozen_snapshot_history=deque(maxlen=32)
+        self.declare_parameter('interaction_config_file','')
+        interaction_file=self.get_parameter('interaction_config_file').value
+        if interaction_file and self.builder is not None:
+            from .surface_interaction import SurfaceInteractionLifecycle
+            from chili_crane_msgs.msg import TargetBinding,SurfaceInteractionEvidence,LiftEvidence,SurfaceRefreshEvidence
+            try:
+                ic=yaml.safe_load(Path(interaction_file).read_text(encoding='utf-8'))
+                if ic['source_type']!=self.config['source_type']:raise ValueError('INTERACTION_SOURCE_PROFILE_MISMATCH')
+                if any(ic.get(k) is not False for k in ('physical_output_enabled','automatic_control_enabled','valid_for_control')):
+                    raise ValueError('INTERACTION_SHADOW_FLAGS_REQUIRED')
+                self.interaction_lifecycle=SurfaceInteractionLifecycle(self.builder.grid,ic)
+                self.refresh_pub=self.create_publisher(SurfaceRefreshEvidence,'perception/surface_refresh_evidence',EVENT_QOS)
+                self.create_subscription(TargetBinding,'phase2c/target_binding',self.interaction_binding,SNAPSHOT_QOS)
+                self.create_subscription(SurfaceInteractionEvidence,'phase2c/interaction_evidence',self.interaction_event,EVENT_QOS)
+                self.create_subscription(LiftEvidence,'phase2c/lift_evidence',self.interaction_clear,EVENT_QOS)
+            except (OSError,ValueError,KeyError,TypeError) as exc:self.get_logger().warning(str(exc))
         self.pub=self.create_publisher(PitSurfaceSnapshot,'perception/pit_surface_snapshot',SNAPSHOT_QOS)
         self.status_pub=self.create_publisher(PitSurfaceStatus,'perception/pit_surface_status',QOS)
         self.debug_pub=self.create_publisher(PointCloud2,'perception/pit_surface_observed_debug',QOS)
@@ -113,6 +132,42 @@ class PitSurfaceShadowNode(Node):
 
     def cloud(self,m):
         self.latest=(m,time.monotonic())  # latest-wins, no unbounded pending queue.
+
+    def interaction_binding(self,m):
+        from chili_crane_control.interaction_transport import binding_from_message
+        try:
+            b=binding_from_message(m)
+            if self.interaction_lifecycle.binding is not None and b.binding_digest_sha256==self.interaction_lifecycle.binding.binding_digest_sha256:
+                return
+            snapshots=[s for s in self.frozen_snapshot_history if s.snapshot_id==b.surface_snapshot_id]
+            if len(snapshots)!=1:raise ValueError('FROZEN_SNAPSHOT_NOT_IN_BOUNDED_HISTORY')
+            self.interaction_lifecycle.bind(b,snapshots[0],source_now(self,self.config))
+        except (ValueError,TypeError,KeyError,AttributeError) as exc:self.get_logger().warning(str(exc))
+
+    def interaction_event(self,m):
+        from chili_crane_control.interaction_transport import observation_evidence
+        try:
+            life=self.interaction_lifecycle;b=life.binding
+            if (b is None or m.state!=m.INTERACTION_COMMITTED or not m.surface_invalidation_required or m.valid_for_control
+                    or (m.binding_id,m.binding_digest_sha256,m.run_id,m.task_id,m.cycle_id)!=
+                       (b.binding_id,b.binding_digest_sha256,b.run_id,b.task_id,b.cycle_id)
+                    or (m.map_id,m.semantic_version,m.pit_id,m.surface_session_id,m.spatial_calibration_id,m.bound_surface_snapshot_id,
+                        m.bound_surface_generation)!=(b.map_id,b.semantic_version,b.pit_id,b.surface_session_id,b.spatial_calibration_id,
+                                                     b.surface_snapshot_id,b.surface_generation)
+                    or m.collapse_margin_m!=life.config['collapse_margin_m']
+                    or tuple((p.x,p.y) for p in m.capture_footprint.points)!=b.capture_footprint):
+                raise ValueError('INTERACTION_CONTRACT_OR_BINDING_CONFLICT')
+            life.interact(m.interaction_id,seconds(m.interaction_stamp),int(m.interaction_source_counter),
+                tuple(tuple((p.x,p.y) for p in fp.points) for fp in m.swept_footprints),observation_evidence(m),source_now(self,self.config))
+        except (ValueError,TypeError,KeyError,AttributeError) as exc:self.get_logger().warning(str(exc))
+
+    def interaction_clear(self,m):
+        from chili_crane_control.interaction_transport import observation_evidence
+        try:
+            if not m.clear_of_bound_surface or m.valid_for_control:return
+            self.interaction_lifecycle.allow_observation(m.binding_id,m.binding_digest_sha256,observation_evidence(m),
+                m.observed_rise_m,m.bound_clearance_m,source_now(self,self.config))
+        except (ValueError,TypeError,KeyError,AttributeError) as exc:self.get_logger().warning(str(exc))
 
     def event(self,m):
         if self.disturbance is None:
@@ -196,6 +251,12 @@ class PitSurfaceShadowNode(Node):
                 frame=dict(epoch=epoch,source_counter=int(meta.source_counter),frame_id=cloud.header.frame_id,
                     mid_epoch=timing.mid_epoch,frame_start_epoch=timing.start_epoch,frame_end_epoch=timing.end_epoch,
                     span_sec=timing.span_sec,source_type=ctx.source_type,calibration_id=meta.calibration_id)
+                if self.interaction_lifecycle is not None:
+                    p=np.c_[points['x'],points['y'],points['z']]
+                    transform=np.asarray(ctx.transform,dtype=float).reshape(4,4)
+                    keep=self.interaction_lifecycle.filter_points(p@transform[:3,:3].T+transform[:3,3],points['timestamp'])
+                    points=points[keep]
+                    if not len(points):raise ValueError('ALL_POINTS_BLOCKED_BY_INTERACTION_LIFECYCLE')
                 if b.ingest(np.c_[points['x'],points['y'],points['z']],points['sensor_id'],frame,ctx,grab,now):
                     self.last_receive=arrival
                     self.last_grab=grab
@@ -220,6 +281,7 @@ class PitSurfaceShadowNode(Node):
                 b.grid.clear(str(exc))
         snapshot=b.grid.snapshot(now)
         if snapshot.generation != self.last_published_generation:
+            if self.interaction_lifecycle is not None:self.frozen_snapshot_history.append(snapshot)
             tick=time.perf_counter()
             message=snapshot_to_message(snapshot,source_now(self,c),b.grid.last_counter)
             b.grid.stage_ms['snapshot_serialization']=(time.perf_counter()-tick)*1000
@@ -237,6 +299,10 @@ class PitSurfaceShadowNode(Node):
         status.evidence_age_sec=max(0.,now-snapshot.window_end) if now>=snapshot.window_end>0 else 1e9
         status.evidence.evidence_age_sec=status.evidence_age_sec
         self.status_pub.publish(status)
+        if self.interaction_lifecycle is not None:
+            from chili_crane_control.interaction_transport import refresh_to_message
+            refreshed=self.interaction_lifecycle.refresh(snapshot,source_now(self,c))
+            if refreshed is not None:self.refresh_pub.publish(refresh_to_message(refreshed,self.interaction_lifecycle))
         if time.monotonic() < self.next_debug:
             return
         self.next_debug=time.monotonic()+1.

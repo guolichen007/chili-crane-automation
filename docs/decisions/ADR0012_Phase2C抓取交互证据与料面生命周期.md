@@ -41,6 +41,11 @@ CLEAR_OF_BOUND_SURFACE只开启post-interaction观察；继续Grab mask、不插
 ## 验证与边界
 
 新增消息为breaking接口扩展，所有消费者重建；LoadState统一EvidenceMetadata同时迁移mock/consumer。
+既有CycleStatus、UnloadSafeZone/UnloadingCartState缺统一来源/epoch/counter，追加EvidenceMetadata，
+不改变旧字段或TaskCycles顺序；旧未携带证据的发布者只得到UNKNOWN，不猜来源。
+SurfaceRefreshEvidence为第9个证据消息，承载权威局部失效ACK/清遮挡/真实新点质量和新世代，不混用旧disturbance。
+Lift优先读取冻结SemanticMap V1 pit.wall_top_z_m并核对map/version/frame/pit；PHYSICAL缺地图或FIELD几何证明未知。
+显式NON_PRODUCTION独立fixture才允许配置rim数值，不把该数值用作现场高程。
 SYNTHETIC/REPLAY配置与FIELD分离；FIELD未知数值null/NOT_CONFIGURED，不以synthetic配置伪造标定。
 8个ROS包normal/symlink、旧A/B/PTP/vendor/全部反证保留；new installed证据链与三控制topic零消息另验。
 最终最多PASS_SOFTWARE_SHADOW_NOT_FIELD；physical/automatic/camera/valid_for_control全false，FIELD与BENCH均NOT_RUN。

@@ -1,0 +1,57 @@
+config_state: NOT_CONFIGURED
+config_version: phase2c-field-v1
+source_type: PHYSICAL
+semantic_map_file: null
+physical_output_enabled: false
+automatic_control_enabled: false
+camera_control_authority: false
+valid_for_control: false
+maximum_bindings: 1024
+maximum_events: 2048
+evidence_ttl_sec: null
+maximum_evidence_skew_sec: null
+maximum_sample_gap_sec: null
+geometry_calibration_id: NOT_CONFIGURED
+contact_persistence_sec: null
+penetration_depth_m: null
+penetration_persistence_sec: null
+collapse_margin_m: null
+maximum_swept_footprints: 256
+bound_clearance_margin_m: null
+updated_clearance_margin_m: null
+minimum_observed_rise_m: null
+pit_rim_elevation_m: null
+pit_geometry_state: NOT_CONFIGURED
+pit_clearance_margin_m: null
+safe_lift_height_m: null
+maximum_stable_velocity_mps: null
+maximum_stable_acceleration_mps2: null
+payload_settling_sec: null
+closure_persistence_sec: null
+unload_persistence_sec: null
+load:
+  source_type: PHYSICAL
+  calibration_state: NOT_CONFIGURED
+  calibration_id: NOT_CONFIGURED
+  unit: NOT_CONFIGURED
+  maximum_samples: 128
+  minimum_samples: 3
+  short_window_sec: null
+  long_window_sec: null
+  baseline_ttl_sec: null
+  sensor_ttl_sec: null
+  maximum_sample_gap_sec: null
+  scale_floor: null
+  normalized_enter: null
+  normalized_exit: null
+  debounce_sec: null
+  settle_slope_limit: null
+  load_polarity: null
+  contact_abs_threshold: null
+  payload_abs_threshold: null
+  payload_normalized_threshold: null
+  unload_abs_threshold: null
+motion:
+  maximum_samples: 128
+  minimum_samples: 5
+  window_sec: null

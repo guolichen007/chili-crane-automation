@@ -31,6 +31,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TargetBinding.msg"
   "msg/ContactEvidence.msg"
   "msg/SurfaceInteractionEvidence.msg"
+  "msg/SurfaceRefreshEvidence.msg"
   "msg/ClosureEvidence.msg"
   "msg/PayloadEvidence.msg"
   "msg/LiftEvidence.msg"

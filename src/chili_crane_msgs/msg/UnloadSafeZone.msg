@@ -17,3 +17,4 @@ float64 z_min
 float64 z_max
 string geometry_version
 bool flow_projection_verified
+chili_crane_msgs/EvidenceMetadata evidence
