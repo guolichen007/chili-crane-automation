@@ -48,6 +48,7 @@ EXCLUDED_DIRECTORIES = {
     ".idea",
     ".vscode",
     "__pycache__",
+    ".pytest_cache",
     "build",
     "devel",
     "install",

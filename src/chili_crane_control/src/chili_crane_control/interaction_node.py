@@ -10,7 +10,8 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.qos import QoSProfile,ReliabilityPolicy,DurabilityPolicy
 from chili_crane_msgs.msg import (TargetBinding,GraspInteractionState,GrabGeometrySafetyState,GrabState,
     HoistState,GrabIoState,LoadState,CycleStatus,GraspProposal,SurfaceInteractionEvidence,SurfaceRefreshEvidence,
-    ContactEvidence,ClosureEvidence,PayloadEvidence,LiftEvidence,UnloadEvidence,UnloadSafeZone,UnloadingCartState)
+    ContactEvidence,ClosureEvidence,PayloadEvidence,LiftEvidence,UnloadEvidence,UnloadSafeZone,UnloadingCartState,
+    PlanningSpatialContext)
 from .grasp_interaction import GraspInteractionEngine,GrabObservation,HoistObservation,IoObservation,CartObservation,ZoneObservation
 from .load_features import LoadSample
 from .interaction_contracts import Evidence
@@ -21,6 +22,12 @@ from .cycle import CycleState
 QOS=QoSProfile(depth=1,reliability=ReliabilityPolicy.BEST_EFFORT)
 STATE_QOS=QoSProfile(depth=10,reliability=ReliabilityPolicy.RELIABLE)
 BIND_QOS=QoSProfile(depth=1,reliability=ReliabilityPolicy.RELIABLE,durability=DurabilityPolicy.TRANSIENT_LOCAL)
+
+
+def latest_callback(inputs,key):
+    def callback(message):
+        inputs[key]=(message,time.monotonic())
+    return callback
 
 
 class InteractionShadowNode(Node):
@@ -46,9 +53,10 @@ class InteractionShadowNode(Node):
                 ('grab',GrabState,'perception/grab_state',QOS),('hoist',HoistState,'hardware/hoist_state',QOS),
                 ('io',GrabIoState,'hardware/grab_io_state',QOS),('load',LoadState,'hardware/load_state',QOS),
                 ('proposal',GraspProposal,'planning/grasp_proposal_shadow',QOS),
+                ('context',PlanningSpatialContext,'planning/spatial_context',QOS),
                 ('refresh',SurfaceRefreshEvidence,'perception/surface_refresh_evidence',STATE_QOS),
                 ('cart',UnloadingCartState,'perception/unloading_cart_state',QOS),('zone',UnloadSafeZone,'planning/unload_safe_zone',QOS)):
-            self.create_subscription(kind,topic,lambda m,key=key:self.inputs.update({key:(m,time.monotonic())}),qos)
+            self.create_subscription(kind,topic,latest_callback(self.inputs,key),qos)
         self.create_timer(.05,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
 
     def now(self):return self.get_clock().now().nanoseconds/1e9
@@ -120,8 +128,14 @@ class InteractionShadowNode(Node):
             lineage=b.lineage
             if 'proposal' in self.inputs:
                 proposal,_=self.inputs['proposal']
-                lineage=tuple(getattr(proposal,key) for key in ('map_id','semantic_version','pit_id','surface_session_id',
-                    'spatial_calibration_id','geofence_id','geofence_version','geofence_config_sha256','kernel_id'))
+                if proposal.validity in (3,4) and proposal.selected_candidate_id:
+                    lineage=tuple(getattr(proposal,key) for key in ('map_id','semantic_version','pit_id','surface_session_id',
+                        'spatial_calibration_id','geofence_id','geofence_version','geofence_config_sha256','kernel_id'))
+            context,live=self.input('context')
+            if (not live.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type'])
+                    or (context.map_id,context.semantic_version,context.pit_id,context.calibration_id)!=
+                       (b.map_id,b.semantic_version,b.pit_id,b.spatial_calibration_id)):
+                raise ValueError('LIVE_SPATIAL_LINEAGE_STALE_OR_CONFLICT')
             result=self.engine.evaluate(self.phase,g,h,i,l,self.now(),lineage,r,ca,zo)
             derived=replace(ge,calibration_id=b.spatial_calibration_id,config_version=self.config['config_version'])
             state=result_to_message(result,b,derived,self.config)

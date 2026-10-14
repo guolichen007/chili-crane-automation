@@ -14,7 +14,8 @@ jobs:
     env:
       CHILI_CI_IMAGE_REFERENCE: ros:humble-ros-base-jammy
       ROS_DOMAIN_ID: 42
-    timeout-minutes: 25
+    # Preserve all historical gates; add bounded C2/C3 installed and symlink SIL.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:

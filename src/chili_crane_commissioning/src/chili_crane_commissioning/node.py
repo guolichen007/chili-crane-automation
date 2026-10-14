@@ -127,14 +127,24 @@ def main():
             ('hardware/hoist_state',HoistState,qos),('hardware/load_state',LoadState,qos),
             ('hardware/remote_control_state',RemoteControlState,qos),('hardware/control_board_state',ControlBoardState,qos),
             ('safety/event',SafetyEvent,reliable))
-        subscriptions=[ros_node.create_subscription(kind,topic,lambda m,topic=topic:mirror(topic,m),profile) for topic,kind,profile in topics]
+        def callback_for(topic):
+            def callback(message):
+                mirror(topic,message)
+            return callback
+        subscriptions=[ros_node.create_subscription(kind,topic,callback_for(topic),profile) for topic,kind,profile in topics]
+        manifest_counter=0
         def manifest():
+            nonlocal manifest_counter
+            manifest_counter+=1
             m=RunManifest(validity=3,reason='COMMISSIONING_RECORD_NOT_FIELD_ACCEPTANCE',run_id=recorder.run_id,
                 git_sha=args.git_sha,config_hash=config_hash,schema_version='RUN_MANIFEST_V2',phase='2C',
                 recording_profile=config['recording_profile'],recording_enabled=True)
             m.header.stamp=ros_node.get_clock().now().to_msg();m.evidence.header=m.header
             m.started_stamp=started_stamp;m.task_id=backend.context['task_id'];m.cycle_id=backend.context['cycle_id']
-            m.evidence.measurement_stamp=m.header.stamp;m.evidence.validity=3;m.evidence.source_type=2
+            m.evidence.measurement_stamp=m.header.stamp;m.evidence.receive_stamp=m.header.stamp
+            m.evidence.validity=3;m.evidence.source_type=2;m.evidence.source_counter=manifest_counter
+            m.evidence.calibration_id='COMMISSIONING_RECORD_NOT_SENSOR_CALIBRATION'
+            m.evidence.config_version=config['config_version']
             manifest_pub.publish(m)
         ros_node.create_timer(1.,manifest)
     server=ConsoleServer((args.host,args.port),backend,allow_nonlocal=args.allow_nonlocal,allowed_hosts=args.allowed_host)

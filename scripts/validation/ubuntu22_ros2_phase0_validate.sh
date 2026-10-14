@@ -44,11 +44,14 @@ printf 'EVIDENCE_SCOPE: UBUNTU22_ROS2_SOFTWARE_ONLY\n'
 } > "$run_dir/software-environment.txt" 2>&1
 dpkg-query -W > "$run_dir/apt-package-versions.txt"
 python3 tools/check_repo_contracts.py
+python3 -m compileall -q src tools tests_static
 python3 -m unittest discover -s tests_static -p "test_*.py"
+python3 -m pytest -q tests_static | tee "$run_dir/pytest-static.txt"
 python3 tools/validate_architecture_scenarios.py | tee "$run_dir/architecture-scenarios.json"
 python3 tools/validate_phase2a_synthetic.py --output "$run_dir/phase2a-monte-carlo.json"
 timeout 600s python3 tools/validate_phase2a_r1.py --output "$run_dir/phase2a-r1-sequences.json"
 timeout 600s python3 tools/validate_phase2b_synthetic.py --output "$run_dir/phase2b-sequences.json"
+timeout 90s python3 tools/validate_phase2c_synthetic.py --output "$run_dir/phase2c-synthetic.json"
 rosdep check --from-paths src --ignore-src --rosdistro humble
 colcon --log-base "$run_dir/log" build --base-paths "$workspace/src" \
   --build-base "$run_dir/build" --install-base "$run_dir/install" \
@@ -70,6 +73,7 @@ bash scripts/validation/rviz_installation_smoke.sh "$workspace" "$run_dir/rviz" 
 timeout 45s python3 tools/validate_phase2a_ros.py --evidence-dir "$run_dir/phase2a-normal" | tee "$run_dir/phase2a-normal-result.json"
 timeout 65s python3 tools/validate_phase2b_ros.py --evidence-dir "$run_dir/phase2b-normal" | tee "$run_dir/phase2b-normal-result.json"
 timeout 150s python3 tools/validate_phase2b_r11_ros.py --evidence-dir "$run_dir/phase2b-r11-normal" | tee "$run_dir/phase2b-r11-normal-result.json"
+timeout 300s python3 tools/validate_phase2c_ros.py --evidence-dir "$run_dir/phase2c-normal" | tee "$run_dir/phase2c-normal-result.json"
 # Cross-run shared-runner P95 is not a regression comparison. Read the frozen
 # exact base into an owned temporary evidence directory (never another project
 # or Git worktree), then bracket current timing with baseline on the same host.
@@ -95,13 +99,14 @@ colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$
   colcon test-result --test-result-base "$run_dir/symlink-build" --verbose
   [ "$package_test_status" = 0 ]
   timeout 180s python3 tools/validate_phase2b_r1.py --output "$run_dir/phase2b-r1-symlink.json"
-  for package in chili_crane_slam chili_crane_hardware chili_crane_control chili_crane_perception; do
+  for package in chili_crane_slam chili_crane_hardware chili_crane_control chili_crane_perception chili_crane_commissioning; do
     ros2 pkg executables "$package"
   done
   timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-dir "$run_dir/symlink-phase1c"
   timeout 45s python3 tools/validate_phase2a_ros.py --evidence-dir "$run_dir/phase2a-symlink"
   timeout 65s python3 tools/validate_phase2b_ros.py --evidence-dir "$run_dir/phase2b-symlink"
   timeout 150s python3 tools/validate_phase2b_r11_ros.py --evidence-dir "$run_dir/phase2b-r11-symlink"
+  timeout 300s python3 tools/validate_phase2c_ros.py --evidence-dir "$run_dir/phase2c-symlink"
 ) 2>&1 | tee "$run_dir/symlink-executables-and-transport.log"
 ros2 launch chili_crane_bringup mock_system.launch.py > "$run_dir/mock-launch.log" 2>&1 &
 launch_pid=$!
@@ -129,6 +134,10 @@ RVIZ_CONFIGURATION_LOAD_STATUS: PASS
 ROS2_MOCK_LAUNCH_STATUS: PASS
 MOCK_FAIL_CLOSED_STATUS: PASS
 MOCK_SCENARIO_STATUS: PASS
+PHASE2C_INSTALLED_SHADOW_STATUS: PASS_INSTALLED_SYNTHETIC
+PHASE2C_SYMLINK_SHADOW_STATUS: PASS_INSTALLED_SYNTHETIC
+COMMISSIONING_SIMULATION_STATUS: PASS_SOFTWARE
+BENCH_DO_STATUS: NOT_RUN
 ADAM6052_LIVE_STATUS: NOT_RUN
 ADAM6251_LIVE_STATUS: NOT_RUN
 PULL_WIRE_LIVE_STATUS: NOT_RUN

@@ -2,3 +2,4 @@ PyYAML==6.0.2
 jsonschema==4.23.0
 numpy==1.26.4
 Shapely==2.0.7
+pytest==8.3.5

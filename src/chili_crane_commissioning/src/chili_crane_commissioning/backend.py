@@ -22,6 +22,7 @@ class ConsoleBackend:
         self.publish_remote=publish_remote;self.lock=threading.RLock();self.token=secrets.token_urlsafe(32)
         self.active='stop';self.lease_until=0.;self.counter=0;self.devices={};self.timeline=deque(maxlen=config['maximum_events'])
         self.last_remote={};self.context=dict(task_id='',cycle_id='',binding_id='');self.samples=deque(maxlen=config['maximum_plot_samples'])
+        self.recorded_refresh=set()
 
     def remote(self,signal,active=False):
         if not isinstance(signal,str) or signal not in set(SIGNALS)|{'stop'} or type(active) is not bool:raise ValueError('SIMULATION_SIGNAL_INVALID')
@@ -75,6 +76,16 @@ class ConsoleBackend:
             elif topic=='phase2c/target_binding':
                 self.timeline.append(self.recorder.append('events','TARGET_BOUND',source_type,ros_timestamp,**self.context,
                     reason='IMMUTABLE_CYCLE_CONTRACT',binding_digest=value.get('binding_digest_sha256','')))
+            elif topic=='perception/surface_refresh_evidence':
+                for flag,event in (('invalidation_acknowledged','SURFACE_INVALIDATED'),
+                                   ('observation_enabled','SURFACE_REFRESH_STARTED'),('refresh_ready','SURFACE_REFRESH_READY')):
+                    key=(value.get('binding_id'),event)
+                    if value.get(flag) and key not in self.recorded_refresh:
+                        if len(self.recorded_refresh)>=self.config['maximum_events']:
+                            raise ValueError('RECORDING_EVENT_CAPACITY_REQUIRES_NEW_RUN')
+                        self.recorded_refresh.add(key)
+                        self.timeline.append(self.recorder.append('events',event,source_type,ros_timestamp,**self.context,
+                            reason=value.get('reason',''),surface_generation=value.get('surface_generation')))
 
     def voltage(self,body):
         for name in ('supply_voltage','measured_do_voltage'):

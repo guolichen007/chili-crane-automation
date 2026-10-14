@@ -196,6 +196,13 @@ class PitSurfaceShadowNode(Node):
             return
         b,c=self.builder,self.config
         now=source_now(self,c)
+        interaction_pause=False
+        if self.interaction_lifecycle is not None and self.interaction_lifecycle.binding is not None and 'grab' in self.inputs:
+            geometry,received_grab=self.inputs['grab']
+            interaction_pause=(geometry.validity in (3,4) and geometry.tracking_state=='TRACKED'
+                and geometry.measurement_accepted and not geometry.motion_stable
+                and time.monotonic()-received_grab<=c['frame_ttl_sec']
+                and 0<=now-seconds(geometry.header.stamp)<=c['frame_ttl_sec'])
         item,self.latest=self.latest,None
         if item is not None:
             cloud,arrival=item
@@ -257,7 +264,12 @@ class PitSurfaceShadowNode(Node):
                     keep=self.interaction_lifecycle.filter_points(p@transform[:3,:3].T+transform[:3,3],points['timestamp'])
                     points=points[keep]
                     if not len(points):raise ValueError('ALL_POINTS_BLOCKED_BY_INTERACTION_LIFECYCLE')
-                if b.ingest(np.c_[points['x'],points['y'],points['z']],points['sensor_id'],frame,ctx,grab,now):
+                if interaction_pause:
+                    # Opt-in bound cycle only: no fusion while moving, and no
+                    # wholesale clear merely for motion. Unaffected samples still
+                    # expire by their ORIGINAL epochs in the frozen grid.
+                    self.last_receive=arrival;self.last_scan_mid_epoch=timing.mid_epoch
+                elif b.ingest(np.c_[points['x'],points['y'],points['z']],points['sensor_id'],frame,ctx,grab,now):
                     self.last_receive=arrival
                     self.last_grab=grab
                     self.last_scan_mid_epoch=timing.mid_epoch
@@ -275,7 +287,8 @@ class PitSurfaceShadowNode(Node):
                 current_context.validate(c,b.grid.semantic,current_context.source_frame,
                     current_context.measurement_epoch,now)
                 geometry,received_grab=self.inputs['grab']
-                if geometry.tracking_state != 'TRACKED' or not geometry.motion_stable or time.monotonic()-received_grab > c['frame_ttl_sec']:
+                if (geometry.tracking_state != 'TRACKED' or not geometry.motion_stable and not interaction_pause
+                        or time.monotonic()-received_grab > c['frame_ttl_sec']):
                     raise ValueError('GRAB_MASK_STALE_OR_MOVING')
             except (ValueError,TypeError,KeyError) as exc:
                 b.grid.clear(str(exc))
