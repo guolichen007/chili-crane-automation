@@ -1,5 +1,31 @@
 # Project Context
 
+## Phase2C 抓取交互证据与调试台（2026-10-14，当前授权）
+
+BASE_SHA=077d0bfe44d8fe34fc7572f52cff65362cbc83d8；分支codex/phase2c-grasp-interaction-evidence-v1。
+Phase2A、Phase2B已软件shadow封板；本轮新增证据层，不重写其核心，也不另造TaskCycles。
+项目处理生产豆瓣酱的辣椒酱/辣椒物料，不按刚性固体料堆假定。抓斗侵入、闭合、取料会导致塌陷、重排或局部流动。
+单抓链：SCAN → GraspProposal → TargetBinding → 下降 → 接触/侵入 → 闭斗 → 提升 → 新料面更新 → 下一SCAN。
+TargetBinding建立后，本cycle的proposal/candidate、目标XYZ、capture footprint、surface snapshot及
+map/calibration/geofence/kernel lineage全部冻结；下降/接触/闭斗中的新proposal不能替换目标。
+换点必须ABORT当前cycle → 新SCAN → 新cycle_id → 新TargetBinding；lineage改变只输出STALE/CONFLICT/ABORT_REQUIRED。
+
+料面生命周期：抓前generation=N可规划，TARGET_BOUND后N作为当前cycle不可变证据保留。
+第一次可靠interaction即局部失效受扰区域，独立于最终是否抓到料；未受扰坑区可保留。
+抓斗未脱离原料面/遮挡区时，受扰cell不得用旧点恢复。CLEAR_OF_BOUND_SURFACE只开启重新观察，非最终安全事实。
+脱离后继续Phase2A抓斗mask，只接收post-interaction新点；达到既有覆盖率/新鲜度/稳定性/lineage质量后产生N+1或更高新世代。
+再用更新料面证明CLEAR_OF_UPDATED_SURFACE；发生interaction的下一cycle必须使用generation > bound generation。
+无新点保持UNKNOWN/DEGRADED，不以插值或抓前数据伪造刷新。
+
+长期工具需求：Crane Commissioning Console / 辣椒行车调试与运行监控台，独立ROS工具包。
+覆盖SIL、遥控器模拟、shadow证据监控、事件时间线、运行数据/ROS bag保存、隔离台架DO、
+人工万用表电压记录、现场故障复盘及后续参数优化。默认仅127.0.0.1；production不反向依赖/默认启动工具包。
+模拟遥控是SOURCE_SIMULATED observation，不是物理授权；X DO未确认，不猜造映射。
+台架输出显式门禁、独占会话、FSV/WDT/OFF证据与有限单通道pulse；软件readback不等于万用表或电机方向证据。
+FIELD极性、接触/载荷绝对门槛、坑高程、机械能力未确认继续null/NOT_CONFIGURED，FIELD/BENCH实机验收NOT_RUN。
+Phase2C最多PASS_SOFTWARE_SHADOW_NOT_FIELD；SafetyPermit=false，AuthorizedCommand=0，ActuationRequest=0，
+physical_output_enabled=false，automatic_control_enabled=false，camera_control_authority=false，valid_for_control=false。
+
 ## Phase2B-R1.1 最终软件封板（2026-10-14）
 
 用户授权基于8ee41886dfb8d084b2b01d505b770c98bf2fefde建立codex/phase2b-final-seal-r1-1。
