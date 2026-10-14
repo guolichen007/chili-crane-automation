@@ -42,10 +42,12 @@ def main():
         c.update(semantic_map_file=str(tmp/'semantic.yaml'),geofence_file=str(tmp/'geofence.yaml'))
         for path,value in ((config,c),(tmp/'semantic.yaml',s),(tmp/'geofence.yaml',gc)):
             path.write_text(yaml.safe_dump(value),encoding='utf-8')
-        processes={};logs=[];launch_counts={'surface':0,'planner':0}
+        processes={};logs=[];launch_counts={'surface':0,'planner':0};planner_started_ns=0
 
         def start(kind):
+            nonlocal planner_started_ns
             launch_counts[kind]+=1
+            if kind=='planner':planner_started_ns=time.time_ns()
             name='pit_surface_shadow_node.py' if kind=='surface' else 'grasp_proposal_shadow_node.py'
             log=(args.evidence_dir/(kind+'-'+str(launch_counts[kind])+'.log')).open('w',encoding='utf-8');logs.append(log)
             processes[kind]=subprocess.Popen(['ros2','run','chili_crane_perception',name,'--ros-args',
@@ -64,8 +66,13 @@ def main():
         def snapshot_callback(m):
             received['snapshot']=m
             snapshot_history.append((m.surface_session_id,m.status.surface_generation,m.status.evidence.source_counter))
+        def proposal_callback(m,info):
+            received['proposal']=m
+            # Humble message-info source_timestamp is DDS publication time.
+            # Acceptance-test origin proof ONLY, never a measurement epoch.
+            received['proposal_publication_ns']=info['source_timestamp']
         subscriptions=[node.create_subscription(PitSurfaceSnapshot,'perception/pit_surface_snapshot',snapshot_callback,SNAPSHOT_QOS),
-            node.create_subscription(GraspProposal,'planning/grasp_proposal_shadow',lambda m:received.update(proposal=m),PROPOSAL_QOS)]
+            node.create_subscription(GraspProposal,'planning/grasp_proposal_shadow',proposal_callback,PROPOSAL_QOS)]
         for kind,topic in ((SafetyPermit,'safety/permit'),(AuthorizedCommand,'control/authorized_command'),
                            (ActuationRequest,'control/actuation_request')):
             subscriptions.append(node.create_subscription(kind,topic,lambda m:forbidden.append(type(m).__name__),QOS))
@@ -142,7 +149,8 @@ def main():
             raise RuntimeError('R1.1 timeout: '+json.dumps({k:getattr(v,'reason','') for k,v in received.items()}))
 
         def selected():
-            return 'proposal' in received and bool(received['proposal'].selected_candidate_id)
+            return ('proposal' in received and bool(received['proposal'].selected_candidate_id)
+                    and received.get('proposal_publication_ns',0)>planner_started_ns)
 
         def drain_valid_generation():
             # Stop sending before recording replay/cache baselines. Otherwise a
@@ -205,7 +213,9 @@ def main():
             # current context with unchanged measurement stamp for the new reader.
             drain_valid_generation()
             stable=copy.deepcopy(received['snapshot']);source_pid=processes['surface'].pid
-            before=len(snapshot_history);stop('planner');received.pop('proposal',None);start('planner')
+            before=len(snapshot_history);stop('planner')
+            wait(lambda:node.count_publishers('planning/grasp_proposal_shadow')==0,timeout=3.,context_only=True)
+            received.pop('proposal',None);start('planner')
             wait(lambda:selected() and received['proposal'].surface_session_id==stable.surface_session_id,
                  timeout=4.,context_only=True)
             assert processes['surface'].pid==source_pid
@@ -221,6 +231,7 @@ def main():
                 OLD_SESSION_REPLAY_REJECTION_STATUS='PASS',SAME_SESSION_REGRESSION_STATUS='PASS',
                 SAME_GENERATION_DIFFERENT_SESSION_STATUS='PASS',SNAPSHOT_ID_UNIQUENESS_STATUS='PASS',
                 PLANNER_TRANSIENT_LOCAL_RESTART_STATUS='PASS_WITHOUT_NEW_SNAPSHOT',
+                RESTART_PUBLICATION_ORIGIN_STATUS='PASS_NEW_DDS_PUBLICATION_AFTER_PROCESS_START',
                 CACHE_SESSION_ISOLATION_STATUS='PASS',CONTROL_TOPIC_MESSAGES=len(forbidden),
                 PHYSICAL_ACTUATION_STATUS='NOT_RUN',valid_for_control=False)
             (args.evidence_dir/'result.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')

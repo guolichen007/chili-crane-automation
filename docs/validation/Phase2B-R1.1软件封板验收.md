@@ -6,15 +6,20 @@
 
 ## 当前状态
 
-CODE_SHA=9ed69a3ecc112ce95f6bfebf5d24f789b7b5e6c6；PHASE2B_SOFTWARE_STATUS=PENDING_PAIRED_PERFORMANCE_CI。
+CODE_SHA=9ed69a3ecc112ce95f6bfebf5d24f789b7b5e6c6；PHASE2B_SOFTWARE_STATUS=PENDING_RESTART_ORIGIN_AND_PAIRED_CI。
 WINDOWS_STATUS=PASS_STATIC_NATIVE；382项测试，377通过、5项缺ROS环境跳过。
 该CODE_SHA的[Static 38499327447](https://github.com/guolichen007/chili-crane-automation/actions/runs/38499327447)与
 [ROS/vendor 38499327449](https://github.com/guolichen007/chili-crane-automation/actions/runs/38499327449)全部通过。
 normal/symlink各七包、各326 tests无错误/失败/跳过；构建前382项，378通过、4项缺生成消息跳过。
 两安装树A/B和R1.1 installed全部通过，三种重启、TL无新snapshot恢复、旧session/世代重放反证通过，三控制topic各0。
+以上是脚本历史回传，不作为最终planner-only证据：归档normal planner-2.log显示在Python初始化时就被中断。
+审计发现旧节点排队proposal可能在received清空后到达，导致planner-only predicate假阳性；软件状态不封板。
+修复验收callback保存Humble DDS source_timestamp，仅用于证明publication发生于新进程启动之后，
+不替换任何measurement epoch/arrival/freshness。planner-only先等旧publisher退出图，再接纳新DDS publication。
+最终SHA必须重新跑完整CI与检查节点日志；历史全绿不隐藏验收漏洞。
 PTP/dual LiDAR/Phase1C/Capture/全部RViz/mock/vendor旧入口全部通过。
 ROS2_NORMAL_STATUS/ROS2_SYMLINK_STATUS/ROS2_PHASE2B_SHADOW_STATUS/VENDOR_STATUS=PASS_FOR_CODE_SHA。
-GITHUB_ACTIONS_STATUS=PASS_FOR_CODE_SHA；新增同runner性能验证及最终归档HEAD仍需完整精确CI。
+GITHUB_ACTIONS_STATUS=PASS_FOR_CODE_SHA_ONLY；新publication-origin反证/同runner性能及最终HEAD仍需完整精确CI。
 不能用Windows或历史8ee CI代替本轮ROS构建、installed重启与最终HEAD CI。
 只有全部反证与旧回归通过才标SEALED_SOFTWARE_SHADOW_NOT_FIELD；不继续Phase2B-R1.2。
 
