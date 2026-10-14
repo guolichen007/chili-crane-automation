@@ -49,6 +49,15 @@ class MockHardwareAdapter(Node):
             message.reason = "mock_hardware_not_configured"
             message.evidence_age_sec = 1.0e9
             if hasattr(message, "evidence"):
+                message.evidence.header = message.header
+                message.evidence.measurement_stamp = stamp
+                message.evidence.receive_stamp = stamp
+                message.evidence.source_counter = self._counter
+                message.evidence.validity = message.validity
+                message.evidence.reason = message.reason
+                message.evidence.evidence_age_sec = message.evidence_age_sec
+                message.evidence.calibration_id = "NOT_CONFIGURED"
+                message.evidence.config_version = "MOCK_V1"
                 message.evidence.source_type = message.evidence.SOURCE_SIMULATED
             if hasattr(message, "calibration_id"):
                 message.calibration_id = "NOT_CONFIGURED"

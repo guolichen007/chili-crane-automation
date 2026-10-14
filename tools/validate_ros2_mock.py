@@ -46,6 +46,11 @@ def main():
         def hardware_callback(msg, topic=topic, kind=kind):
             if msg.validity != kind.NOT_CONFIGURED:
                 failure.append(topic + " is not NOT_CONFIGURED")
+            if topic == "load_state" and (msg.evidence.validity != msg.validity
+                    or msg.evidence.measurement_stamp != msg.header.stamp
+                    or msg.evidence.evidence_age_sec != msg.evidence_age_sec
+                    or msg.evidence.source_type != msg.evidence.SOURCE_SIMULATED):
+                failure.append("LoadState unified evidence migration is inconsistent")
             if topic == "control_board_state" and (msg.safety_ok or msg.safety_ok_known or msg.e_stop_known):
                 failure.append("mock board must not manufacture safety/estop evidence")
             if topic == "remote_control_state" and (

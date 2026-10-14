@@ -19,3 +19,4 @@ float64 delta
 string unit
 string calibration_id
 float64 evidence_age_sec
+chili_crane_msgs/EvidenceMetadata evidence
