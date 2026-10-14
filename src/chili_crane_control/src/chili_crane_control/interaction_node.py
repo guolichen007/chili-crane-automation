@@ -14,7 +14,7 @@ from chili_crane_msgs.msg import (TargetBinding,GraspInteractionState,GrabGeomet
     PlanningSpatialContext)
 from .grasp_interaction import GraspInteractionEngine,GrabObservation,HoistObservation,IoObservation,CartObservation,ZoneObservation
 from .load_features import LoadSample
-from .interaction_contracts import Evidence
+from .interaction_contracts import Evidence,require_observation_successor
 from .interaction_transport import (binding_from_message,binding_to_message,observation_evidence,ns,
     result_to_message,refresh_from_message)
 from .cycle import CycleState
@@ -35,6 +35,7 @@ class InteractionShadowNode(Node):
         super().__init__('grasp_interaction_shadow_node')
         self.declare_parameter('config_file','')
         self.config,self.engine={},None;self.error='NOT_CONFIGURED';self.inputs={};self.phase='SCAN';self.cycle_input=None
+        self.cycle_error='CYCLE_INPUT_MISSING';self.refresh_generation_floor=0
         try:
             self.config=yaml.safe_load(Path(self.get_parameter('config_file').value).read_text(encoding='utf-8'))
             semantic_file=self.config.get('semantic_map_file')
@@ -66,6 +67,7 @@ class InteractionShadowNode(Node):
         try:
             b=binding_from_message(m)
             self.engine.bind(b,self.now());self.binding_pub.publish(binding_to_message(b))
+            self.cycle_input=None;self.cycle_error='CYCLE_INPUT_MISSING';self.refresh_generation_floor=b.surface_generation
             self.error='SHADOW_ONLY'
         except (ValueError,TypeError,KeyError,AttributeError) as exc:
             self.error=str(exc);self.get_logger().warning(self.error)
@@ -75,11 +77,15 @@ class InteractionShadowNode(Node):
         try:
             b=self.engine.binding;e=observation_evidence(m)
             ttl=self.config.get('evidence_ttl_sec') or 0.
-            if (m.run_id!=b.run_id or m.task_id!=b.task_id or m.cycle_id!=b.cycle_id
+            if (m.run_id!=b.run_id or m.task_id!=b.task_id or m.cycle_id!=b.cycle_id or m.cycle_index!=b.cycle_index
                     or not e.fresh(self.now(),ttl,self.config['source_type'])):
                 raise ValueError('CYCLE_BINDING_IDENTITY_OR_FRESHNESS_CONFLICT')
+            previous=observation_evidence(self.cycle_input[0]) if self.cycle_input else None
+            old_state=self.cycle_input[0].state if self.cycle_input else None
+            require_observation_successor(previous,old_state,e,m.state)
             self.phase=CycleState(m.state).name;self.cycle_input=(m,time.monotonic())
-        except (ValueError,TypeError,KeyError,AttributeError) as exc:self.error=str(exc)
+            self.cycle_error=''
+        except (ValueError,TypeError,KeyError,AttributeError) as exc:self.cycle_error='CYCLE_'+str(exc)
 
     def input(self,key,optional=False):
         if key not in self.inputs:
@@ -95,6 +101,7 @@ class InteractionShadowNode(Node):
         try:
             if self.engine is None or self.engine.binding is None:raise ValueError(self.error)
             b=self.engine.binding
+            if self.cycle_error:raise ValueError(self.cycle_error)
             if self.cycle_input is None:raise ValueError('CYCLE_INPUT_MISSING')
             cycle,cycle_arrival=self.cycle_input
             ce=observation_evidence(cycle,time.monotonic()-cycle_arrival)
@@ -118,6 +125,12 @@ class InteractionShadowNode(Node):
             l=LoadSample(le,load.value,load.unit,load.load_state==load.LOAD_SENSOR_FAULT,
                          load.load_state==load.LOAD_SUSPENDED_EMPTY) if load is not None else None
             refresh,re=self.input('refresh',True)
+            if (refresh is not None and re.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type'])
+                    and (refresh.binding_id,refresh.binding_digest_sha256,refresh.surface_session_id,re.calibration_id,re.frame_id)==
+                       (b.binding_id,b.binding_digest_sha256,b.surface_session_id,b.spatial_calibration_id,b.evidence.frame_id)):
+                if refresh.surface_generation<self.refresh_generation_floor:
+                    raise ValueError('REFRESH_GENERATION_REGRESSION_CONFLICT')
+                self.refresh_generation_floor=max(self.refresh_generation_floor,refresh.surface_generation)
             try:r=refresh_from_message(refresh) if refresh is not None else None
             except ValueError:r=None
             if r is not None:r=replace(r,evidence=re)

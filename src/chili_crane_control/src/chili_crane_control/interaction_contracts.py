@@ -133,6 +133,16 @@ class TargetBinding:
             'spatial_calibration_id','geofence_id','geofence_version','geofence_config_sha256','kernel_id'))
 
 
+def require_observation_successor(previous,previous_payload,current,payload):
+    """Accept exact duplicates, never regress epoch/counter or change producer identity."""
+    if previous is None:return
+    identity=lambda e:(e.source_type,e.frame_id,e.calibration_id,e.config_version)
+    if identity(previous)!=identity(current):raise ValueError('OBSERVATION_SOURCE_IDENTITY_CONFLICT')
+    old=(previous.epoch_ns,previous.counter);new=(current.epoch_ns,current.counter)
+    if new==old and payload==previous_payload:return
+    if new[0]<=old[0] or new[1]<=old[1]:raise ValueError('OBSERVATION_CHRONOLOGY_CONFLICT')
+
+
 class BindingLedger:
     """No eviction/rebinding. A new run may create a new deliberate ledger."""
     def __init__(self, maximum=1024):

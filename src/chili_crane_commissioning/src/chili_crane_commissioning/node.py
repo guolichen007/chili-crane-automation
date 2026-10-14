@@ -115,7 +115,9 @@ def main():
             e=getattr(m,'evidence',getattr(getattr(m,'status',None),'evidence',None))
             source={1:'PHYSICAL',2:'SIMULATED',3:'REPLAY',4:'SYNTHETIC'}.get(e.source_type,'UNKNOWN') if e else 'UNKNOWN'
             epoch=m.header.stamp.sec+m.header.stamp.nanosec/1e9 if hasattr(m,'header') else None
-            if e:summary['reported_age_sec']=e.evidence_age_sec
+            if e:
+                summary.update(reported_age_sec=e.evidence_age_sec,evidence_source_counter=e.source_counter,
+                    evidence_calibration_id=e.calibration_id,evidence_config_version=e.config_version)
             backend.mirror(topic,summary,source,epoch)
         topics=(('task/status',TaskStatus,qos),('task/cycle_status',CycleStatus,qos),('system/mode',SystemModeStatus,qos),
             ('system/readiness',SystemReadiness,qos),('perception/grab_state',GrabState,qos),

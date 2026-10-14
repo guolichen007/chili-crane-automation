@@ -4,7 +4,7 @@ import sys
 import unittest
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src/chili_crane_control/src'))
-from chili_crane_control.interaction_contracts import Evidence,TargetBinding,BindingLedger
+from chili_crane_control.interaction_contracts import Evidence,TargetBinding,BindingLedger,require_observation_successor
 
 
 def binding():
@@ -14,6 +14,17 @@ def binding():
 
 
 class ContractTests(unittest.TestCase):
+    def test_logical_cycle_observation_cannot_regress_or_mutate_same_source_identity(self):
+        previous=Evidence.at(10.,3)
+        require_observation_successor(None,None,previous,'LOWER')
+        require_observation_successor(previous,'LOWER',previous,'LOWER')
+        require_observation_successor(previous,'LOWER',Evidence.at(10.1,4),'CLOSE')
+        for current,state in ((Evidence.at(9.99,4),'CLOSE'),(Evidence.at(10.1,2),'CLOSE'),(previous,'CLOSE')):
+            with self.assertRaisesRegex(ValueError,'CHRONOLOGY'):
+                require_observation_successor(previous,'LOWER',current,state)
+        with self.assertRaisesRegex(ValueError,'IDENTITY'):
+            require_observation_successor(previous,'LOWER',dataclasses.replace(Evidence.at(10.1,4),config_version='changed'),'CLOSE')
+
     def test_binding_digest_and_immutable_nested_fields(self):
         b=binding();self.assertEqual(b.digest(),b.binding_digest_sha256)
         self.assertEqual(binding().binding_digest_sha256,b.binding_digest_sha256)

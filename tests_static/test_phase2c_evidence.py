@@ -60,6 +60,17 @@ class Harness:
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_cart_zone_and_sensor_role_replay_cannot_change_same_epoch_fact(self):
+        from types import SimpleNamespace
+        a=Harness();e=Evidence.at(10.2,3)
+        for key in ('cart','zone','grab','hoist'):
+            self.assertTrue(a.engine._ordered(key,SimpleNamespace(evidence=e),(False,)))
+            self.assertTrue(a.engine._ordered(key,SimpleNamespace(evidence=e),(False,)))
+            self.assertFalse(a.engine._ordered(key,SimpleNamespace(evidence=e),(True,)))
+            self.assertFalse(a.engine._ordered(key,SimpleNamespace(evidence=replace(e,epoch_ns=e.epoch_ns+1,counter=2)),(False,)))
+            self.assertFalse(a.engine._ordered(key,SimpleNamespace(evidence=replace(e,epoch_ns=e.epoch_ns+1,counter=4,
+                calibration_id='changed-source-role')),(False,)))
+
     def test_calibrated_contact_requires_joint_overlap_descent_and_persistence(self):
         a=Harness();a.warm()
         states=[]

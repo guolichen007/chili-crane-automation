@@ -72,7 +72,7 @@ class ConsoleBackend:
             if topic=='phase2c/interaction_state':
                 for event in value.get('event_types',[]):
                     self.timeline.append(self.recorder.append('events',event,source_type,ros_timestamp,**self.context,
-                        old_state='',new_state=value.get('task_cycle_state',''),reason=value.get('reason','')))
+                        old_state='',new_state=value.get('task_cycle_state',''),reason=value.get('reason',''),evidence_summary=value))
             elif topic=='phase2c/target_binding':
                 self.timeline.append(self.recorder.append('events','TARGET_BOUND',source_type,ros_timestamp,**self.context,
                     reason='IMMUTABLE_CYCLE_CONTRACT',binding_digest=value.get('binding_digest_sha256','')))

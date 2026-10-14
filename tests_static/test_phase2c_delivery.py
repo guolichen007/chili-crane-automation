@@ -58,6 +58,8 @@ class DeliveryTests(unittest.TestCase):
                         and isinstance(n.func,ast.Attribute) and n.func.attr=='create_publisher']
             self.assertFalse({'SafetyPermit','AuthorizedCommand','ActuationRequest'} & set(publishers))
         self.assertIn('LIVE_SPATIAL_LINEAGE_STALE_OR_CONFLICT',text)
+        self.assertIn('REFRESH_GENERATION_REGRESSION_CONFLICT',text)
+        self.assertIn('require_observation_successor(previous,old_state,e,m.state)',text)
         self.assertIn('proposal.validity in (3,4) and proposal.selected_candidate_id',text)
         self.assertNotIn('from chili_crane_perception',text)
 

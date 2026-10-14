@@ -180,9 +180,12 @@ class GraspInteractionEngine:
 
     def _ordered(self,key,observation,payload):
         e=observation.evidence;previous=self.watermarks.get(key)
+        role=(e.source_type,e.frame_id,e.calibration_id,e.config_version)
+        payload=(role,tuple(payload))
         stamp=(e.epoch_ns,e.counter)
         if previous is not None:
             old,old_payload=previous
+            if payload[0]!=old_payload[0]:return False
             if stamp==old:return payload==old_payload
             if stamp[0]<=old[0] or stamp[1]<=old[1]:return False
         self.watermarks[key]=(stamp,payload)
@@ -221,6 +224,11 @@ class GraspInteractionEngine:
             return self._empty(phase,'SOURCE_CHRONOLOGY_CONFLICT',True)
         if abs(grab.evidence.epoch-hoist.evidence.epoch)>c['maximum_evidence_skew_sec']:
             return self._empty(phase,'GRAB_HOIST_TIME_SKEW')
+        for key,observation,payload in (
+                ('cart',cart,(cart.station_id,cart.present,cart.aligned,cart.full,cart.overflow) if cart else ()),
+                ('zone',zone,(zone.bounds,zone.geometry_version,zone.verified) if zone else ())):
+            if self._fresh(observation,now) and not self._ordered(key,observation,payload):
+                return self._empty(phase,key.upper()+'_OBSERVATION_CHRONOLOGY_CONFLICT',True)
         epoch=grab.evidence.epoch
         motion=self.motion.observe(grab.evidence,grab.z)
         stopped=hoist.motion=='STOPPED'

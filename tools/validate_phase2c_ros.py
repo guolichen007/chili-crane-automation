@@ -115,7 +115,16 @@ class InstalledRun:
             if send:send()
             else:self.spin()
             if condition():return
-        raise RuntimeError('Phase2C timeout '+json.dumps({k:getattr(v,'reason','received') for k,v in self.received.items()}))
+        diagnostics={k:getattr(v,'reason','received') for k,v in self.received.items()}
+        state=self.received.get('state')
+        if state is not None:
+            diagnostics.update(task_cycle_state=state.task_cycle_state,contact_state=state.contact.state,
+                closure_state=state.closure.state,payload_state=state.payload.state,unload_state=state.unload.state,
+                load_features_json=state.load_features_json,clear_bound=state.lift.clear_of_bound_surface,
+                clear_updated=state.lift.clear_of_updated_surface,clear_pit=state.lift.clear_of_pit,
+                source_counter=state.evidence.source_counter)
+        (self.directory/'timeout-diagnostics.json').write_text(json.dumps(diagnostics,indent=2)+'\n',encoding='utf-8')
+        raise RuntimeError('Phase2C timeout '+json.dumps(diagnostics))
 
     def annotate(self,message,epoch,calibration,frame='map',validity=4):
         message.header.frame_id=frame;message.header.stamp=stamp(epoch);message.validity=validity
@@ -163,6 +172,10 @@ class InstalledRun:
             valid_for_control=False),epoch,self.ctx.calibration_id,validity=3)
         grab=self.annotate(GrabState(tracking_state=2,opening_state=opening,source=1,motion_stable=stable),epoch,'synthetic-extrinsic',validity=3)
         grab.pose.pose.position.z=z
+        grab.pose.pose.orientation.w=1.
+        if self.binding:
+            grab.pose.pose.position.x,grab.pose.pose.position.y=self.binding.target_suspension_map[:2]
+        grab.bottom_z_m=z-.05;grab.top_z_m=z+.8;grab.footprint_map=copy.deepcopy(geometry.conservative_footprint)
         hoist=self.annotate(HoistState(motion=motion,running=motion!=0),epoch,'synthetic-hoist')
         io=self.annotate(GrabIoState(open_limit=opened,closed_limit=closed,known_signals=['open_limit','closed_limit']),epoch,'synthetic-io')
         load=self.annotate(LoadState(value=value,unit='raw',calibration_id='synthetic-load',load_state=1 if empty else 3),epoch,'synthetic-load')
@@ -264,6 +277,12 @@ def main():
             run=InstalledRun(args.evidence_dir,name)
             try:
                 run.initialize()
+                old_cycle=copy.deepcopy(run.last_messages['cycle'])
+                old_cycle.evidence.source_counter=0
+                old_cycle.state=CycleStatus.CLOSE
+                run.pubs['cycle'].publish(old_cycle)
+                run.wait(lambda:'CYCLE_OBSERVATION_CHRONOLOGY_CONFLICT' in run.received['state'].reason,timeout=2.)
+                run.wait(lambda:run.received['state'].validity==3,send=lambda:run.send(empty=True))
                 now_ns=run.node.get_clock().now().nanoseconds
                 attack=replace(run.binding,candidate_id='swap-attack',binding_epoch_ns=now_ns,
                     evidence=replace(run.binding.evidence,epoch_ns=now_ns,reported_age=0.),binding_digest_sha256='')
