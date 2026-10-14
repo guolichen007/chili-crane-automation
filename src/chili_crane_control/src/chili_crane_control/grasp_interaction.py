@@ -450,6 +450,8 @@ class GraspInteractionEngine:
             refreshed_cell_count=refresh.refreshed_cell_count if refresh else 0,
             unknown_cell_count=refresh.unknown_cell_count if refresh else 0,
             refresh_observed_fraction=refresh.observed_fraction if refresh else 0.,updated_clear=updated_clear,
+            next_candidate_generation=next_candidate.surface_generation if next_candidate else None,
+            next_candidate_lineage_matches=next_candidate.lineage==b.lineage if next_candidate else None,
             surface_refresh_ready=refresh_ok,next_plan_ready=next_plan_ready,
             cycle_id=b.cycle_id,binding_id=b.binding_id,source_type=grab.evidence.source_type,
             source_counter=grab.evidence.counter)

@@ -95,7 +95,7 @@ class InstalledRun:
             source_frame='sensor-'+str(i),target_frame=self.ctx.source_frame,rotation_matrix=np.eye(3).tolist(),translation_m=[0,0,0])) for i in (0,1)]
         self.merger=DualLidarMerger(*extrinsics);self.counter=0;self.binding=None;self.last_messages={}
         self.processes=[];self.logs=[];self.url=None
-        self.hold_post_cloud=False;self.visibility='full';self.chains={}
+        self.hold_post_cloud=False;self.visibility='full';self.chains={};self.next_cloud_publish=0.
         self.hold_pit_context=False
         log=(self.directory/'commissioning_console.py.log').open('w',encoding='utf-8');self.logs.append(log)
         self.processes.append(subprocess.Popen(['ros2','launch','chili_crane_bringup','phase2c_shadow_stack.launch.py',
@@ -136,6 +136,11 @@ class InstalledRun:
                     load=json.loads(m.load_features_json or '{}')))
         diagnostics['state_transitions']=transitions[-128:]
         diagnostics['source_epoch_gaps_sec']=[b-a for a,b in zip(self.source_epochs,self.source_epochs[1:])][-256:]
+        proposal=self.received.get('proposal')
+        if proposal is not None:
+            diagnostics['proposal_observation']=dict(generation=proposal.surface_generation,
+                session=proposal.surface_session_id,selected=proposal.selected_candidate_id,
+                source_counter=proposal.evidence.source_counter,stamp=seconds(proposal.header.stamp))
         state=self.received.get('state')
         if state is not None:
             diagnostics.update(task_cycle_state=state.task_cycle_state,contact_state=state.contact.state,
@@ -223,9 +228,15 @@ class InstalledRun:
         cart=self.annotate(UnloadingCartState(station_id='synthetic-only',present=True,aligned=True,full=False,overflow=False),epoch,'synthetic-cart')
         zone=self.annotate(UnloadSafeZone(frame_id='map',x_min=-3.,x_max=3.,y_min=-3.,y_max=3.,z_min=3.5,z_max=5.,
             geometry_version='synthetic-zone',flow_projection_verified=True),epoch,'synthetic-zone')
+        cloud_due=time.monotonic()>=self.next_cloud_publish
         for key,message in (('meta',meta),('context',context),('geometry',geometry),('clearance',clearance),('grab',grab),
             ('hoist',hoist),('io',io),('load',load),('cycle',cycle),('cart',cart),('zone',zone),('cloud',cloud)):
-            if key=='cloud' and (self.hold_post_cloud or not scans):continue
+            if key=='cloud':
+                if self.hold_post_cloud or not scans or not cloud_due:continue
+                # LiDAR frames and normalized load/motion have independent
+                # explicit fixture rates. Keep a snapshot long enough for the
+                # actual B planner to finish before another frame supersedes it.
+                self.next_cloud_publish=time.monotonic()+.2
             if key=='context' and self.hold_pit_context:continue
             self.pubs[key].publish(message);self.last_messages[key]=message
         # Publish normalized fixture evidence at 20 Hz, independently of the

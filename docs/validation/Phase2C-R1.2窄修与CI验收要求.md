@@ -77,6 +77,16 @@ PIT_EXIT 后续一直 true，closure/bound/rim/height/vertical/settling 通过�
 不延长任何等待或放松运行时 gap；真实断流仍失效。第二轮 artifact 11908347990
 SHA256 `a36ef4ec3582557d64c12a39aa92827e70031c127df831bacb57255011a57486`。
 
+第三轮 `3b36d7a3056d0085a07647a4afbe1a73cad3ecfd` 的
+[run 38594579941](https://github.com/guolichen007/chili-crane-automation/actions/runs/38594579941)
+normal build、389 项 colcon、Static/vendor PASS；installed stable payload、refresh、updated clear 已通过，
+但等待 NEXT_PLAN_READY 超时。最大 source gap 0.172627687s，baseline/delta/aggregate/PIT_EXIT 均 true。
+fixture 把所有源一起提高到约 20Hz，而原 B planner 使用 0.1s timer；现有诊断提示持续 supersede 的 refresh 与
+异步 B proposal 可能不能稳定对齐 current generation，尚须新诊断核验。后续 fixture 单独以显式 0.2s 间隔发布 LiDAR，
+load/motion 保持 0.05s spin；不更改 B 的统计、scoring、hard gates、C 的 generation floor 或成功条件。
+diagnostics 新增实际 next candidate generation/lineage 与收到的 proposal generation，保留法证区分。
+第三轮 artifact 11908499930 SHA256 `cc2eac7e13e63685def17aeba094a50e161a713d70ffa1834f2843bc45adf394`。
+
 本提交必须正常 push，然后等待相同 exact SHA 的 Static 与 ROS2 workflows 完成，
 读取 jobs 和 artifacts，最终回传分开列 normal build、colcon、installed C、symlink、vendor。
 新提交的最终结果以同 SHA 的 GitHub 记录和回传为准，不用本机 PASS 替代 ROS。
