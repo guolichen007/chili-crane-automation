@@ -1,5 +1,17 @@
 # Project Context
 
+## Phase2C-R1.1 窄修（2026-10-14，当前授权）
+
+BASE_SHA=1c14ac89d6429a31fa1cfcd3253b9eb7feabe56a；新分支 codex/phase2c-r1-1-closeout。
+当前指令 SUPERSEDES 下方历史 skip CI 要求：本轮正常 push，不跳 CI、不改原 C 分支、不 merge main、不进入 D。
+R1.1 载荷确认只依赖冻结 bound surface 与原 load/motion 门禁；新料面可含 UNKNOWN，下一候选必须过原 B 局部门禁。
+updated clear 保守要求受扰区全部有可靠新证据，独立于 payload。session restart active 要 abort，terminal 后 full rescan；
+generation 只在同 session 比较。ledger 按 run 有界，terminal 新 run 可重建。默认记录 STOP_ONLY，全根目录预算未确认保持 null。
+完整 shadow stack 组合现有 B/C 节点，commissioning=false；所有控制 flags 保持 false。
+R1_1_CODE_STATUS=WINDOWS_STATIC_PASS_UBUNTU_PENDING，最终 exact SHA 的八包 normal/symlink、installed C/console、DDS 均待 Ubuntu。
+历史 stable-lift timeout 的现存归档没有逐门载荷/运动采样，根因 OPEN；原生耦合复现不冒充历史 ROS 复现或修复。
+详见 [R1.1接口](api/PHASE2C_R11_CONTRACTS.md) 和 [软件审查/工控机待验](validation/Phase2C-R1.1软件审查与工控机待验.md)。
+
 ## Phase2C 抓取交互证据与调试台（2026-10-14，当前授权）
 
 当前代码4af2bb0378c134800d34de6178b004b6fa4d8f6e：C0-C4与加固已完成，C5交付归档。

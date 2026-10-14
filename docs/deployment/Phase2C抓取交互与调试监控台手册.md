@@ -1,6 +1,7 @@
 # Phase2C 抓取交互证据与调试监控台使用手册
 
-交付日期：2026-10-14。验收范围以[Windows交付与工控机待验记录](../validation/Phase2C软件交付与工控机待验.md)为准。
+交付日期：2026-10-14。R1.1 范围以[窄修验收记录](../validation/Phase2C-R1.1软件审查与工控机待验.md)
+及[接口迁移](../api/PHASE2C_R11_CONTRACTS.md)为准；原交付记录保留历史，不升级其 Ubuntu 状态。
 
 范围：Windows 静态/纯算法交付，Ubuntu 安装态验收待工控机；不是生产自动控制操作规程。运行环境 Ubuntu 22.04 / ROS2 Humble /
 Python 3.10 / GCC 11 / C++17。Windows 仅编辑、静态/纯算法测试及 Git。
@@ -25,7 +26,7 @@ VERIFY_LOAD 仅检查已经交互、闭合且无矛盾；RAISE 出口才要求�
 
 新增消息：TargetBinding、ContactEvidence、SurfaceInteractionEvidence、ClosureEvidence、PayloadEvidence、
 LiftEvidence、UnloadEvidence、GraspInteractionState、SurfaceRefreshEvidence、CommissioningShadowOutput、BenchOutputEvidence。
-LoadState、CycleStatus、UnloadSafeZone、UnloadingCartState 追加统一 EvidenceMetadata；RunManifest 保留原字段并扩展 V2 记录字段。
+LoadState、CycleStatus、UnloadSafeZone、UnloadingCartState 追加统一 EvidenceMetadata；RunManifest 当前为 V3 记录语义。
 这是 wire 接口扩展，所有 producer/consumer 必须按同一 SHA 重建；不支持混用旧生成消息。
 旧消息缺来源、测量 epoch、counter、标定/配置身份的，保持 UNKNOWN/NOT_CONFIGURED，不猜来源或续期。
 同周期 CycleStatus 拒绝 epoch/counter 倒序、同源同序号变更及来源身份变更；cart/zone 采用同样的观测顺序门禁。
@@ -63,7 +64,10 @@ SCAN -> proposal -> immutable binding(N)
          refreshed generation > N -> CLEAR_OF_UPDATED_SURFACE
                       |
                       v
-          stable payload/lift -> next cycle uses new snapshot
+          updated clear / safe lift (independent of payload)
+                      |
+                      v
+          B candidate-local hard gates -> next binding
 ```
 
 mask 为绑定 footprint、实测 swept footprint、显式 collapse margin 的局部并集，只处理坑内交叠格。
@@ -73,7 +77,9 @@ mask 为绑定 footprint、实测 swept footprint、显式 collapse margin 的�
 丢失、无效 provenance、空间变更等原拒绝仍 fail-closed。只有显式 interaction_config_file 启用此行为。
 默认 Phase2B launch、统计、mask、扰动、规划/ESDF、时基、session、TaskCycles 与 vendor patch 保持冻结。
 
-新局部 surface 必须全部受扰 cells 满足原 B sample/frame/support/coverage、坡度/粗糙度、uncertainty、TTL、稳定平台与 lineage。
+R1.1 SUPERSEDED：旧版要求全部受扰 cell 合格才建立新料面、payload 等待 updated clear。
+新 generation 中合格新观测为 OBSERVED，不可靠受扰 cell 为 UNKNOWN；局部 UNKNOWN 不等于全坑可抓。
+下一抓只由原 B planner 对新 generation 产生的真实候选局部 hard gates 决定。
 没有新点或被 Grab mask 遮挡时不插值、不填高程，不得将仅 bound-clear 宣布为 updated-clear。
 pit-clear 优先使用 SemanticMap V1 的 pit.wall_top_z_m 并核对 map/version/frame/pit 与源标定状态。
 safe lift height 是独立检查，不等于 surface clear，也不等于真实 MOVE_TO_UNLOAD 授权。
@@ -88,7 +94,8 @@ safe lift height 是独立检查，不等于 surface clear，也不等于真实 
 Contact 必须同时满足下降、保守区间 overlap、标定载荷变化与持续时序；仅几何最多 POSSIBLE。
 Closure 要闭限位与实测 LiDAR CLOSED 一致；双限位、闭限位+OPEN 等冲突不做多数投票。
 载荷只在空斗已知、停止稳定、非接触且未交互时更新 empty baseline；运动/抓取期间冻结 baseline。
-最终 payload 要已交互/闭合/真实上升、updated clear、低速度/低加速度、load settling 与有效标定门槛。
+最终 payload 要已交互/闭合/真实上升、bound clear、低速度/低加速度、load settling 与有效基线/标定/增量门槛。
+payload 可先 CONFIRMED，refresh 尚未 ready、updated clear UNKNOWN、下一 PLAN 等待是合法状态。
 卸料还要求匹配的安全区与车状态、not full/overflow、真实 OPEN 一致和 loaded baseline 相对下降。
 所有这些均只是 shadow 证据，不是许可。
 
@@ -118,14 +125,14 @@ python3 tools/validate_phase2c_synthetic.py --output /tmp/phase2c-native.json
 python3 tools/validate_phase2c_ros.py --evidence-dir /tmp/phase2c-installed-unique
 ```
 
-最后一个工具只在自己的 UUID namespace 建立四个 owned process：surface、planner、interaction、console。
+最后一个工具在自己的 UUID namespace 使用完整 shadow-stack launch，组合 surface、planner、interaction、console。
 本轮按用户新指令不执行本段 Ubuntu 命令。最终 SHA 的构建、colcon test、DDS/launch/bag 都须工控机实际确认。
 历史 0f8db3d 的 installed case 在稳定提升等待时未满足 payload/updated-clear 条件而 timeout，
 不能写成已修复或通过。最终工具新增 timeout-diagnostics.json 与事件 evidence_summary，供工控机定位
 baseline、sample gap、closure、velocity/acceleration、settling、refresh 与 clear 各门槛；不得先猜阈值改成 PASS。
 使用未修改双雷达 merger 的 FIRST_POINT header、实际 point-derived MID_SCAN Grab 和完整标准化 synthetic 状态；
 它没有 ADAM transport、writer、safety/authorized/executor 节点，不应拿 synthetic motion 输入当现场传感器结果。
-覆盖成功抓取、空抓仍失效刷新、加速误报、同 cycle 换点，真实 DDS 局部 ACK/新世代/载荷/卸料链，
+覆盖成功抓取、空抓仍失效刷新、加速误报、同 cycle 换点、部分可见与遮挡恢复；分别报告三条证据链，
 以及 HTTP -> SOURCE_SIMULATED -> 既有仲裁策略 -> shadow DO 期望、释放/租约 STOP、未 armed bench 拒绝。
 三控制 topic 订阅计数为零，所有 valid_for_control 为 false；脚本退出只清理自己的进程，不删除证据。
 
@@ -140,6 +147,24 @@ ros2 launch chili_crane_bringup phase2c_interaction_shadow.launch.py namespace:=
 该节点依赖标准化 Grab/geometry、live PlanningSpatialContext、Hoist/IO/Load、原 owner CycleStatus 和明确绑定；
 启用局部生命周期需另对 surface node 显式传 `interaction_config_file`，不是默认加载 production。
 cart/zone/refresh 缺失分别阻断相关 evidence，不把缺消息解释成安全。
+
+完整 shadow-stack launch 自动接线现有 B surface runtime 的 C 生命周期、B planner 与 C evidence：
+
+```bash
+ros2 launch chili_crane_bringup phase2c_shadow_stack.launch.py \
+  namespace:=crane_01 surface_config_file:=/path/to/confirmed-surface.yaml \
+  interaction_config_file:=/path/to/confirmed-interaction.yaml
+```
+
+输入仍需来自既有 A/标准化设备状态与原 TaskCycles owner。默认 commissioning=false，模板仍 NOT_CONFIGURED。
+commissioning launch 是上述命令显式增加 commissioning:=true、git_sha:=EXACT_SHA、
+commissioning_run_id:=CONFIRMED_RUN_ID、runs_directory:=/path/to/owned-runs；仅本地 monitor/记录，无 bench writer。
+single-node launch 只用于 C 调试；full shadow-stack 组合 B/C；commissioning 需显式可选工具；
+isolated bench 则只用独立 console CLI 和下述实测门禁，不通过 stack 打开物理输出。
+
+producer restart 在 ACTIVE_CYCLE 要 ABORT；COMPLETE/ABORTED 后新 session 先 full SCAN，
+新 proposal/new cycle_id 才能绑定。跨 session 不比较 generation 大小，旧证据清除。
+ledger 上限按 active run 计算；同 run 超限拒绝，新 run 只在 terminal 后重建，无 silent eviction。
 
 本地 ROS console 示例（namespace/run_id 必须与该次受监控 owner 运行相符；记录根目录由 operator 确认）：
 
@@ -189,13 +214,17 @@ ISOLATED BENCH ONLY / 隔离台架专用。默认 bench.yaml physical=false、ho
 人工数值标为 OPERATOR_REPORTED_NOT_FIELD_ACCEPTANCE；不自动把 register bool 转成电压。
 
 bag 默认 disabled/NOT_CONFIGURED；state_only 不含 raw points，event_debug 默认也不持续录 raw。
-必须确认 storage、每文件 size/duration 和总 storage/duration 四项正整数上限及 namespace/topics，再通过显式 recording config 启动。
+必须确认 storage、每文件 size/duration、单次总 storage/duration、整个 recording root 的
+global_recording_budget_bytes 和 minimum_free_space_bytes，以及 namespace/topics，才可启动。
+默认 retention_policy=STOP_ONLY，预算不足产生 STORAGE_LIMIT 并拒绝新 bag/停止当前 bag，不删除历史证据。
+V3 manifest 分别记录 journal_enabled、rosbag_configured、rosbag_enabled、rosbag_process_alive、recording_profile；
+recording_enabled 兼容字段仅表示实际 rosbag 进程，JSONL 运行不等于正在录 bag。
 原始点云还需 event_debug 与独立 high_bandwidth approval；停止只针对 owned recorder，不清除证据或其他进程。
 JSONL 是 append-only 事件记录，不是已验证的长期工业存储/掉电完整性系统；现场容量/留存仍 OPEN。
 
 ## 本阶段结束条件
 
-本轮状态 WINDOWS_STATIC_PASS_UBUNTU_ACCEPTANCE_PENDING；纯算法与 headless PASS 不代替 ROS 安装态验收。
+本轮状态 R1_1_CODE_STATUS=WINDOWS_STATIC_PASS_UBUNTU_PENDING；纯算法与 headless PASS 不代替 ROS 安装态验收。
 未来只有真实完成软件验收后才能至多 PASS_SOFTWARE_SHADOW_NOT_FIELD / COMMISSIONING_SIMULATION_STATUS=PASS_SOFTWARE。
 BENCH_DO、FIELD_CONTACT/LOAD/SURFACE_REFRESH/GRASP、FIELD motor direction/limit chain/control E2E、FULL_AUTO 一律 NOT_RUN。
 实机 bag 重放、真实 load polarity/absolute threshold、坑/轴/外参标定、可停能力、料面流变组合、存储容量须另行提供真实证据。
