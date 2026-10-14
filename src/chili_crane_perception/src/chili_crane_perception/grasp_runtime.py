@@ -15,6 +15,7 @@ from chili_crane_perception.surface_transport import (snapshot_from_message,cont
 from chili_crane_perception.surface_disturbance import SurfaceDisturbanceTracker
 from chili_crane_control.geofence import OperationalGeofence
 from chili_crane_control.grasp_planning import GraspPlanner
+from .surface_session import SurfaceSessionGate
 
 
 class GraspProposalShadowNode(Node):
@@ -33,6 +34,8 @@ class GraspProposalShadowNode(Node):
         self.generation_floor=-1
         self.last_counter=-1
         self.pending_event=None
+        self.surface_sessions=SurfaceSessionGate()
+        self.pending_surface=None
         self.decoded_message,self.decoded_snapshot=None,None
         self.serialized_proposal,self.last_result=None,None
         self.pub=self.create_publisher(GraspProposal,'planning/grasp_proposal_shadow',PROPOSAL_QOS)
@@ -44,27 +47,84 @@ class GraspProposalShadowNode(Node):
         self.create_timer(.1,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
 
     def surface(self,m):
-        if self.latest is not None and m.status.surface_generation <= self.generation_floor:
-            # Old/duplicate DDS history never replaces latest evidence or its arrival.
+        decision=self.surface_sessions.begin(m.status.surface_session_id)
+        if decision not in ('NEW_SESSION','SAME_SESSION'):
+            if decision == 'SESSION_HISTORY_CAPACITY_EXCEEDED':
+                self.reset_surface_state()
+            return
+        if decision == 'NEW_SESSION':
+            # The ID alone never grants admission. Block old state immediately;
+            # only validated fresh evidence below can establish a new baseline.
+            self.reset_surface_state()
+        if not self.surface_sessions.note(m.status.surface_generation):
+            return
+        self.latest=None
+        self.pending_surface=(m,time.monotonic())
+        self.admit_surface()
+
+    def reset_surface_state(self):
+        self.latest,self.pending_surface=None,None
+        self.decoded_message,self.decoded_snapshot=None,None
+        self.serialized_proposal,self.last_result=None,None
+        self.generation_floor,self.last_counter=-1,-1
+        self.pending_event=None
+        if self.planner is not None:
+            self.planner.reset_cache()
+            self.recent=SurfaceDisturbanceTracker(self.config)
+
+    def admit_surface(self):
+        if self.pending_surface is None or self.planner is None or self.spatial_context_input is None:
+            return
+        m,arrival=self.pending_surface
+        try:
+            now=source_now(self,self.config)
+            ctx_msg,ctx_arrival=self.spatial_context_input
+            if (time.monotonic()-arrival > self.config['surface_ttl_sec']
+                    or time.monotonic()-ctx_arrival > self.config['frame_ttl_sec']
+                    or not 0 <= ctx_msg.evidence.evidence_age_sec <= self.config['frame_ttl_sec']):
+                raise ValueError('SESSION_INPUT_RESIDENCE_STALE')
+            snapshot=snapshot_from_message(m,self.config)
+            ctx=context_from_message(ctx_msg)
+            ctx.validate(self.config,self.planner.geofence.semantic,ctx.source_frame,ctx.measurement_epoch,now)
+            snapshot.context.validate(self.config,self.planner.geofence.semantic,
+                                      snapshot.context.source_frame,snapshot.window_end,now)
+            if (snapshot.surface_session_id != self.surface_sessions.session_id
+                    or snapshot.config_sha256 != self.planner.config_hash or snapshot.context.key != ctx.key
+                    or snapshot.validity not in ('VALID','DEGRADED')
+                    or not 0 <= now-snapshot.window_end <= self.config['surface_ttl_sec']):
+                raise ValueError('SESSION_SNAPSHOT_PROVENANCE_OR_FRESHNESS_INVALID')
+        except (ValueError,TypeError,KeyError,AttributeError):
+            # Keep one pending latest snapshot so a late context callback can
+            # validate TRANSIENT_LOCAL delivery after a planner-only restart.
+            if time.monotonic()-arrival > self.config['surface_ttl_sec']:
+                self.pending_surface=None
             return
         if self.pending_event is not None:
             event_id,counter=self.pending_event
             if m.status.disturbance_counter < counter or m.status.last_disturbance_id != event_id:
                 self.latest=None
+                self.pending_surface=None
                 return
             self.pending_event=None
-        if (m.status.surface_generation < self.generation_floor or m.status.evidence.source_counter < self.last_counter):
-            self.latest=None
+        if m.status.surface_generation < self.generation_floor:
+            self.pending_surface=None
+            return
+        if not self.surface_sessions.accept(m.status.surface_generation,m.status.evidence.source_counter):
+            self.pending_surface=None
             return
         self.generation_floor=m.status.surface_generation
         self.last_counter=m.status.evidence.source_counter
-        self.latest=(m,time.monotonic())
+        self.latest=(m,arrival)
+        self.decoded_message,self.decoded_snapshot=m,snapshot
+        self.pending_surface=None
 
     def event(self,m):
         if self.planner is None or self.latest is None:
             return
         try:
             snapshot=snapshot_from_message(self.latest[0],self.config)
+            if m.surface_session_id != self.surface_sessions.session_id:
+                raise ValueError('RECENT_EVENT_SESSION_MISMATCH')
             if (m.validity != 4 or m.source_type not in ('SYNTHETIC','REPLAY') or m.source_type != snapshot.context.source_type
                     or m.header.frame_id != snapshot.context.target_frame
                     or m.map_id != snapshot.context.map_id or m.semantic_version != snapshot.context.semantic_version
@@ -88,6 +148,7 @@ class GraspProposalShadowNode(Node):
             self.get_logger().warning(str(exc))
 
     def tick(self):
+        self.admit_surface()
         try:
             if self.planner is None or self.latest is None or self.spatial_context_input is None:
                 raise ValueError(self.error if self.planner is None else 'SURFACE_OR_CONTEXT_MISSING')
@@ -138,6 +199,7 @@ class GraspProposalShadowNode(Node):
             self.markers.publish(MarkerArray(markers=markers))
         except (ValueError,TypeError,KeyError,AttributeError) as exc:
             m=GraspProposal(validity=2 if 'STALE' in str(exc) else 1,reason=str(exc),valid_for_control=False)
+            m.surface_session_id=self.surface_sessions.session_id or ''
             if self.latest is not None:
                 m.header=copy.deepcopy(self.latest[0].status.header)
                 m.evidence=copy.deepcopy(self.latest[0].status.evidence)

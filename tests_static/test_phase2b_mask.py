@@ -20,7 +20,7 @@ def mask_fixture():
 
 
 def ingest(b,p,sensors,ctx,grab,epoch=10.,counter=1):
-    return b.ingest(p,sensors,dict(epoch=epoch,source_counter=counter,frame_id='cloud',span_sec=.02,
+    return b.ingest(p,sensors,dict(epoch=epoch,mid_epoch=epoch,source_counter=counter,frame_id='cloud',span_sec=.02,
         source_type='SYNTHETIC',calibration_id='cal1'),replace(ctx,measurement_epoch=epoch),
         replace(grab,epoch=epoch) if grab is not None else None,epoch+.01)
 

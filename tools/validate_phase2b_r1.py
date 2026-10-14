@@ -41,7 +41,7 @@ def validate(repetitions=8):
         planner.plan(snap,10.14+i*.01,snap.context,snap.generation)
     counters['OLD_GENERATION_RECOMPUTE_COUNT']+=planner.compute_count-before
     assert first.measurement_epoch==snap.window_end
-    frame=dict(epoch=10.,source_counter=1,frame_id=ctx.source_frame,span_sec=.02,source_type='SYNTHETIC',calibration_id=ctx.calibration_id)
+    frame=dict(epoch=10.,mid_epoch=10.,source_counter=1,frame_id=ctx.source_frame,span_sec=.02,source_type='SYNTHETIC',calibration_id=ctx.calibration_id)
     old=PitSurfaceBuilder(c,s)
     counters['STALE_GRAB_MASK_ACCEPTED_COUNT']+=int(old.ingest(p,sensors,frame,ctx,replace(grab,epoch=9.9),10.01))
     assert old.grid.reason=='GRAB_MASK_TIME_ALIGNMENT_REJECTED'

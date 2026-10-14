@@ -8,6 +8,7 @@ from chili_crane_msgs.msg import (PlanningSpatialContext as ContextMessage, PitS
     GraspProposal as ProposalMessage)
 from .pit_surface import PlanningSpatialContext,SurfaceCell,SurfaceSnapshot
 from .surface_payload import ENCODING,sparse_cells,expand_sparse
+from .surface_session import snapshot_identity,valid_session_id
 
 SOURCE_IDS={'PHYSICAL':1,'SIMULATED':2,'REPLAY':3,'SYNTHETIC':4}
 VALIDITY={'UNKNOWN':0,'NOT_CONFIGURED':1,'STALE':2,'DEGRADED':3,'VALID':4}
@@ -66,6 +67,7 @@ def snapshot_to_message(snapshot,now,counter):
     s.reason=snapshot.reason
     m.validity,m.reason=s.validity,s.reason
     s.snapshot_id,s.surface_generation=snapshot.snapshot_id,snapshot.generation
+    m.surface_session_id=s.surface_session_id=snapshot.surface_session_id
     s.config_sha256=snapshot.config_sha256
     s.last_disturbance_id,s.disturbance_counter=snapshot.last_disturbance_id,snapshot.disturbance_counter
     s.resolution_m=snapshot.resolution
@@ -113,6 +115,7 @@ def snapshot_to_message(snapshot,now,counter):
 def snapshot_from_message(m,config):
     s=m.status
     if (m.validity != s.validity or m.reason != s.reason or s.valid_for_control
+            or not valid_session_id(s.surface_session_id) or m.surface_session_id != s.surface_session_id
             or s.evidence.measurement_stamp != s.header.stamp or s.window_end != s.header.stamp
             or s.evidence.evidence_age_sec != s.evidence_age_sec or not math.isfinite(s.evidence_age_sec)
             or not 0 <= s.evidence_age_sec <= config['surface_ttl_sec'] or not s.spatial_eligible
@@ -122,6 +125,8 @@ def snapshot_from_message(m,config):
             or not 0 <= s.dual_supported_cell_count <= s.support_qualified_cell_count <= s.observed_cell_count <= s.pit_active_cell_count <= m.width*m.height):
         raise ValueError('SURFACE_TYPED_IDENTITY_OR_FRESHNESS_REJECTED')
     ctx=context_from_message(m.spatial_context)
+    if s.snapshot_id != snapshot_identity(s.surface_session_id,s.surface_generation,s.config_sha256,ctx.lineage_key):
+        raise ValueError('SURFACE_SESSION_SNAPSHOT_ID_MISMATCH')
     if (s.map_id != ctx.map_id or s.semantic_version != ctx.semantic_version or s.pit_id != ctx.pit_id
             or s.transform_id != ctx.transform_id or s.spatial_calibration_id != ctx.calibration_id
             or s.header.frame_id != ctx.target_frame or s.evidence.source_type != SOURCE_IDS[ctx.source_type]
@@ -135,7 +140,7 @@ def snapshot_from_message(m,config):
     return SurfaceSnapshot(s.snapshot_id,s.surface_generation,seconds(s.window_start),seconds(s.window_end),ctx,cells,
         (m.origin_x_m,m.origin_y_m),s.resolution_m,m.width,m.height,{v:k for k,v in VALIDITY.items()}.get(s.validity,'UNKNOWN'),
         s.reason,s.config_sha256,False,s.last_disturbance_id,s.disturbance_counter,
-        s.pit_active_cell_count,s.observed_cell_count,s.support_qualified_cell_count,s.dual_supported_cell_count)
+        s.pit_active_cell_count,s.observed_cell_count,s.support_qualified_cell_count,s.dual_supported_cell_count,s.surface_session_id)
 
 
 def proposal_to_message(proposal,surface_message,age):
@@ -146,6 +151,9 @@ def proposal_to_message(proposal,surface_message,age):
     m.reason,m.proposal_id=proposal.reason,proposal.proposal_id
     m.selected_candidate_id=proposal.selected.candidate_id if proposal.selected else ''
     m.surface_snapshot_id,m.surface_generation=proposal.snapshot_id,proposal.generation
+    if proposal.surface_session_id != s.surface_session_id:
+        raise ValueError('PROPOSAL_SURFACE_SESSION_MISMATCH')
+    m.surface_session_id=proposal.surface_session_id
     for key in ('map_id','semantic_version','pit_id','transform_id','spatial_calibration_id'):
         setattr(m,key,getattr(s,key))
     provenance=proposal.geofence_provenance

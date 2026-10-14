@@ -75,7 +75,7 @@ class ReadinessTests(unittest.TestCase):
 
     def test_fresh_but_not_contemporaneous_grab_rejected(self):
         c,s,ctx,grab=mask_fixture();b=PitSurfaceBuilder(c,s);p,sensors=cloud(b.grid)
-        frame=dict(epoch=10.,source_counter=1,frame_id='cloud',span_sec=.02,source_type='SYNTHETIC',calibration_id=ctx.calibration_id)
+        frame=dict(epoch=10.,mid_epoch=10.,source_counter=1,frame_id='cloud',span_sec=.02,source_type='SYNTHETIC',calibration_id=ctx.calibration_id)
         self.assertFalse(b.ingest(p,sensors,frame,ctx,replace(grab,epoch=9.9),10.01))
         self.assertEqual(b.grid.reason,'GRAB_MASK_TIME_ALIGNMENT_REJECTED')
         self.assertFalse(b.grid.frames)
@@ -85,7 +85,7 @@ class ReadinessTests(unittest.TestCase):
         c,s,ctx,grab=mask_fixture();ctx=replace(ctx,calibration_id='full-chain',field_extrinsic_id=grab.calibration_id)
         for mismatch in ('none','extrinsic','chain'):
             b=PitSurfaceBuilder(c,s);p,sensors=cloud(b.grid)
-            frame=dict(epoch=10.,source_counter=1,frame_id='cloud',span_sec=.02,source_type='SYNTHETIC',
+            frame=dict(epoch=10.,mid_epoch=10.,source_counter=1,frame_id='cloud',span_sec=.02,source_type='SYNTHETIC',
                        calibration_id='wrong' if mismatch=='chain' else 'full-chain')
             active=replace(grab,calibration_id='wrong') if mismatch=='extrinsic' else grab
             self.assertEqual(b.ingest(p,sensors,frame,ctx,active,10.01),mismatch=='none')

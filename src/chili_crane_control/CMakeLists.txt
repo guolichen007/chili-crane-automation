@@ -17,6 +17,8 @@ if(BUILD_TESTING)
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_perception/src)
   ament_add_pytest_test(phase2b_r1 ../../tests_static/test_phase2b_r1.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_perception/src)
+  ament_add_pytest_test(phase2b_r11 ../../tests_static/test_phase2b_r11.py
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_perception/src)
   ament_add_pytest_test(architecture_contracts test/test_architecture.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_hardware/src)
 endif()

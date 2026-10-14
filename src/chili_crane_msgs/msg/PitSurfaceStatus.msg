@@ -20,6 +20,8 @@ chili_crane_msgs/EvidenceMetadata evidence
 string map_id
 string semantic_version
 string snapshot_id
+# Opaque UUID of this surface producer process lifecycle, not a timestamp.
+string surface_session_id
 uint64 surface_generation
 builtin_interfaces/Time window_start
 builtin_interfaces/Time window_end

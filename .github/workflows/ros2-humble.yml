@@ -17,6 +17,9 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          # R1.1 compares frozen algorithm ASTs against the reviewed exact base.
+          fetch-depth: 0
       - name: Install software dependencies
         shell: bash
         run: |

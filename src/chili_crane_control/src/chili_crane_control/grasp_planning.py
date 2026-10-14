@@ -94,6 +94,7 @@ class GraspProposal:
     search_complete: bool = False
     global_optimum_proven: bool = False
     ranked_candidate_ids: tuple = ()
+    surface_session_id: str = ''
 
 
 class GraspPlanner:
@@ -125,9 +126,15 @@ class GraspPlanner:
         self.compute_count, self.cache_hit_count = 0, 0
         self.layout_key, self.active_indices, self.distance_field = None, (), None
 
+    def reset_cache(self):
+        # Lifecycle reset only. Do not change kernel, search, rank or ESDF policy.
+        self.cache_key,self.cached_snapshot,self.cached_proposal=None,None,None
+        self.layout_key,self.active_indices,self.distance_field=None,(),None
+
     def _empty(self, snapshot, reason):
         return GraspProposal(f"{snapshot.snapshot_id}:none",snapshot.snapshot_id,snapshot.generation,snapshot.window_end,
-            (),None,reason,snapshot.context,self.geofence.provenance(),self.kernel.kernel_id)
+            (),None,reason,snapshot.context,self.geofence.provenance(),self.kernel.kernel_id,
+            surface_session_id=snapshot.surface_session_id)
 
     def publication_gate(self, proposal, snapshot, now, age, context):
         """Recheck after expensive computation, not just when computation started."""
@@ -163,7 +170,7 @@ class GraspPlanner:
                 or math.acos(float(np.clip((np.trace(a[:3,:3].T@b[:3,:3])-1)/2,-1,1)))
                 > self.config['maximum_stationary_transform_rotation_delta_rad']+1e-12):
             return self._empty(snapshot,'SPATIAL_MOTION_EXCEEDS_STATIONARY_WINDOW')
-        cache_key = (snapshot.snapshot_id,snapshot.generation,snapshot.disturbance_counter,
+        cache_key = (snapshot.surface_session_id,snapshot.snapshot_id,snapshot.generation,snapshot.disturbance_counter,
                      snapshot.context.lineage_key,self.config_hash,getattr(recent,'counter',0))
         if cache_key == self.cache_key and snapshot is self.cached_snapshot:
             self.cache_hit_count += 1
@@ -324,6 +331,6 @@ class GraspPlanner:
             reason += '|BOUNDED_SHORTLIST|GLOBAL_OPTIMUM_NOT_PROVEN'
         self.cached_proposal = GraspProposal(f"{snapshot.snapshot_id}:proposal",snapshot.snapshot_id,snapshot.generation,snapshot.window_end,
             tuple(candidates),selected,reason,snapshot.context,g.provenance(),self.kernel.kernel_id,
-            False,complete,proven,tuple(c.candidate_id for c in accepted))
+            False,complete,proven,tuple(c.candidate_id for c in accepted),snapshot.surface_session_id)
         self.cache_key,self.cached_snapshot = cache_key,snapshot
         return self.cached_proposal

@@ -3,6 +3,8 @@ std_msgs/Header header
 uint8 validity
 string reason
 string event_id
+# Bind delayed synthetic/replay events to the producer they invalidate.
+string surface_session_id
 uint64 source_counter
 string source_type
 string map_id

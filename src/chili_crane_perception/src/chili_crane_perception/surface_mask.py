@@ -79,8 +79,8 @@ class SurfaceMasks:
 
 class PitSurfaceBuilder:
     """Gate, transform, mask, then accumulate once in the authoritative grid."""
-    def __init__(self, config, semantic):
-        self.grid = PitSurfaceGrid(config, semantic)
+    def __init__(self, config, semantic, surface_session_id=None):
+        self.grid = PitSurfaceGrid(config, semantic, surface_session_id)
         self.masks = SurfaceMasks(config)
         self.masked_count = 0
 
@@ -90,7 +90,11 @@ class PitSurfaceBuilder:
                 raise ValueError("GRAB_MASK_MISSING")
             t = context.validate(self.grid.config,self.grid.semantic,frame["frame_id"],frame["epoch"],now)
             polygon = grab.validate(context,now,self.grid.config["frame_ttl_sec"])
-            if abs(frame["epoch"]-grab.epoch) > self.grid.config["maximum_grab_mask_time_skew_sec"]:
+            mid = frame['mid_epoch']
+            if (type(mid) not in (int,float) or not math.isfinite(mid) or mid <= 0
+                    or not 0 <= now-mid <= self.grid.config['frame_ttl_sec']):
+                raise ValueError('FRAME_MID_EPOCH_INVALID_OR_STALE')
+            if abs(mid-grab.epoch) > self.grid.config["maximum_grab_mask_time_skew_sec"]:
                 raise ValueError("GRAB_MASK_TIME_ALIGNMENT_REJECTED")
             p = np.asarray(xyz, dtype=float)
             if p.ndim != 2 or p.shape[1] != 3 or not 0 < len(p) <= self.grid.config["maximum_input_points"]:

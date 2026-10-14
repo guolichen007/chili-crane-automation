@@ -165,6 +165,7 @@ def main():
             snapshot=received['snapshot']
             original_generation=snapshot.status.surface_generation
             event=SurfaceDisturbance(validity=4,reason='SYNTHETIC_NOT_EXECUTION',event_id='installed-event',source_counter=1,
+                surface_session_id=snapshot.surface_session_id,
                 source_type='SYNTHETIC',map_id=ctx.map_id,semantic_version=ctx.semantic_version,pit_id=ctx.pit_id,
                 transform_id=ctx.transform_id,kernel_id=c['kernel']['kernel_id'],footprint=copy.deepcopy(selected.footprint))
             event.header.frame_id='map';event.header.stamp=node.get_clock().now().to_msg()

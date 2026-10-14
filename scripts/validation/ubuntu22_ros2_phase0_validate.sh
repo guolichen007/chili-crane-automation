@@ -69,6 +69,7 @@ timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-di
 bash scripts/validation/rviz_installation_smoke.sh "$workspace" "$run_dir/rviz" | tee "$run_dir/rviz-smoke-result.txt"
 timeout 45s python3 tools/validate_phase2a_ros.py --evidence-dir "$run_dir/phase2a-normal" | tee "$run_dir/phase2a-normal-result.json"
 timeout 65s python3 tools/validate_phase2b_ros.py --evidence-dir "$run_dir/phase2b-normal" | tee "$run_dir/phase2b-normal-result.json"
+timeout 150s python3 tools/validate_phase2b_r11_ros.py --evidence-dir "$run_dir/phase2b-r11-normal" | tee "$run_dir/phase2b-r11-normal-result.json"
 sh scripts/validation/rviz_phase2b_smoke.sh "$workspace" "$run_dir/phase2b-rviz"
 # Independent install tree catches executable modes hidden by normal install copies.
 colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$workspace/src" \
@@ -90,6 +91,7 @@ colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$
   timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-dir "$run_dir/symlink-phase1c"
   timeout 45s python3 tools/validate_phase2a_ros.py --evidence-dir "$run_dir/phase2a-symlink"
   timeout 65s python3 tools/validate_phase2b_ros.py --evidence-dir "$run_dir/phase2b-symlink"
+  timeout 150s python3 tools/validate_phase2b_r11_ros.py --evidence-dir "$run_dir/phase2b-r11-symlink"
 ) 2>&1 | tee "$run_dir/symlink-executables-and-transport.log"
 ros2 launch chili_crane_bringup mock_system.launch.py > "$run_dir/mock-launch.log" 2>&1 &
 launch_pid=$!

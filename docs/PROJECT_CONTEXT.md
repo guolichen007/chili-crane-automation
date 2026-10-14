@@ -1,5 +1,16 @@
 # Project Context
 
+## Phase2B-R1.1 最终软件封板（2026-10-14）
+
+用户授权基于8ee41886dfb8d084b2b01d505b770c98bf2fefde建立codex/phase2b-final-seal-r1-1。
+范围仅两个P1：真正点时间MID_SCAN的Grab遮罩共时，以及surface producer进程session/restart身份。
+HEADER继续FIRST_POINT身份；MID_SCAN从合并点timestamp的min/max计算，不改dual LiDAR/PTP/vendor。
+surface_session_id进入status/snapshot/proposal/cache；新session先清空旧状态，再验证新鲜空间证明。
+所有冻结算法、Phase2A门限、SemanticMap V1、Geofence v2保持不变；不扩搜索/ESDF/payload/performance算法。
+当前实施与精确SHA CI验收见[Phase2B-R1.1软件封板验收](validation/Phase2B-R1.1软件封板验收.md)。
+只有两安装树与完整旧回归全部通过才标SEALED_SOFTWARE_SHADOW_NOT_FIELD；不继续Phase2B-R1.2。
+剩余任务仅FIELD gate或另行授权的Phase2C。PHYSICAL disturbance仍不接入，四控制flags保持false。
+
 ## Phase2B-R1 FIELD-readiness（2026-10-13）
 
 用户授权从ac0dec1d589d92ab8215d1a0f7b5207762bddbd4建立codex/phase2b-field-readiness-r1。

@@ -2,6 +2,7 @@
 import copy
 from pathlib import Path
 import time
+import uuid
 import numpy as np
 import yaml
 import rclpy
@@ -19,6 +20,7 @@ from chili_crane_slam.pointcloud import CANONICAL,validate_points
 from .surface_mask import PitSurfaceBuilder,GrabMask
 from .surface_disturbance import SurfaceDisturbanceTracker,SurfaceGraspEvent
 from .surface_transport import seconds,stamp,context_from_message,snapshot_to_message,SOURCE_IDS
+from .surface_time import scan_epochs
 
 QOS=QoSProfile(depth=1,reliability=ReliabilityPolicy.BEST_EFFORT)
 # Raw sensors and rapidly expiring evidence remain sensor-compatible. Large
@@ -53,9 +55,7 @@ def decode_cloud(m,maximum):
         raise ValueError('CANONICAL_XYZIRT_REQUIRED')
     p=np.ndarray((m.height,m.width),dtype=CANONICAL,buffer=m.data,strides=(m.row_step,32)).reshape(-1).copy()
     validate_points(p)
-    epoch=seconds(m.header.stamp)
-    if not p['timestamp'].min() <= epoch <= p['timestamp'].max():
-        raise ValueError('MID_SCAN_EPOCH_MISMATCH')
+    scan_epochs(seconds(m.header.stamp),p['timestamp'],p['sensor_id'])
     return p
 
 
@@ -79,11 +79,12 @@ def line_marker(header,xy,identifier,color,z=0.):
 class PitSurfaceShadowNode(Node):
     def __init__(self):
         super().__init__('pit_surface_shadow_node')
+        self.surface_session_id=uuid.uuid4().hex
         self.config,self.builder,self.disturbance={},None,None
         self.error='NOT_CONFIGURED'
         try:
             self.config,semantic=configure(self)
-            self.builder=PitSurfaceBuilder(self.config,semantic)
+            self.builder=PitSurfaceBuilder(self.config,semantic,self.surface_session_id)
             self.disturbance=SurfaceDisturbanceTracker(self.config)
         except (OSError,ValueError,TypeError,KeyError) as exc:
             self.error=str(exc)
@@ -92,6 +93,7 @@ class PitSurfaceShadowNode(Node):
         self.last_receive=None
         self.last_grab=None
         self.last_event=None
+        self.last_scan_mid_epoch=0.
         self.last_snapshot_message=None
         self.last_published_generation=-1
         self.next_debug=0.
@@ -118,6 +120,8 @@ class PitSurfaceShadowNode(Node):
         try:
             if m.validity != 4:
                 raise ValueError('DISTURBANCE_VALIDITY_REJECTED')
+            if m.surface_session_id != self.surface_session_id:
+                raise ValueError('DISTURBANCE_SESSION_MISMATCH')
             event=SurfaceGraspEvent(m.event_id,m.source_counter,seconds(m.header.stamp),m.source_type,
                 m.map_id,m.semantic_version,m.pit_id,m.transform_id,m.kernel_id,
                 tuple((p.x,p.y) for p in m.footprint.points))
@@ -130,7 +134,8 @@ class PitSurfaceShadowNode(Node):
 
     def tick(self):
         if self.builder is None:
-            status=PitSurfaceStatus(validity=1,reason=self.error,valid_for_control=False,spatial_eligible=False,evidence_age_sec=1e9)
+            status=PitSurfaceStatus(validity=1,reason=self.error,valid_for_control=False,spatial_eligible=False,
+                                    evidence_age_sec=1e9,surface_session_id=self.surface_session_id)
             status.evidence.validity=1;status.evidence.evidence_age_sec=1e9
             self.status_pub.publish(status)
             return
@@ -185,11 +190,16 @@ class PitSurfaceShadowNode(Node):
                     tuple((p.x,p.y) for p in geometry.conservative_footprint.points),geometry.bottom_lower_bound_m,
                     geometry.top_upper_bound_m,max(geometry.evidence_age_sec,time.monotonic()-grab_arrival),geometry.extrinsic_state)
                 points=decode_cloud(cloud,c['maximum_input_points'])
+                timing=scan_epochs(epoch,points['timestamp'],points['sensor_id'])
+                if timing.mid_epoch <= self.last_scan_mid_epoch:
+                    raise ValueError('POINT_TIME_FRAME_REGRESSION')
                 frame=dict(epoch=epoch,source_counter=int(meta.source_counter),frame_id=cloud.header.frame_id,
-                    span_sec=float(np.ptp(points['timestamp'])),source_type=ctx.source_type,calibration_id=meta.calibration_id)
+                    mid_epoch=timing.mid_epoch,frame_start_epoch=timing.start_epoch,frame_end_epoch=timing.end_epoch,
+                    span_sec=timing.span_sec,source_type=ctx.source_type,calibration_id=meta.calibration_id)
                 if b.ingest(np.c_[points['x'],points['y'],points['z']],points['sensor_id'],frame,ctx,grab,now):
                     self.last_receive=arrival
                     self.last_grab=grab
+                    self.last_scan_mid_epoch=timing.mid_epoch
             except (ValueError,TypeError,KeyError,AttributeError) as exc:
                 b.grid.clear(str(exc))
         elif self.last_receive is None or time.monotonic()-self.last_receive > c['frame_ttl_sec']:

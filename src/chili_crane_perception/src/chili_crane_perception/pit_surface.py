@@ -4,9 +4,11 @@ from dataclasses import dataclass, replace
 import hashlib
 import json
 import math
+import uuid
 from time import perf_counter
 import numpy as np
 from shapely.geometry import Point, Polygon, box
+from .surface_session import snapshot_identity,valid_session_id
 
 
 def number(value, name, positive=False):
@@ -129,10 +131,14 @@ class SurfaceSnapshot:
     observed_cell_count: int = 0
     support_qualified_cell_count: int = 0
     dual_supported_cell_count: int = 0
+    surface_session_id: str = ''
 
 
 class PitSurfaceGrid:
-    def __init__(self, config, semantic):
+    def __init__(self, config, semantic, surface_session_id=None):
+        self.surface_session_id = uuid.uuid4().hex if surface_session_id is None else surface_session_id
+        if not valid_session_id(self.surface_session_id):
+            raise ValueError('SURFACE_SESSION_ID_INVALID')
         self.config = json.loads(json.dumps(config, allow_nan=False))
         self.semantic = json.loads(json.dumps(semantic, allow_nan=False))
         c, s = self.config, self.semantic
@@ -350,7 +356,8 @@ class PitSurfaceGrid:
         self.stage_ms["slope_roughness"] = (perf_counter()-tick)*1000
         starts = [e for e, _, _ in self.frames]
         end = max(starts, default=self.last_epoch)
-        snapshot_id = f"{self.config_hash[:12]}:{self.generation}:{self.context.key[:12] if self.context else 'unknown'}"
+        snapshot_id = snapshot_identity(self.surface_session_id,self.generation,self.config_hash,
+                                        self.context.key if self.context else 'unknown')
         observed = [v for v in cells if v.observed and self.pit_active_cell_mask[v.index]]
         qualified = [v for v in observed if math.isfinite(v.slope)
                      and v.height_uncertainty <= c["max_height_dispersion_m"]
@@ -360,5 +367,5 @@ class PitSurfaceGrid:
             tuple(cells), self.origin, self.resolution, self.width, self.height,
             "DEGRADED" if starts else "STALE", self.reason, self.config_hash,False,
             self.last_disturbance_id,self.disturbance_counter,self.pit_active_cell_count,len(observed),
-            len(qualified),sum(v.sensor_support_mask == 3 for v in qualified))
+            len(qualified),sum(v.sensor_support_mask == 3 for v in qualified),self.surface_session_id)
         return self._snapshot_cache

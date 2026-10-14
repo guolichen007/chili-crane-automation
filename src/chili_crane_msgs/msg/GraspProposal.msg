@@ -7,6 +7,7 @@ string map_id
 string semantic_version
 string pit_id
 string surface_snapshot_id
+string surface_session_id
 uint64 surface_generation
 string transform_id
 string spatial_calibration_id

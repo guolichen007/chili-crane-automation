@@ -149,3 +149,31 @@ Windows byte count为NATIVE_JSON_DIAGNOSTIC_NOT_DDS；Ubuntu installed测实际R
 旧八类安全计数和新增五类反证均要求0；ROS installed另验证世代快照静默、缓存age增长、旧DDS世代不重算。
 installed专用NON_PRODUCTION时间profile为frame TTL 2s/surface TTL 2.5s/window 3s/最多2帧，
 将共享runner中的缓存暂停与自然窗口淘汰分开；停止输入expiry仍单独断言。native原0.7s与FIELD null不变。
+
+## R1.1 时间锚点与进程session收口
+
+本轮只改时间共时与生命周期，不改上述统计/候选/ranking/ESDF/proxy算法。
+上游canonical header为FIRST_POINT；merged header为两header最大值，保持原ROS/evidence/frame.epoch身份。
+surface_time.scan_epochs从canonical point timestamps求start=min、end=max、mid=start+(end-start)/2。
+header落在点范围内仅证明HEADER范围合法，不证明MID_SCAN。Grab测量与frame.mid_epoch比较skew；
+未显式提供mid_epoch拒绝，绝不退回header。每sensor内部时间regression/nonfinite与后继帧mid回退拒绝。
+无插值/预测，仅真实latest Grab测量；FIRST_POINT Grab即使TTL fresh，只要半跨度超过skew也拒绝。
+
+producer进程UUID hex surface_session_id贯穿PitSurfaceStatus、PitSurfaceSnapshot、snapshot_id、
+GraspProposal provenance与planner cache。snapshot_id=session:config前12位:generation:lineage前12位；
+wire内外session一致且ID组合正确，仍独立验证完整hash、context与freshness。
+新session清latest/缓存/floors/pending，再以valid/fresh/provenance/context建立基线。137→1不是旧世代。
+同session已见更高无效世代也清latest，不准较低旧snapshot复活。旧session重放不续arrival、不重算cache。
+TL迟加入只保留一个pending，context晚到仍使用原到达时间和原measurement epoch；不能续龄冒充新观测。
+退役session拒绝集合有界128项，容量耗尽fail-closed而非LRU淘汰。完全消费者重启仍依赖TTL/空间证明，非认证系统。
+disturbance ROS session绑定拒绝跨session旧事件；核心PHYSICAL拒绝策略不变。
+所有扩展ROS消息需生产者/消费者同步重建。独立installed脚本validate_phase2b_r11_ros.py
+使用未修改DualLidarMerger与80/100ms扫描、两个FIRST_POINT相差4ms，真实geometry测量戳在点时间mid。
+单scan regression/nonfinite、FIRST_POINT Grab、旧但fresh Grab均拒绝；surface-only/planner-only/both重启验证恢复。
+planner-only验证保留的TL快照，无新cloud/snapshot，仅重传epoch不变且age增长的真实context。
+专用NON_PRODUCTION启动profile frame5s/surface6s/window6s/max2frames/span.12s，原R1期限/现场null不变。
+原R1性能三workload与全部反证保留，冻结算法AST与基线比较。FIELD性能不由CI合成P95升级。
+
+SEARCH_TRUNCATED/GLOBAL_OPTIMUM_NOT_PROVEN保持；search completeness != safety eligibility。
+是否允许truncated candidate进入控制留后续control admission policy，当前输出仍valid_for_control=false。
+最终证据见[软件封板验收](../validation/Phase2B-R1.1软件封板验收.md)，只封软件shadow，不封现场或执行链。

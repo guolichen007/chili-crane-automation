@@ -71,3 +71,29 @@ DDS实现可能阻塞，现场吞吐/网络/丢包另验。事件若丢失，不
 性能分FAST_REJECT/FULL_VALID_PROPOSAL/DENSE_SURFACE，逐stage P50/P95/MAX及payload/容量统计。
 Windows JSON diagnostic byte count不是DDS；Ubuntu实跑CDR。64/256/1024格是NON_PRODUCTION容量样本，
 不把消息上限100000格当作生产默认频率。所有生产新数字null；现场组合缺口不扩算法、不升级状态。
+
+## R1.1 amendment：两个P1的最终软件封板（2026-10-14）
+
+基线8ee41886dfb8d084b2b01d505b770c98bf2fefde；冻结全部料面统计、候选搜索/排序、ESDF与proxy策略。
+R1的“MID_SCAN共时”意图不等于header落在点范围内。上游canonical header保持FIRST_POINT，
+merged header=max(两个FIRST_POINT)，不改PTP/dual LiDAR。Phase2B单独计算点时间min/max及
+mid=min+(max-min)/2；frame.epoch保留header/evidence identity，frame.mid_epoch专用于Grab共时。
+每雷达点时间非递减；两雷达拼接产生的跨sensor时间回退不是单scan regression。
+nonfinite、单scan regression、后继帧MID_SCAN回退、header超点范围均fail-closed；名称明确区分header和mid。
+latest-only真实Grab测量保留；超过skew拒绝，不插值、不预测、不以arrival伪造measurement。
+
+surface producer启动时生成一次UUID hex surface_session_id，不随clear/expire/世代变化。
+snapshot_id=session:config前12位:generation:lineage前12位；独立字段还校验完整config与lineage。
+status/snapshot/proposal及cache均绑定session。新session先清空latest/cache/floors/pending event与代际假设，
+再校验真实snapshot的freshness、完整空间context与provenance，允许137→1。
+同session收到更高generation即使无效也阻断旧latest；已见代际不允许后续回退或重复样本续龄。
+迟加入的TRANSIENT_LOCAL最新snapshot可在真实context后到时保持一个有界pending，原arrival不重置。
+已退役session集合最多128项，不LRU淘汰以免复活旧session；耗尽fail-closed，需显式重启消费者。
+session是生命周期身份，不是签名/认证。节点完全重启后不能仅凭ID证明跨进程恶意重放历史，仍需freshness与空间证据。
+SurfaceDisturbance消息增加session绑定以拒绝延迟旧事件；核心仍SYNTHETIC/REPLAY only，PHYSICAL执行证据链留Phase2C。
+消息扩展为breaking wire变更，全体消费者重建，禁止旧新消息混跑。
+
+search completeness != safety eligibility。SEARCH_TRUNCATED/GLOBAL_OPTIMUM_NOT_PROVEN保持；
+未来truncated candidate能否进入控制由另行control admission policy决定，本轮不授权。
+normal/symlink installed三种真实节点重启、旧session/世代反证、80–100ms真实点时间结构必须通过；
+完整Phase2A/旧入口/vendor不缩减，三控制topic仍0。全部通过后软件封板，FIELD仍NOT_RUN，无Phase2B-R1.2。

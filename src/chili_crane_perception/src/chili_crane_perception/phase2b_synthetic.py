@@ -83,6 +83,6 @@ def scene(grid,name,rng=None):
 
 
 def ingest(builder,p,sensors,context,grab,epoch,counter):
-    return builder.ingest(p,sensors,dict(epoch=epoch,source_counter=counter,frame_id=context.source_frame,span_sec=.02,
+    return builder.ingest(p,sensors,dict(epoch=epoch,mid_epoch=epoch,source_counter=counter,frame_id=context.source_frame,span_sec=.02,
         source_type=context.source_type,calibration_id=context.calibration_id),replace(context,measurement_epoch=epoch),
         replace(grab,epoch=epoch),epoch+.01)
