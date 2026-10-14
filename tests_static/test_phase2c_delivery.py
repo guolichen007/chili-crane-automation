@@ -23,7 +23,7 @@ class DeliveryTests(unittest.TestCase):
         spec=importlib.util.spec_from_file_location('phase2c_acceptance',ROOT/'tools/validate_phase2c_synthetic.py')
         module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
         result=module.validate()
-        self.assertEqual(len(result['scenarios']),4)
+        self.assertEqual(len(result['scenarios']),6)
         self.assertFalse(any(result['counters'].values()))
         cases={c['scenario']:c for c in result['scenarios']}
         self.assertEqual(cases['SUCCESSFUL_GRASP']['payload_after_lift'],'PAYLOAD_CONFIRMED')

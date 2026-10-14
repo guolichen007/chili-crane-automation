@@ -110,7 +110,7 @@ class ConsoleBackend:
                 BENCH_DO_STATUS='NOT_RUN',FULL_AUTO='NOT_RUN',context=dict(self.context),remote=dict(self.last_remote),
                 bench_enabled=self.bench.enabled,bench_label='ISOLATED BENCH ONLY / 隔离台架专用',bench_last=self.bench.last,
                 devices={k:dict(v,transport_residence_sec=max(0.,time.monotonic()-v['received_monotonic'])) for k,v in self.devices.items()},
-                events=list(self.timeline),plot_samples=list(self.samples),recording_profile=self.config.get('recording_profile','state_only'))
+                events=list(self.timeline),plot_samples=list(self.samples),**self.bag.status())
 
     def shutdown(self):
         try:self.release('CONSOLE_SHUTDOWN')

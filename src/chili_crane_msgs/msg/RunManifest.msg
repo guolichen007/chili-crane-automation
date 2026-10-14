@@ -24,5 +24,10 @@ string schema_version
 string phase
 string recording_profile
 bool recording_enabled
+# recording_enabled is a compatibility alias for rosbag_enabled, never JSONL.
+bool journal_enabled
+bool rosbag_configured
+bool rosbag_enabled
+bool rosbag_process_alive
 string rosbag_storage_id
 bool recording_capacity_configured

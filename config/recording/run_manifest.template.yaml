@@ -1,5 +1,11 @@
 config_state: NOT_CONFIGURED
-contract_version: 2
+contract_version: 3
+journal_enabled: false
+rosbag_configured: false
+rosbag_enabled: false
+rosbag_process_alive: false
+recording_enabled: false
+recording_profile: NOT_CONFIGURED
 run_id: NOT_CONFIGURED
 task_id: NOT_CONFIGURED
 cycle_id: NOT_CONFIGURED

@@ -100,7 +100,8 @@ def main():
             'value','delta','unit','load_state','motion','fault','event_types','abort_required','next_cycle_surface_ready',
             'refresh_ready','invalidation_acknowledged','observation_enabled','qualified_cell_count','affected_cell_count',
             'map_id','semantic_version','pit_id','surface_session_id','surface_snapshot_id','spatial_calibration_id',
-            'geofence_id','geofence_version','kernel_id','load_features_json')
+            'geofence_id','geofence_version','kernel_id','load_features_json','gate_diagnostics_json',
+            'refreshed_cell_count','unknown_cell_count','observed_fraction','generation_ready')
         def mirror(topic,m):
             summary={name:getattr(m,name) for name in selected if hasattr(m,name)}
             if hasattr(m,'target_suspension_map'):
@@ -141,8 +142,8 @@ def main():
             nonlocal manifest_counter
             manifest_counter+=1
             m=RunManifest(validity=3,reason='COMMISSIONING_RECORD_NOT_FIELD_ACCEPTANCE',run_id=recorder.run_id,
-                git_sha=args.git_sha,config_hash=config_hash,schema_version='RUN_MANIFEST_V2',phase='2C',
-                recording_profile=config['recording_profile'],recording_enabled=True)
+                git_sha=args.git_sha,config_hash=config_hash,schema_version='RUN_MANIFEST_V3',phase='2C')
+            for key,value in backend.bag.status().items():setattr(m,key,value)
             m.header.stamp=ros_node.get_clock().now().to_msg();m.evidence.header=m.header
             m.started_stamp=started_stamp;m.task_id=backend.context['task_id'];m.cycle_id=backend.context['cycle_id']
             m.evidence.measurement_stamp=m.header.stamp;m.evidence.receive_stamp=m.header.stamp

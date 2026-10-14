@@ -17,6 +17,11 @@ string snapshot_id
 uint64 surface_generation
 uint32 affected_cell_count
 uint32 qualified_cell_count
+# New generation evidence is not a global planning permission.
+uint32 refreshed_cell_count
+uint32 unknown_cell_count
+float64 observed_fraction
+bool generation_ready
 bool invalidation_acknowledged
 bool observation_enabled
 bool refresh_ready

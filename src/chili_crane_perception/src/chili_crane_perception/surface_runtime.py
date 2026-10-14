@@ -293,6 +293,8 @@ class PitSurfaceShadowNode(Node):
             except (ValueError,TypeError,KeyError) as exc:
                 b.grid.clear(str(exc))
         snapshot=b.grid.snapshot(now)
+        if self.interaction_lifecycle is not None:
+            snapshot=self.interaction_lifecycle.planning_snapshot(snapshot,now)
         if snapshot.generation != self.last_published_generation:
             if self.interaction_lifecycle is not None:self.frozen_snapshot_history.append(snapshot)
             tick=time.perf_counter()

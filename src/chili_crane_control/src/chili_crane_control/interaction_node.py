@@ -1,5 +1,6 @@
 """Phase2C normalized evidence-only ROS node; no permit/command/output publisher."""
 from dataclasses import replace
+from collections import deque
 from pathlib import Path
 import time
 import yaml
@@ -11,12 +12,12 @@ from rclpy.qos import QoSProfile,ReliabilityPolicy,DurabilityPolicy
 from chili_crane_msgs.msg import (TargetBinding,GraspInteractionState,GrabGeometrySafetyState,GrabState,
     HoistState,GrabIoState,LoadState,CycleStatus,GraspProposal,SurfaceInteractionEvidence,SurfaceRefreshEvidence,
     ContactEvidence,ClosureEvidence,PayloadEvidence,LiftEvidence,UnloadEvidence,UnloadSafeZone,UnloadingCartState,
-    PlanningSpatialContext)
+    PlanningSpatialContext,PitSurfaceStatus)
 from .grasp_interaction import GraspInteractionEngine,GrabObservation,HoistObservation,IoObservation,CartObservation,ZoneObservation
 from .load_features import LoadSample
 from .interaction_contracts import Evidence,require_observation_successor
 from .interaction_transport import (binding_from_message,binding_to_message,observation_evidence,ns,
-    result_to_message,refresh_from_message)
+    result_to_message,refresh_from_message,binding_from_proposal)
 from .cycle import CycleState
 
 QOS=QoSProfile(depth=1,reliability=ReliabilityPolicy.BEST_EFFORT)
@@ -36,6 +37,7 @@ class InteractionShadowNode(Node):
         self.declare_parameter('config_file','')
         self.config,self.engine={},None;self.error='NOT_CONFIGURED';self.inputs={};self.phase='SCAN';self.cycle_input=None
         self.cycle_error='CYCLE_INPUT_MISSING';self.refresh_generation_floor=0
+        self.proposal_history=deque(maxlen=32)
         try:
             self.config=yaml.safe_load(Path(self.get_parameter('config_file').value).read_text(encoding='utf-8'))
             semantic_file=self.config.get('semantic_map_file')
@@ -49,24 +51,63 @@ class InteractionShadowNode(Node):
         self.evidence_publishers={name:self.create_publisher(kind,'phase2c/'+name+'_evidence',STATE_QOS) for name,kind in kinds}
         self.create_subscription(TargetBinding,'phase2c/binding_request',self.bind,STATE_QOS)
         self.create_subscription(CycleStatus,'task/cycle_status',self.cycle,QOS)
+        self.create_subscription(PitSurfaceStatus,'perception/pit_surface_status',self.surface_status,QOS)
         for key,kind,topic,qos in (
                 ('geometry',GrabGeometrySafetyState,'perception/grab_geometry_safety',QOS),
                 ('grab',GrabState,'perception/grab_state',QOS),('hoist',HoistState,'hardware/hoist_state',QOS),
                 ('io',GrabIoState,'hardware/grab_io_state',QOS),('load',LoadState,'hardware/load_state',QOS),
-                ('proposal',GraspProposal,'planning/grasp_proposal_shadow',QOS),
                 ('context',PlanningSpatialContext,'planning/spatial_context',QOS),
                 ('refresh',SurfaceRefreshEvidence,'perception/surface_refresh_evidence',STATE_QOS),
                 ('cart',UnloadingCartState,'perception/unloading_cart_state',QOS),('zone',UnloadSafeZone,'planning/unload_safe_zone',QOS)):
             self.create_subscription(kind,topic,latest_callback(self.inputs,key),qos)
+        self.create_subscription(GraspProposal,'planning/grasp_proposal_shadow',self.proposal,STATE_QOS)
         self.create_timer(.05,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
 
     def now(self):return self.get_clock().now().nanoseconds/1e9
+
+    def surface_status(self,m):
+        if self.engine is None:return
+        try:
+            b=self.engine.binding
+            if b is not None and (m.map_id,m.semantic_version,m.pit_id,m.spatial_calibration_id,m.header.frame_id)!=(
+                    b.map_id,b.semantic_version,b.pit_id,b.spatial_calibration_id,b.evidence.frame_id):
+                raise ValueError('SURFACE_STATUS_LINEAGE_CONFLICT')
+            changed=self.engine.observe_surface_session(m.surface_session_id,observation_evidence(m),self.now())
+            if changed:
+                for key in ('refresh','proposal'):self.inputs.pop(key,None)
+                self.proposal_history.clear()
+                self.refresh_generation_floor=0
+                self.error='NEW_SESSION_FULL_RESCAN_REQUIRED'
+        except ValueError as exc:
+            self.error=str(exc)
+
+    def proposal(self,m):
+        if self.engine is not None and self.engine.surface_session_id not in (None,m.surface_session_id):return
+        self.inputs['proposal']=(m,time.monotonic())
+        self.proposal_history.append((m,time.monotonic()))
 
     def bind(self,m):
         if self.engine is None:return
         try:
             b=binding_from_message(m)
+            matches=[(p,arrival) for p,arrival in self.proposal_history if p.proposal_id==b.proposal_id
+                     and p.surface_session_id==b.surface_session_id]
+            if not matches:raise ValueError('BINDING_REQUIRES_FRESH_SCAN_PROPOSAL')
+            proposal,arrival=matches[-1]
+            pe=observation_evidence(proposal,time.monotonic()-arrival)
+            if not pe.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type']):
+                raise ValueError('BINDING_PROPOSAL_STALE')
+            expected=binding_from_proposal(proposal,b.run_id,b.task_id,b.cycle_id,b.cycle_index,b.binding_epoch_ns/1e9)
+            if any(getattr(expected.evidence,k)!=getattr(b.evidence,k) for k in
+                   ('epoch_ns','counter','source_type','calibration_id','config_version','frame_id','validity')):
+                raise ValueError('BINDING_PROPOSAL_SOURCE_IDENTITY_CONFLICT')
+            # Publication residence/receive stamps are bookkeeping, not a new
+            # candidate. Both evidence ages are checked independently above.
+            expected=replace(expected,evidence=b.evidence,binding_digest_sha256='')
+            if expected.binding_digest_sha256!=b.binding_digest_sha256:
+                raise ValueError('BINDING_REQUIRES_CURRENT_PHASE2B_HARD_GATE_CANDIDATE')
             self.engine.bind(b,self.now());self.binding_pub.publish(binding_to_message(b))
+            self.inputs.pop('refresh',None)
             self.cycle_input=None;self.cycle_error='CYCLE_INPUT_MISSING';self.refresh_generation_floor=b.surface_generation
             self.error='SHADOW_ONLY'
         except (ValueError,TypeError,KeyError,AttributeError) as exc:
@@ -77,6 +118,9 @@ class InteractionShadowNode(Node):
         try:
             b=self.engine.binding;e=observation_evidence(m)
             ttl=self.config.get('evidence_ttl_sec') or 0.
+            if m.run_id!=b.run_id and self.engine.active_cycle:
+                self.engine.session_conflict=True
+                raise ValueError('RUN_SWAP_DURING_ACTIVE_CYCLE_ABORT_REQUIRED')
             if (m.run_id!=b.run_id or m.task_id!=b.task_id or m.cycle_id!=b.cycle_id or m.cycle_index!=b.cycle_index
                     or not e.fresh(self.now(),ttl,self.config['source_type'])):
                 raise ValueError('CYCLE_BINDING_IDENTITY_OR_FRESHNESS_CONFLICT')
@@ -84,6 +128,7 @@ class InteractionShadowNode(Node):
             old_state=self.cycle_input[0].state if self.cycle_input else None
             require_observation_successor(previous,old_state,e,m.state)
             self.phase=CycleState(m.state).name;self.cycle_input=(m,time.monotonic())
+            if self.phase in ('COMPLETE','ABORTED'):self.engine.last_phase=self.phase
             self.cycle_error=''
         except (ValueError,TypeError,KeyError,AttributeError) as exc:self.cycle_error='CYCLE_'+str(exc)
 
@@ -152,7 +197,14 @@ class InteractionShadowNode(Node):
                     or (context.map_id,context.semantic_version,context.pit_id,context.calibration_id)!=
                        (b.map_id,b.semantic_version,b.pit_id,b.spatial_calibration_id)):
                 raise ValueError('LIVE_SPATIAL_LINEAGE_STALE_OR_CONFLICT')
-            result=self.engine.evaluate(self.phase,g,h,i,l,self.now(),lineage,r,ca,zo)
+            next_candidate=None
+            try:
+                proposal,pe=self.input('proposal')
+                if pe.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type']):
+                    next_candidate=binding_from_proposal(proposal,b.run_id,b.task_id,b.cycle_id+':next',
+                                                         b.cycle_index+1,self.now())
+            except ValueError:pass
+            result=self.engine.evaluate(self.phase,g,h,i,l,self.now(),lineage,r,ca,zo,next_candidate)
             derived=replace(ge,calibration_id=b.spatial_calibration_id,config_version=self.config['config_version'])
             state=result_to_message(result,b,derived,self.config)
             self.state_pub.publish(state)

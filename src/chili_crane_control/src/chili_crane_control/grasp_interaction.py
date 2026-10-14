@@ -53,6 +53,11 @@ class RefreshedSurface:
     nominal: float
     ready: bool
     lineage: tuple
+    affected_cell_count: int = 0
+    refreshed_cell_count: int = 0
+    unknown_cell_count: int = 0
+    observed_fraction: float = 0.
+    generation_ready: bool = False
 
 
 @dataclass(frozen=True)
@@ -88,6 +93,7 @@ class InteractionResult:
     next_cycle_surface_ready: bool
     events: tuple = ()
     valid_for_control: bool = False
+    diagnostics: dict = field(default_factory=dict)
 
 
 class Persistence:
@@ -117,6 +123,8 @@ class GraspInteractionEngine:
         self.load=LoadFeatureEstimator(config['load'])
         self.motion=VerticalMotionEstimator(config['motion'])
         self.binding=None;self.last_phase=None;self.previous_interaction_generation=None
+        self.active_run_id=None;self.surface_session_id=None;self.session_conflict=False
+        self.rescan_required=False;self.session_epoch=0
         self.events=[]
         self.reset_cycle()
 
@@ -137,18 +145,60 @@ class GraspInteractionEngine:
             raise ValueError('BINDING_INPUT_STALE_OR_NOT_CONFIGURED')
         if not 0 <= now-binding.binding_epoch_ns/1e9 <= self.config['evidence_ttl_sec']:
             raise ValueError('BINDING_EVENT_TIME_INVALID')
-        if self.binding is not None and self.last_phase not in (CycleState.COMPLETE.name,CycleState.ABORTED.name):
+        if self.active_cycle and binding.run_id!=self.active_run_id:
+            self.session_conflict=True
+            raise ValueError('RUN_SWAP_DURING_ACTIVE_CYCLE_ABORT_REQUIRED')
+        if self.active_cycle and binding.surface_session_id!=self.surface_session_id:
+            self.session_conflict=True
+            raise ValueError('SURFACE_RESTART_DURING_ACTIVE_CYCLE_ABORT_REQUIRED')
+        if self.active_cycle:
             raise ValueError('ACTIVE_CYCLE_CANNOT_REBIND')
+        if self.surface_session_id is not None and binding.surface_session_id!=self.surface_session_id:
+            raise ValueError('NEW_SESSION_REQUIRES_FRESH_SCAN')
+        if self.binding is not None and binding.cycle_id==self.binding.cycle_id:
+            raise ValueError('NEW_CYCLE_ID_REQUIRED')
         if self.binding is not None and self.committed and (
-                binding.surface_session_id!=self.binding.surface_session_id
-                or binding.surface_generation<=self.binding.surface_generation
-                or self.last_refresh is None or not self.last_refresh.ready
+                binding.surface_generation<=self.binding.surface_generation
+                or self.last_refresh is None or not (self.last_refresh.generation_ready or self.last_refresh.ready)
                 or not self.last_refresh.evidence.fresh(now,self.config['evidence_ttl_sec'],self.config['source_type'])
                 or binding.surface_generation<self.last_refresh.surface_generation):
             raise ValueError('NEXT_CYCLE_REQUIRES_POST_INTERACTION_NEW_SURFACE')
-        self.binding=self.ledger.bind(binding);self.reset_cycle();self.last_phase=CycleState.PLAN_PICK.name
+        new_run=binding.run_id!=self.active_run_id
+        ledger=self.ledger if not new_run else BindingLedger(self.config['maximum_bindings'])
+        self.binding=ledger.bind(binding);self.ledger=ledger;self.active_run_id=binding.run_id
+        if new_run:self.load=LoadFeatureEstimator(self.config['load'])
+        self.surface_session_id=binding.surface_session_id;self.session_conflict=False
+        self.rescan_required=False
+        self.reset_cycle();self.last_phase=CycleState.PLAN_PICK.name
         self.events.append('TARGET_BOUND')
         return binding
+
+    @property
+    def active_cycle(self):
+        return self.binding is not None and self.last_phase not in ('COMPLETE','ABORTED')
+
+    def observe_surface_session(self,session,evidence,now):
+        """Only fresh producer status can open a terminal-session full rescan."""
+        import re
+        if (re.fullmatch('[0-9a-f]{32}',session or '') is None
+                or not evidence.fresh(now,self.config['evidence_ttl_sec'],self.config['source_type'])):
+            raise ValueError('SURFACE_SESSION_STATUS_STALE_OR_INVALID')
+        if evidence.epoch_ns<self.session_epoch:raise ValueError('SURFACE_SESSION_STATUS_CHRONOLOGY_CONFLICT')
+        self.session_epoch=evidence.epoch_ns
+        if self.surface_session_id in (None,session):
+            self.surface_session_id=session;return False
+        if self.active_cycle:
+            self.session_conflict=True
+            raise ValueError('SURFACE_RESTART_DURING_ACTIVE_CYCLE_ABORT_REQUIRED')
+        if any(v.surface_session_id==session for v in self.ledger.bindings.values()):
+            raise ValueError('RETIRED_SURFACE_SESSION_REJECTED')
+        self.surface_session_id=session;self.session_conflict=False
+        self.rescan_required=True
+        self.reset_cycle();self.load=LoadFeatureEstimator(self.config['load'])
+        self.events=['SURFACE_SESSION_RESTART_FULL_RESCAN']
+        # Keep the terminal binding for audit/identity, never compare generations
+        # across sessions. It is not an active binding after the terminal state.
+        return True
 
     def _fresh(self,observation,now,geometry=False):
         c=self.config
@@ -192,6 +242,16 @@ class GraspInteractionEngine:
         return True
 
     def _empty(self,phase,reason,abort=False):
+        diagnostic_keys=('closure_confirmed','interaction_committed','bound_clear','raise_seen','vertical_velocity',
+            'vertical_acceleration','vertical_settled','load_sensor_valid','load_sensor_fresh','load_baseline_valid',
+            'load_source_calibration_allowed','load_delta','normalized_delta','robust_zscore','settling_window_valid',
+            'payload_gate_pass','refresh_generation','affected_cell_count','refreshed_cell_count','unknown_cell_count',
+            'refresh_observed_fraction','updated_clear','source_type','source_counter')
+        diagnostics=dict.fromkeys(diagnostic_keys,None)
+        diagnostics.update(gate_evaluation='NOT_EVALUATED',reason=reason,
+            surface_session_id=self.binding.surface_session_id if self.binding else None,
+            bound_generation=self.binding.surface_generation if self.binding else None,
+            cycle_id=self.binding.cycle_id if self.binding else None,binding_id=self.binding.binding_id if self.binding else None)
         return InteractionResult(phase,reason,abort,dict(state='CONTACT_UNKNOWN'),
             dict(state='INTERACTION_COMMITTED' if self.committed else 'NO_INTERACTION',
                  interaction_id=(self.binding.binding_id+':interaction') if self.binding else '',
@@ -199,11 +259,12 @@ class GraspInteractionEngine:
                  swept=tuple(self.swept)),dict(state='CLOSURE_UNKNOWN'),dict(state='PAYLOAD_UNKNOWN'),
             dict(clear_of_bound_surface=False,clear_of_updated_surface=False,clear_of_material_surface=False,
                  clear_of_pit=False,safe_lift_height=False,refresh_ready=False),dict(state='UNLOAD_UNKNOWN'),
-            self.load.features,False,(),False)
+            self.load.features,False,(),False,diagnostics)
 
-    def evaluate(self,phase,grab,hoist,io,load,now,lineage=None,refresh=None,cart=None,zone=None):
+    def evaluate(self,phase,grab,hoist,io,load,now,lineage=None,refresh=None,cart=None,zone=None,next_candidate=None):
         phase=phase.name if isinstance(phase,CycleState) else phase
         if phase not in CycleState.__members__:return self._empty(str(phase),'CYCLE_STATE_UNKNOWN',True)
+        if self.rescan_required:return self._empty(phase,'NEW_SESSION_FULL_RESCAN_REQUIRED')
         self.last_phase=phase
         start=len(self.events);c,b=self.config,self.binding
         if b is None:return self._empty(phase,'TARGET_BINDING_MISSING')
@@ -213,6 +274,7 @@ class GraspInteractionEngine:
         if phase=='ABORTED':
             if 'CYCLE_ABORTED' not in self.events[start:]:self.events.append('CYCLE_ABORTED')
             return self._empty(phase,'CYCLE_ABORTED',True)
+        if self.session_conflict:return self._empty(phase,'SURFACE_OR_RUN_CONFLICT_ABORT_REQUIRED',True)
         required=('maximum_evidence_skew_sec','contact_persistence_sec','penetration_depth_m','penetration_persistence_sec',
                   'collapse_margin_m','bound_clearance_margin_m','updated_clearance_margin_m','minimum_observed_rise_m',
                   'maximum_stable_velocity_mps','maximum_stable_acceleration_mps2','payload_settling_sec',
@@ -289,35 +351,60 @@ class GraspInteractionEngine:
                     and rise>=c['minimum_observed_rise_m'])
         bound_clear=(self.committed and rise_order and hoist.motion in ('UP','STOPPED')
                      and grab.bottom_lower-b.surface_upper_m>=c['bound_clearance_margin_m'])
-        refresh_ok=(refresh is not None and refresh.ready and refresh.binding_id==b.binding_id
+        generation_ok=(refresh is not None and (refresh.generation_ready or refresh.ready) and refresh.binding_id==b.binding_id
                     and refresh.binding_digest==b.binding_digest_sha256 and refresh.lineage==b.lineage
                     and refresh.surface_session_id==b.surface_session_id and refresh.surface_generation>b.surface_generation
                     and refresh.evidence.epoch>self.commit_epoch
                     and refresh.evidence.calibration_id==b.spatial_calibration_id
                     and refresh.evidence.frame_id==b.evidence.frame_id
-                    and refresh.evidence.fresh(now,c['evidence_ttl_sec'],c['source_type'])
+                    and refresh.evidence.fresh(now,c['evidence_ttl_sec'],c['source_type']))
+        refresh_ok=(generation_ok and refresh.ready
                     and all(math.isfinite(v) for v in (refresh.lower,refresh.nominal,refresh.upper))
                     and refresh.lower<=refresh.nominal<=refresh.upper)
-        updated_clear=(bound_clear and refresh_ok and grab.bottom_lower-refresh.upper>=c['updated_clearance_margin_m'])
-        self.last_refresh=refresh if refresh_ok else None
+        updated_clear=(bound_clear and refresh_ok and refresh.unknown_cell_count==0
+                       and grab.bottom_lower-refresh.upper>=c['updated_clearance_margin_m'])
+        self.last_refresh=refresh if generation_ok else None
+        next_plan_ready=bool(generation_ok and next_candidate is not None
+            and next_candidate.lineage==b.lineage and next_candidate.run_id==b.run_id
+            and next_candidate.cycle_id!=b.cycle_id and next_candidate.surface_generation>=refresh.surface_generation
+            and next_candidate.surface_generation>b.surface_generation
+            and next_candidate.evidence.fresh(now,c['evidence_ttl_sec'],c['source_type']))
         pit_state='FIELD_VALIDATED' if c['source_type']=='PHYSICAL' else 'SYNTHETIC_VALIDATED'
         pit_elevation=self._pit_elevation()
         pit_config=(c.get('pit_geometry_state')==pit_state and pit_elevation is not None
                     and configured_number(c,'pit_clearance_margin_m',True) and configured_number(c,'safe_lift_height_m',True))
         pit_clear=bool(pit_config and updated_clear and grab.bottom_lower-pit_elevation>=c['pit_clearance_margin_m'])
         safe_height=bool(pit_clear and grab.bottom_lower>=c['safe_lift_height_m'])
-        settled=(motion.valid and grab.motion_stable and stopped
+        vertical_settled=(motion.valid and grab.motion_stable and stopped
                  and abs(motion.velocity)<=c['maximum_stable_velocity_mps']
-                 and abs(motion.acceleration)<=c['maximum_stable_acceleration_mps2']
-                 and features.fresh and features.settling_sec>=c['payload_settling_sec'])
+                 and abs(motion.acceleration)<=c['maximum_stable_acceleration_mps2'])
+        settling_window_valid=features.fresh and features.settling_sec>=c['payload_settling_sec']
+        settled=vertical_settled and settling_window_valid
+        calibrated=features.calibration_confirmed_for_source and configured_number(c['load'],'payload_normalized_threshold',True)
+        delta=features.delta*c['load']['load_polarity']
+        loaded=(delta>=c['load']['payload_abs_threshold']
+                and features.normalized_delta*c['load']['load_polarity']>=c['load']['payload_normalized_threshold'])
+        diagnostics=dict(closure_confirmed=closure=='CLOSURE_CONFIRMED',interaction_committed=self.committed,
+            gate_evaluation='EVALUATED',
+            bound_clear=bound_clear,raise_seen=rise_order,vertical_velocity=motion.velocity,
+            vertical_acceleration=motion.acceleration,vertical_settled=vertical_settled,
+            load_sensor_valid=features.fresh,load_sensor_fresh=features.fresh,load_baseline_valid=features.baseline_valid,
+            load_source_calibration_allowed=calibrated,load_delta=features.delta,normalized_delta=features.normalized_delta,
+            robust_zscore=features.normalized_delta,settling_window_valid=settling_window_valid,payload_gate_pass=loaded,
+            surface_session_id=b.surface_session_id,bound_generation=b.surface_generation,
+            refresh_generation=refresh.surface_generation if refresh else None,
+            affected_cell_count=refresh.affected_cell_count if refresh else 0,
+            refreshed_cell_count=refresh.refreshed_cell_count if refresh else 0,
+            unknown_cell_count=refresh.unknown_cell_count if refresh else 0,
+            refresh_observed_fraction=refresh.observed_fraction if refresh else 0.,updated_clear=updated_clear,
+            surface_refresh_ready=refresh_ok,next_plan_ready=next_plan_ready,
+            cycle_id=b.cycle_id,binding_id=b.binding_id,source_type=grab.evidence.source_type,
+            source_counter=grab.evidence.counter)
         payload='PAYLOAD_UNKNOWN'
         if closure=='CLOSURE_CONFLICT':payload='PAYLOAD_CONFLICT'
-        elif self.committed and closure=='CLOSURE_CONFIRMED' and rise_order and features.baseline_valid and features.fresh:
+        elif self.committed and closure=='CLOSURE_CONFIRMED' and rise_order:
             payload='PAYLOAD_CANDIDATE'
-            calibrated=features.calibration_confirmed_for_source and configured_number(c['load'],'payload_normalized_threshold',True)
-            if settled and updated_clear and calibrated:
-                delta=features.delta*c['load']['load_polarity']
-                loaded=delta>=c['load']['payload_abs_threshold'] and features.normalized_delta*c['load']['load_polarity']>=c['load']['payload_normalized_threshold']
+            if settled and bound_clear and features.baseline_valid and calibrated:
                 payload='PAYLOAD_CONFIRMED' if loaded else 'PAYLOAD_NOT_CONFIRMED'
                 if loaded:self.loaded_baseline=features.short_median
         # Payload is historical evidence after opening; unloading evaluates its
@@ -363,6 +450,7 @@ class GraspInteractionEngine:
                  opening_state=grab.opening_state,close_started=self.close_started or 0.),
             dict(state=payload,velocity=motion.velocity,acceleration=motion.acceleration,**{'rise':rise}),
             dict(clear_of_bound_surface=bound_clear,clear_of_updated_surface=updated_clear,clear_of_material_surface=updated_clear,
+                 updated_clear_state='CLEAR' if updated_clear else 'NOT_CLEAR' if refresh_ok and refresh.unknown_cell_count==0 else 'UNKNOWN',
                  clear_of_pit=pit_clear,safe_lift_height=safe_height,refresh_ready=refresh_ok,observed_rise=rise,
                  bound_clearance=grab.bottom_lower-b.surface_upper_m,updated_clearance=grab.bottom_lower-refresh.upper if refresh_ok else 0.,
                  pit_clearance=grab.bottom_lower-pit_elevation if pit_config else 0.,
@@ -371,7 +459,7 @@ class GraspInteractionEngine:
                  aligned=cart.aligned if cart is not None else False,not_full=not cart.full if cart is not None else False,
                  not_overflow=not cart.overflow if cart is not None else False,open_confirmed=open_ok,
                  station_id=cart.station_id if cart is not None else '',loaded_baseline=self.loaded_baseline or 0.,unload_delta=unload_delta),
-            features,bool(not self.committed or refresh_ok),emitted)
+            features,next_plan_ready,emitted,False,diagnostics)
 
 
 def evidence_allows_advance(cycles,result):

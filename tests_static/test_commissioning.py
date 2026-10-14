@@ -171,6 +171,7 @@ class CommissioningTests(unittest.TestCase):
         recorder=BagRecorder({},self.recorder,'crane_01',executable='ros2')
         with self.assertRaises(PermissionError):recorder.command('state_only')
         c=dict(config_state='VALID',enabled=True,storage_id='sqlite3',max_bag_size_bytes=1000000,max_bag_duration_sec=20,
+            global_recording_budget_bytes=10000000,minimum_free_space_bytes=0,retention_policy='STOP_ONLY',
             max_total_storage_bytes=2000000,max_recording_duration_sec=30,profiles={'state_only':{'topics':['phase2c/interaction_state']}})
         recorder=BagRecorder(c,self.recorder,'crane_01',executable='ros2')
         command=recorder.command('state_only');self.assertIn('--max-bag-size',command);self.assertIn('--max-bag-duration',command)

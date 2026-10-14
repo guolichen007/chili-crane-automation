@@ -8,6 +8,10 @@ max_bag_size_bytes: null
 max_bag_duration_sec: null
 max_total_storage_bytes: null
 max_recording_duration_sec: null
+# FIELD capacity remains NOT_CONFIGURED until measured by the owner.
+minimum_free_space_bytes: null
+global_recording_budget_bytes: null
+retention_policy: STOP_ONLY
 high_bandwidth:
   config_state: NOT_CONFIGURED
   enabled: false

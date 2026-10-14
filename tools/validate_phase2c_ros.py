@@ -8,6 +8,7 @@ import argparse
 import copy
 from dataclasses import replace
 import json
+import math
 import os
 from pathlib import Path
 import signal
@@ -20,6 +21,7 @@ import uuid
 
 import numpy as np
 import yaml
+from shapely.geometry import Polygon
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import PointCloud2
@@ -28,6 +30,7 @@ from chili_crane_msgs.msg import (EvidenceMetadata,GrabGeometrySafetyState,GrabC
     PitSurfaceSnapshot,GraspProposal,TargetBinding,GraspInteractionState,SurfaceRefreshEvidence,
     RemoteControlState,CommissioningShadowOutput,SafetyPermit,AuthorizedCommand,ActuationRequest)
 from chili_crane_perception.phase2b_synthetic import fixture,scene
+from chili_crane_perception.phase2c_synthetic import post_grab_observations
 from chili_crane_perception.pit_surface import PitSurfaceGrid
 from chili_crane_perception.surface_runtime import QOS,SNAPSHOT_QOS,PROPOSAL_QOS
 from chili_crane_perception.surface_transport import context_to_message,polygon,stamp,seconds
@@ -54,6 +57,7 @@ class InstalledRun:
             (self.directory/(name+'.yaml')).write_text(yaml.safe_dump(value),encoding='utf-8')
         self.node=Node('phase2c_installed_acceptance',namespace=self.namespace)
         self.received={};self.forbidden=[];self.subscriptions=[];self.history=[]
+        self.snapshot_history=[];self.invalidation_generation=None
         for kind,topic,key,qos in (
             (PitSurfaceSnapshot,'perception/pit_surface_snapshot','snapshot',SNAPSHOT_QOS),
             (GraspProposal,'planning/grasp_proposal_shadow','proposal',PROPOSAL_QOS),
@@ -66,6 +70,9 @@ class InstalledRun:
                 def callback(message):
                     self.received[key]=message
                     if key=='state':self.history.append(message)
+                    if key=='snapshot':self.snapshot_history.append(message)
+                    if key=='refresh' and message.invalidation_acknowledged and self.invalidation_generation is None:
+                        self.invalidation_generation=message.surface_generation
                 return callback
             self.subscriptions.append(self.node.create_subscription(kind,topic,callback_for(key),qos))
         for kind,topic in ((SafetyPermit,'safety/permit'),(AuthorizedCommand,'control/authorized_command'),
@@ -84,16 +91,15 @@ class InstalledRun:
             source_frame='sensor-'+str(i),target_frame=self.ctx.source_frame,rotation_matrix=np.eye(3).tolist(),translation_m=[0,0,0])) for i in (0,1)]
         self.merger=DualLidarMerger(*extrinsics);self.counter=0;self.binding=None;self.last_messages={}
         self.processes=[];self.logs=[];self.url=None
-        for package,executable,arguments in (
-            ('chili_crane_perception','pit_surface_shadow_node.py',['-p','config_file:='+str(self.directory/'surface.yaml'),
-                '-p','interaction_config_file:='+str(self.directory/'interaction.yaml')]),
-            ('chili_crane_perception','grasp_proposal_shadow_node.py',['-p','config_file:='+str(self.directory/'surface.yaml')]),
-            ('chili_crane_control','grasp_interaction_shadow_node.py',['-p','config_file:='+str(self.directory/'interaction.yaml')])):
-            self.start(package,executable,['--ros-args','-r','__ns:=/'+self.namespace]+arguments)
-        self.start('chili_crane_commissioning','commissioning_console.py',[
-            '--config',str(ROOT/'config/commissioning/console.yaml'),'--git-sha',subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
-            '--run-id','installed-run','--runs-directory',str(self.directory/'runs'),
-            '--crane-namespace',self.namespace,'--host','127.0.0.1','--port','0'])
+        self.hold_post_cloud=False;self.visibility='full';self.chains={}
+        log=(self.directory/'commissioning_console.py.log').open('w',encoding='utf-8');self.logs.append(log)
+        self.processes.append(subprocess.Popen(['ros2','launch','chili_crane_bringup','phase2c_shadow_stack.launch.py',
+            'namespace:='+self.namespace,'surface_config_file:='+str(self.directory/'surface.yaml'),
+            'interaction_config_file:='+str(self.directory/'interaction.yaml'),'commissioning:=true',
+            'commissioning_config_file:='+str(ROOT/'config/commissioning/console.yaml'),
+            'git_sha:='+subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+            'runs_directory:='+str(self.directory/'runs'),'commissioning_port:=0','commissioning_run_id:=installed-run'],
+            stdout=log,stderr=subprocess.STDOUT,start_new_session=True))
 
     def start(self,package,executable,arguments):
         assert executable in subprocess.check_output(['ros2','pkg','executables',package],text=True)
@@ -123,6 +129,12 @@ class InstalledRun:
                 load_features_json=state.load_features_json,clear_bound=state.lift.clear_of_bound_surface,
                 clear_updated=state.lift.clear_of_updated_surface,clear_pit=state.lift.clear_of_pit,
                 source_counter=state.evidence.source_counter)
+            diagnostics['gates']=json.loads(state.gate_diagnostics_json or '{}')
+            if not diagnostics['gates']:
+                prior=next((m for m in reversed(self.history) if m.gate_diagnostics_json),None)
+                if prior is not None:
+                    diagnostics['last_valid_gates']=json.loads(prior.gate_diagnostics_json)
+                    diagnostics['last_valid_gates_stamp']=seconds(prior.header.stamp)
         (self.directory/'timeout-diagnostics.json').write_text(json.dumps(diagnostics,indent=2)+'\n',encoding='utf-8')
         raise RuntimeError('Phase2C timeout '+json.dumps(diagnostics))
 
@@ -143,15 +155,23 @@ class InstalledRun:
         if self.binding and 'refresh' in self.received and self.received['refresh'].observation_enabled:
             # Actual new observations, no interpolation. Entire physical fixture
             # has changed height; only locally invalidated cells gate C refresh.
-            points[:,2]=.9
+            visible=post_grab_observations(points,self.binding,self.visibility)
+        else:visible=np.ones(len(points),dtype=bool)
         for sensor in (0,1):
-            values=points[self.sensors==sensor];p=np.zeros(len(values),dtype=CANONICAL)
+            values=points[(self.sensors==sensor)&visible];p=np.zeros(len(values),dtype=CANONICAL)
+            if len(p)==0:continue
             for i,k in enumerate(('x','y','z')):p[k]=values[:,i]
             p['sensor_id']=sensor;p['intensity']=20;p['timestamp']=np.linspace(first+sensor*.001,first+sensor*.001+.02,len(p))
             scans.append(Cloud(first+sensor*.001,time.monotonic(),'sensor-'+str(sensor),p,4))
-        merged=self.merger.merge(tuple(scans));cloud=cloud_message(merged)
-        timing=scan_epochs(seconds(cloud.header.stamp),merged.points['timestamp'],merged.points['sensor_id'])
-        assert abs(timing.header_epoch-max(s.stamp for s in scans))<1e-6
+        # No cloud when occluded, but normalized motion/load evidence continues.
+        if not scans:
+            first_scan=now-.04
+            timing=type('Timing',(),dict(header_epoch=first_scan,mid_epoch=first_scan+.01))()
+            cloud=PointCloud2();cloud.header.frame_id=self.ctx.source_frame;cloud.header.stamp=stamp(first_scan)
+        else:
+            merged=self.merger.merge(tuple(scans));cloud=cloud_message(merged)
+            timing=scan_epochs(seconds(cloud.header.stamp),merged.points['timestamp'],merged.points['sensor_id'])
+            assert abs(timing.header_epoch-max(s.stamp for s in scans))<1e-6
         epoch=timing.mid_epoch
         context=context_to_message(replace(self.ctx,measurement_epoch=timing.header_epoch))
         context.header=copy.deepcopy(cloud.header);context.evidence.header=copy.deepcopy(cloud.header)
@@ -186,6 +206,7 @@ class InstalledRun:
             geometry_version='synthetic-zone',flow_projection_verified=True),epoch,'synthetic-zone')
         for key,message in (('meta',meta),('context',context),('geometry',geometry),('clearance',clearance),('grab',grab),
             ('hoist',hoist),('io',io),('load',load),('cycle',cycle),('cart',cart),('zone',zone),('cloud',cloud)):
+            if key=='cloud' and (self.hold_post_cloud or not scans):continue
             self.pubs[key].publish(message);self.last_messages[key]=message
         self.spin(.1)
 
@@ -219,17 +240,57 @@ class InstalledRun:
             assert self.received['state'].payload.state!=self.received['state'].payload.PAYLOAD_CONFIRMED
         if not acceleration:
             expected=2 if value>100.5 else 3
-            self.wait(lambda:self.received['state'].payload.state==expected and self.received['state'].lift.clear_of_updated_surface,
+            self.hold_post_cloud=True
+            self.wait(lambda:self.received['state'].payload.state==expected,
+                timeout=9.,send=lambda:self.send('RAISE',opening=2,closed=True,opened=False,value=value))
+            assert not self.received['state'].lift.surface_refresh_ready
+            self.chains['PAYLOAD_CHAIN']='PASS' if expected==2 else 'EXPECTED_EMPTY_GRASP'
+            self.hold_post_cloud=False
+            if self.visibility!='full':return
+            self.wait(lambda:self.received['refresh'].generation_ready and self.received['refresh'].refresh_ready,
+                timeout=9.,send=lambda:self.send('RAISE',opening=2,closed=True,opened=False,value=value))
+            self.chains['SURFACE_REFRESH_CHAIN']='PASS'
+            self.wait(lambda:self.received['state'].lift.clear_of_updated_surface,
                 timeout=9.,send=lambda:self.send('RAISE',opening=2,closed=True,opened=False,value=value))
             r=self.received['refresh'];assert r.refresh_ready and r.surface_generation>self.binding.surface_generation
             assert r.qualified_cell_count==r.affected_cell_count
             assert self.received['state'].lift.clear_of_pit and self.received['state'].lift.safe_lift_height
+            self.wait(lambda:self.received['proposal'].surface_session_id==self.binding.surface_session_id
+                and self.received['proposal'].surface_generation>self.binding.surface_generation
+                and bool(self.received['proposal'].selected_candidate_id) and self.received['state'].next_cycle_surface_ready,
+                send=lambda:self.send('RAISE',opening=2,closed=True,opened=False,value=value))
+            self.chains['NEXT_PLAN_CHAIN']='PASS'
+
+    def visibility_recovery(self):
+        for _ in range(35):self.send('RAISE',opening=2,closed=True,opened=False,value=101.)
+        assert self.received['state'].payload.state==2
+        assert not self.received['proposal'].selected_candidate_id
+        if self.visibility=='partial':
+            r=self.received['refresh'];assert r.refreshed_cell_count>0 and r.unknown_cell_count>0
+        else:assert not self.received['refresh'].refresh_ready
+        self.visibility='recovery'
+        self.wait(lambda:self.received['proposal'].surface_generation>self.binding.surface_generation
+            and bool(self.received['proposal'].selected_candidate_id) and self.received['state'].next_cycle_surface_ready,
+            send=lambda:self.send('RAISE',opening=2,closed=True,opened=False,value=101.))
+        r=self.received['refresh'];assert r.generation_ready and r.unknown_cell_count>0
+        assert not self.received['state'].lift.clear_of_updated_surface
+        self.chains.update(SURFACE_REFRESH_CHAIN='PASS',NEXT_PLAN_CHAIN='PASS')
+
+    def old_sample_reuse_count(self):
+        assert self.invalidation_generation is not None
+        region=Polygon(self.binding.capture_footprint).buffer(self.ic['collapse_margin_m']/math.cos(math.pi/64),resolution=16)
+        affected={i for i,active in enumerate(self.grid.pit_active_cell_mask)
+                  if active and region.intersects(self.grid.cell_polygon(i))}
+        boundary=self.received['refresh'].observation_after_epoch
+        return sum(cell.observed and cell.index in affected and (boundary==0 or seconds(cell.last_observed_epoch)<=boundary)
+            for snapshot in self.snapshot_history if snapshot.status.surface_generation>=self.invalidation_generation
+            for cell in snapshot.cells)
 
     def http(self,path,body=None):
         if self.url is None:
             def ready():
                 text=(self.directory/'commissioning_console.py.log').read_text(encoding='utf-8')
-                self.url=next((s.split('=',1)[1] for s in text.splitlines() if s.startswith('LOCAL_URL=')),None)
+                self.url=next((s.split('LOCAL_URL=',1)[1].strip() for s in text.splitlines() if 'LOCAL_URL=' in s),None)
                 return bool(self.url)
             self.wait(ready)
         headers={}
@@ -273,7 +334,8 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--evidence-dir',type=Path,required=True);args=parser.parse_args()
     args.evidence_dir.mkdir(parents=True,exist_ok=True);rclpy.init();results=[]
     try:
-        for name in ('SUCCESSFUL_GRASP','FAILED_GRASP_AFTER_INTERACTION','LOAD_ACCELERATION_FALSE_POSITIVE'):
+        for name in ('SUCCESSFUL_GRASP','FAILED_GRASP_AFTER_INTERACTION','LOAD_ACCELERATION_FALSE_POSITIVE',
+                     'PARTIAL_POST_GRAB_VISIBILITY','POST_GRAB_OCCLUSION_THEN_RECOVERY'):
             run=InstalledRun(args.evidence_dir,name)
             try:
                 run.initialize()
@@ -288,7 +350,10 @@ def main():
                     evidence=replace(run.binding.evidence,epoch_ns=now_ns,reported_age=0.),binding_digest_sha256='')
                 run.pubs['binding'].publish(binding_to_message(attack));run.spin(.2)
                 assert run.received['binding'].binding_digest_sha256==run.binding.binding_digest_sha256
-                run.interact();run.lift(value=100. if name=='FAILED_GRASP_AFTER_INTERACTION' else 101.,
+                run.interact()
+                if name in ('PARTIAL_POST_GRAB_VISIBILITY','POST_GRAB_OCCLUSION_THEN_RECOVERY'):
+                    run.visibility='partial' if name=='PARTIAL_POST_GRAB_VISIBILITY' else 'occluded'
+                run.lift(value=100. if name=='FAILED_GRASP_AFTER_INTERACTION' else 101.,
                     acceleration=name=='LOAD_ACCELERATION_FALSE_POSITIVE')
                 payload=run.received['state'].payload.state
                 if name=='SUCCESSFUL_GRASP':
@@ -298,11 +363,16 @@ def main():
                 elif name=='LOAD_ACCELERATION_FALSE_POSITIVE':
                     assert not run.received['refresh'].refresh_ready
                     assert payload!=run.received['state'].payload.PAYLOAD_CONFIRMED
+                else:
+                    if name in ('PARTIAL_POST_GRAB_VISIBILITY','POST_GRAB_OCCLUSION_THEN_RECOVERY'):run.visibility_recovery()
                 assert not run.forbidden
+                reused=run.old_sample_reuse_count();assert reused==0
                 assert all(not m.valid_for_control and not m.contact.valid_for_control and not m.payload.valid_for_control for m in run.history)
                 results.append(dict(scenario=name,status='PASS_INSTALLED_SYNTHETIC',payload_after_lift=payload,
                     interaction_acknowledged=run.received['refresh'].invalidation_acknowledged,
-                    refresh_ready=run.received['refresh'].refresh_ready,control_topic_messages=len(run.forbidden)))
+                    refresh_ready=run.received['refresh'].refresh_ready,control_topic_messages=len(run.forbidden),
+                    unknown_cells=run.received['refresh'].unknown_cell_count,
+                    refreshed_cells=run.received['refresh'].refreshed_cell_count,old_samples_reused=reused,**run.chains))
             finally:run.close()
     finally:
         if rclpy.ok():rclpy.shutdown()

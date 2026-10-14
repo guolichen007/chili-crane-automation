@@ -150,14 +150,18 @@ class BindingLedger:
             raise ValueError('BINDING_LEDGER_BOUND_INVALID')
         self.maximum=maximum
         self.bindings={}
+        self.run_id=None
 
     def bind(self, binding):
+        if self.run_id is not None and binding.run_id!=self.run_id:
+            raise ValueError('BINDING_LEDGER_RUN_MISMATCH')
         key=(binding.run_id,binding.task_id,binding.cycle_id)
         if key in self.bindings:
             raise ValueError('TARGET_ALREADY_BOUND_ABORT_AND_NEW_CYCLE_REQUIRED')
         if len(self.bindings) >= self.maximum:
             raise ValueError('BINDING_LEDGER_CAPACITY_EXCEEDED')
         self.bindings[key]=binding
+        self.run_id=binding.run_id
         return binding
 
     def check_lineage(self, binding, lineage):

@@ -1,5 +1,6 @@
 """Phase2C local lifecycle adapter around the FROZEN Phase2B grid methods."""
 import math
+from dataclasses import replace
 import numpy as np
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
@@ -13,6 +14,7 @@ class SurfaceInteractionLifecycle:
         self.binding,self.frozen_snapshot=None,None
         self.affected=set();self.interaction_id='';self.interaction_epoch=0.
         self.observation_after=None;self.ready=False
+        self.generation_ready=False
         self.invalidated_generation=0;self.last_event_counter=-1
 
     def bind(self,binding,snapshot,now):
@@ -20,7 +22,7 @@ class SurfaceInteractionLifecycle:
             if self.binding.binding_digest_sha256!=binding.binding_digest_sha256:
                 raise ValueError('SURFACE_BINDING_SWAP_REJECTED')
             return
-        if self.interaction_id and not self.ready:
+        if self.interaction_id and not self.generation_ready:
             raise ValueError('PREVIOUS_INTERACTION_SURFACE_NOT_REFRESHED')
         ctx=snapshot.context
         if (ctx is None or snapshot.surface_session_id!=self.grid.surface_session_id
@@ -34,6 +36,7 @@ class SurfaceInteractionLifecycle:
         self.binding,self.frozen_snapshot=binding,snapshot
         self.affected=set();self.interaction_id='';self.interaction_epoch=0.
         self.observation_after=None;self.ready=False;self.last_event_counter=-1
+        self.generation_ready=False
 
     def interact(self,interaction_id,event_epoch,event_counter,footprints,evidence,now):
         b,c=self.binding,self.config
@@ -71,6 +74,7 @@ class SurfaceInteractionLifecycle:
             # after event time while its reliable notification was in flight.
             self.grid.invalidate(region,max(event_epoch,self.grid.last_epoch))
             self.affected|=indices;self.ready=False;self.observation_after=None
+            self.generation_ready=False
             self.invalidated_generation=self.grid.generation
         self.interaction_id=interaction_id;self.interaction_epoch=event_epoch
         self.last_event_counter=max(self.last_event_counter,evidence.counter)
@@ -108,7 +112,7 @@ class SurfaceInteractionLifecycle:
                and ctx.map_id==b.map_id and ctx.semantic_version==b.semantic_version and ctx.pit_id==b.pit_id
                and ctx.calibration_id==b.spatial_calibration_id and snapshot.window_end>self.observation_after
                and 0<=now-snapshot.window_end<=min(c['surface_ttl_sec'],self.config['evidence_ttl_sec']))
-        qualified=[]
+        qualified=[];self.qualified_indices=set()
         if valid:
             for i in self.affected:
                 v=snapshot.cells[i]
@@ -119,7 +123,11 @@ class SurfaceInteractionLifecycle:
                         and v.neighborhood_coverage>=c['minimum_neighborhood_coverage']
                         and v.roughness<=c['planning']['maximum_roughness_m'] and v.slope<=c['planning']['maximum_slope_rad']):
                     qualified.append(v)
-        self.ready=bool(valid and len(qualified)==len(self.affected))
+                    self.qualified_indices.add(i)
+        # Readiness describes a new observed generation, never global graspability.
+        # UNKNOWN remains explicit; the unchanged B planner owns local admission.
+        self.ready=bool(valid and qualified)
+        self.generation_ready=bool(valid)
         self.qualified_cell_count=len(qualified)
         # Unknown means no usable heights. Never interpolate or fill missing cells.
         upper=max((v.z_upper_bound for v in qualified),default=0.)
@@ -128,4 +136,20 @@ class SurfaceInteractionLifecycle:
         return RefreshedSurface(Evidence.at(snapshot.window_end,self.grid.last_counter,ctx.source_type if ctx else self.config['source_type'],
             b.spatial_calibration_id,c['config_version'],frame_id=b.evidence.frame_id,validity=4 if self.ready else 3,
             reported_age=max(0.,now-snapshot.window_end)),b.binding_id,b.binding_digest_sha256,snapshot.snapshot_id,
-            snapshot.generation,snapshot.surface_session_id,upper,lower,nominal,self.ready,b.lineage)
+            snapshot.generation,snapshot.surface_session_id,upper,lower,nominal,self.ready,b.lineage,
+            len(self.affected),len(qualified),len(self.affected)-len(qualified),
+            len(qualified)/len(self.affected),bool(valid))
+
+    def planning_snapshot(self,snapshot,now):
+        """Conservative C projection; frozen B statistics and stored samples stay intact."""
+        if not self.affected:return snapshot
+        from .pit_surface import SurfaceCell
+        self.refresh(snapshot,now)
+        cells=tuple(SurfaceCell(v.index) if v.index in self.affected and v.index not in self.qualified_indices
+                    else v for v in snapshot.cells)
+        observed=[v for v in cells if v.observed and self.grid.pit_active_cell_mask[v.index]]
+        qualified=[v for v in observed if math.isfinite(v.slope)
+                   and v.height_uncertainty<=self.grid.config['max_height_dispersion_m']
+                   and v.neighborhood_coverage>=self.grid.config['minimum_neighborhood_coverage']]
+        return replace(snapshot,cells=cells,observed_cell_count=len(observed),support_qualified_cell_count=len(qualified),
+                       dual_supported_cell_count=sum(v.sensor_support_mask==3 for v in qualified))

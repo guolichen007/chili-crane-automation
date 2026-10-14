@@ -13,6 +13,7 @@ string binding_id
 string binding_digest_sha256
 bool clear_of_bound_surface
 bool clear_of_updated_surface
+string updated_clear_state
 bool clear_of_material_surface
 bool clear_of_pit
 bool safe_lift_height

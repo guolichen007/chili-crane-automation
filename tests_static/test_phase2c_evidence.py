@@ -129,7 +129,7 @@ class EvidenceTests(unittest.TestCase):
     def test_load_not_configured_and_field_unknown_never_confirm(self):
         h=Harness();h.warm();h.interact()
         for _ in range(10):r=h.step('RAISE',opening='CLOSED',closed=True,opened=False,value=110.,load_validity=1,refresh=True)
-        self.assertEqual(r.payload['state'],'PAYLOAD_UNKNOWN')
+        self.assertEqual(r.payload['state'],'PAYLOAD_CANDIDATE')
         h=Harness();h.warm();h.interact();h.engine.config['load']['calibration_state']='NOT_CONFIGURED'
         h.engine.load.config['calibration_state']='NOT_CONFIGURED'
         r=h.lift();self.assertNotEqual(r.payload['state'],'PAYLOAD_CONFIRMED')
@@ -151,7 +151,9 @@ class EvidenceTests(unittest.TestCase):
     def test_updated_clear_requires_real_refresh_and_pit_calibration(self):
         h=Harness();h.warm();h.interact();r=h.lift(refresh=False)
         self.assertTrue(r.lift['clear_of_bound_surface']);self.assertFalse(r.lift['clear_of_updated_surface'])
-        self.assertNotEqual(r.payload['state'],'PAYLOAD_CONFIRMED')
+        self.assertEqual(r.payload['state'],'PAYLOAD_CONFIRMED')
+        self.assertFalse(r.next_cycle_surface_ready)
+        self.assertEqual(r.lift['updated_clear_state'],'UNKNOWN')
         h.engine.config['pit_geometry_state']='NOT_CONFIGURED'
         r=h.step('RAISE',opening='CLOSED',closed=True,opened=False,value=101.,refresh=True)
         self.assertFalse(r.lift['clear_of_pit'])

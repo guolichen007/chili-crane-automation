@@ -28,12 +28,23 @@ class RunRecorder:
         self.run_id,self.git_sha,self.config_hash=run_id,git_sha,config_hash
         self.lock=threading.RLock()
         self.ros_now=None
-        manifest=dict(schema_version='RUN_MANIFEST_V2',phase='2C',run_id=run_id,git_sha=git_sha,config_hash=config_hash,
+        manifest=dict(schema_version='RUN_MANIFEST_V3',phase='2C',run_id=run_id,git_sha=git_sha,config_hash=config_hash,
             recording_profile=profile,started_stamp=datetime.now(timezone.utc).isoformat(),
+            journal_enabled=True,rosbag_configured=False,rosbag_enabled=False,rosbag_process_alive=False,
+            recording_enabled=False,
             source_type='SIMULATED',physical_output_enabled=False,automatic_control_enabled=False,
             BENCH_DO_STATUS='NOT_RUN',FIELD_GRASP_VALIDATION='NOT_RUN',FULL_AUTO='NOT_RUN')
         with (self.directory/'manifest.json').open('x',encoding='utf-8',newline='\n') as stream:
             stream.write(json.dumps(manifest,ensure_ascii=False,sort_keys=True,indent=2)+'\n')
+
+    def recording_status(self,**status):
+        """Manifest is current status; the append-only journal preserves transitions."""
+        with self.lock:
+            path=self.directory/'manifest.json'
+            manifest=json.loads(path.read_text(encoding='utf-8'));manifest.update(status)
+            temporary=self.directory/'manifest.tmp'
+            temporary.write_text(json.dumps(manifest,ensure_ascii=False,sort_keys=True,indent=2)+'\n',encoding='utf-8',newline='\n')
+            temporary.replace(path)
 
     def append(self,name,event_type,source_type='SIMULATED',ros_timestamp=None,task_id='',cycle_id='',binding_id='',
                old_state='',new_state='',reason='',**details):

@@ -106,6 +106,7 @@ def result_to_message(result,b,e,config):
     m.task_cycle_state=result.phase;m.abort_required=result.abort_required
     m.next_cycle_surface_ready=result.next_cycle_surface_ready;m.event_types=list(result.events)
     m.load_features_json=json.dumps(asdict(result.load_features),sort_keys=True,allow_nan=False)
+    m.gate_diagnostics_json=json.dumps(result.diagnostics,sort_keys=True,allow_nan=False)
     contact=common(ContactEvidence(),b,e,result.contact['state'])
     contact.state=getattr(contact,result.contact['state'])
     for target,key in (('gap_lower_m','gap_lower'),('gap_upper_m','gap_upper'),('descending_verified','descending'),
@@ -136,6 +137,7 @@ def result_to_message(result,b,e,config):
     for name in ('clear_of_bound_surface','clear_of_updated_surface','clear_of_material_surface','clear_of_pit',
                  'safe_lift_height'):setattr(lift,name,bool(result.lift.get(name,False)))
     lift.surface_refresh_ready=bool(result.lift.get('refresh_ready',False))
+    lift.updated_clear_state=result.lift.get('updated_clear_state','UNKNOWN')
     for target,key in (('observed_rise_m','observed_rise'),('bound_clearance_m','bound_clearance'),
                        ('updated_clearance_m','updated_clearance'),('pit_clearance_m','pit_clearance')):
         setattr(lift,target,float(result.lift.get(key,0.)))
@@ -154,6 +156,8 @@ def refresh_to_message(r,lifecycle):
     m.interaction_id=lifecycle.interaction_id;m.surface_session_id=r.surface_session_id;m.snapshot_id=r.snapshot_id
     m.surface_generation=r.surface_generation;m.affected_cell_count=len(lifecycle.affected)
     m.qualified_cell_count=lifecycle.qualified_cell_count;m.invalidation_acknowledged=bool(lifecycle.interaction_id)
+    m.refreshed_cell_count=r.refreshed_cell_count;m.unknown_cell_count=r.unknown_cell_count
+    m.observed_fraction=r.observed_fraction;m.generation_ready=r.generation_ready
     m.observation_enabled=lifecycle.observation_after is not None;m.refresh_ready=r.ready
     m.observation_after_epoch=lifecycle.observation_after or 0.
     m.surface_lower_m,m.surface_nominal_m,m.surface_upper_m=r.lower,r.nominal,r.upper
@@ -163,8 +167,13 @@ def refresh_to_message(r,lifecycle):
 
 def refresh_from_message(m):
     if (m.valid_for_control or not m.invalidation_acknowledged or not m.observation_enabled
-            or m.qualified_cell_count!=m.affected_cell_count or m.affected_cell_count==0):
+            or m.affected_cell_count==0 or m.refreshed_cell_count!=m.qualified_cell_count
+            or m.refreshed_cell_count+m.unknown_cell_count!=m.affected_cell_count
+            or not 0<=m.observed_fraction<=1
+            or abs(m.observed_fraction-m.refreshed_cell_count/m.affected_cell_count)>1e-9
+            or m.refresh_ready and (not m.generation_ready or m.refreshed_cell_count==0)):
         raise ValueError('REFRESH_LOCAL_QUALITY_NOT_READY')
     return RefreshedSurface(observation_evidence(m),m.binding_id,m.binding_digest_sha256,m.snapshot_id,
         int(m.surface_generation),m.surface_session_id,m.surface_upper_m,m.surface_lower_m,m.surface_nominal_m,
-        bool(m.refresh_ready),tuple(m.binding_lineage))
+        bool(m.refresh_ready),tuple(m.binding_lineage),int(m.affected_cell_count),int(m.refreshed_cell_count),
+        int(m.unknown_cell_count),float(m.observed_fraction),bool(m.generation_ready))
