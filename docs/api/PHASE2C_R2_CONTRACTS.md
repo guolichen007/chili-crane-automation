@@ -70,6 +70,21 @@ validator 仅清理自己 start_new_session 创建的 PGID 与有自身 ownershi
 分别完成 normal 10/10、symlink 10/10 critical probes，再完成完整 R2 suite。
 没有延长 payload 9s、unload 10s 或 runner 300s。
 
+## R2.1 工程边界收口
+
+- **snapshot refresh 参数合同**：`GraspInteractionEngine` 将配置必需参数拆为
+  `COMMON_REQUIRED` 与 `LEGACY_REFRESH_REQUIRED`。snapshot 模式只要求当前 cycle 安全参数；
+  `collapse_margin_m`/`updated_clearance_margin_m` 仅 legacy 模式必需，快照模式下缺失不再
+  返回 `INTERACTION_PARAMETERS_NOT_CONFIGURED`。
+- **新 cycle GrabMask 时间边界**：`GrabMaskPairs.reset()` 在真正的新 cycle SCAN 时清空全部样本；
+  `closest()` 增加 `minimum_epoch_ns`，surface snapshot 路径传入当前 `scan_start_ns`，凡
+  `key_timestamp_ns <= scan_start_ns` 的 grab/clearance 一律不进入本轮扫描 mask（fail closed
+  `GRAB_MASK_TIME_ALIGNMENT_REJECTED`）。
+- **architecture_mode 一致性**：正式 R2 配置（surface/interaction）声明统一
+  `architecture_mode: SNAPSHOT_PER_CYCLE`（`surface_mode` 为 legacy 别名）。节点启动时
+  `cycle_snapshot_mode` 参数与配置 `architecture_mode` 必须一致，否则
+  `PHASE2C_ARCHITECTURE_MODE_MISMATCH` fail closed，不发布可用于 planning/grasp 的有效结果。
+
 GRAB_DESCENT_TARGET_Z_FIELD_CALIBRATION=NOT_RUN；proposal 的默认 z 不是有效生产下降目标。
 physical_output_enabled/automatic_control_enabled/camera_control_authority/valid_for_control 全为 false。
 GitHub 最多 PASS_CI_SOFTWARE_SHADOW_NOT_FIELD；本轮不封板、不执行 IPC/FIELD/ADAM DO/Phase2D。
