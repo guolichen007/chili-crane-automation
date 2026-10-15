@@ -13,7 +13,8 @@ from chili_crane_msgs.msg import (TargetBinding,GraspInteractionState,GrabGeomet
     HoistState,GrabIoState,LoadState,CycleStatus,GraspProposal,SurfaceInteractionEvidence,SurfaceRefreshEvidence,
     ContactEvidence,ClosureEvidence,PayloadEvidence,LiftEvidence,UnloadEvidence,UnloadSafeZone,UnloadingCartState,
     PlanningSpatialContext,PitSurfaceStatus)
-from .grasp_interaction import GraspInteractionEngine,GrabObservation,HoistObservation,IoObservation,CartObservation,ZoneObservation
+from .grasp_interaction import (GraspInteractionEngine,GrabObservation,HoistObservation,IoObservation,CartObservation,
+    ZoneObservation,check_architecture_mode)
 from .load_features import LoadSample
 from .interaction_contracts import Evidence,require_observation_successor
 from .interaction_transport import (binding_from_message,binding_to_message,observation_evidence,ns,
@@ -42,7 +43,8 @@ class InteractionShadowNode(Node):
         self.proposal_history=deque(maxlen=32)
         try:
             self.config=yaml.safe_load(Path(self.get_parameter('config_file').value).read_text(encoding='utf-8'))
-            if self.snapshot_mode:self.config['surface_mode']='SNAPSHOT_PER_CYCLE'
+            check_architecture_mode(self.snapshot_mode,self.config)
+            self.config['surface_mode']='SNAPSHOT_PER_CYCLE' if self.snapshot_mode else 'LEGACY_R1_ARCHITECTURE'
             semantic_file=self.config.get('semantic_map_file')
             semantic=yaml.safe_load(Path(semantic_file).read_text(encoding='utf-8')) if semantic_file else None
             self.engine=GraspInteractionEngine(self.config,semantic)

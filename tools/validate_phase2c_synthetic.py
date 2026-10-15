@@ -13,6 +13,7 @@ from chili_crane_perception.phase2c_synthetic import SyntheticInteractionRun
 
 def validate():
     config=yaml.safe_load((ROOT/'config/algorithms/phase2c_interaction.synthetic.yaml').read_text(encoding='utf-8'))
+    config['architecture_mode']='LEGACY_R1_ARCHITECTURE'
     config['surface_mode']='LEGACY_R1_ARCHITECTURE'
     results=[];counters={'TARGET_SWAP_ACCEPTED_COUNT':0,'ACCELERATION_PAYLOAD_CONFIRMED_COUNT':0,
         'INTERACTION_WITHOUT_LOCAL_INVALIDATION_COUNT':0,'OLD_GENERATION_NEXT_BIND_ACCEPTED_COUNT':0,

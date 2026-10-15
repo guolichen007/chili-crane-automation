@@ -43,7 +43,8 @@ class SnapshotRun:
         self.namespace='phase2c_r2_'+uuid.uuid4().hex[:12]
         self.cycles=TaskCycles('installed-run','installed-task')
         self.c,self.semantic,self.gc,self.ctx,self.initial_grab=fixture(ROOT/'config/safety/pit_operational_geofence.template.yaml')
-        self.c.update(frame_ttl_sec=2.,surface_ttl_sec=2.5,window_sec=3.,maximum_window_frames=4)
+        self.c.update(frame_ttl_sec=2.,surface_ttl_sec=2.5,window_sec=3.,maximum_window_frames=4,
+                      architecture_mode='SNAPSHOT_PER_CYCLE')
         self.ic=yaml.safe_load((ROOT/'config/algorithms/phase2c_interaction.synthetic.yaml').read_text(encoding='utf-8'))
         if missing_rim:self.ic['pit_geometry_state']='NOT_CONFIGURED'
         self.ic['semantic_map_file']=str(self.directory/'semantic.yaml')

@@ -31,7 +31,7 @@ class SnapshotHarness:
         self.t=10.;self.counter=1;self.binding=None;self.result=None
         self.xyz,self.sensors=scene(self.window.builder.grid,'flat')
         self.planner=GraspPlanner(self.c,OperationalGeofence(self.gc,self.semantic))
-        config=configuration();config['surface_mode']='SNAPSHOT_PER_CYCLE'
+        config=configuration();config['architecture_mode']='SNAPSHOT_PER_CYCLE';config['surface_mode']='SNAPSHOT_PER_CYCLE'
         self.engine=GraspInteractionEngine(config,self.semantic)
         self.observe_cycle()
 
@@ -220,6 +220,41 @@ class SnapshotCycleTests(unittest.TestCase):
         h=SnapshotHarness();h.scan();h.scan();_,b,p=h.proposal_and_binding()
         self.assertTrue(h.window.gate.accepts(p,h.t));h.window.gate.freeze(p.key)
         self.assertFalse(h.window.gate.accepts(p,h.t))
+
+    def test_snapshot_with_refresh_fields_unset(self):
+        # SNAPSHOT_WITH_REFRESH_FIELDS_UNSET: the dead legacy refresh margins must
+        # not gate snapshot-per-cycle startup/runtime.
+        h=SnapshotHarness()
+        h.engine.config.pop('collapse_margin_m',None)
+        h.engine.config.pop('updated_clearance_margin_m',None)
+        h.bind()
+        r=h.step()
+        self.assertNotEqual(r.reason,'INTERACTION_PARAMETERS_NOT_CONFIGURED')
+
+    def test_legacy_refresh_fields_unset_rejected(self):
+        # LEGACY_REFRESH_FIELDS_UNSET: legacy still fails closed without its own
+        # genuinely required refresh margins.
+        from test_phase2c_evidence import Harness as LegacyHarness
+        h=LegacyHarness()
+        h.config.pop('collapse_margin_m',None)
+        h.config.pop('updated_clearance_margin_m',None)
+        h.engine=GraspInteractionEngine(h.config)
+        h.engine.bind(h.binding,10.1)
+        h.step()
+        self.assertEqual(h.result.reason,'INTERACTION_PARAMETERS_NOT_CONFIGURED')
+
+    def test_mixed_r2_mode_configuration_rejected(self):
+        # MIXED_R2_MODE_CONFIGURATION: parameter vs config architecture_mode must
+        # match or the node fails closed instead of silently running mixed mode.
+        from chili_crane_control.grasp_interaction import check_architecture_mode,architecture_mode_from
+        with self.assertRaisesRegex(ValueError,'MISMATCH'):
+            check_architecture_mode(False,{'architecture_mode':'SNAPSHOT_PER_CYCLE'})
+        with self.assertRaisesRegex(ValueError,'MISMATCH'):
+            check_architecture_mode(True,{'architecture_mode':'LEGACY_R1_ARCHITECTURE'})
+        self.assertEqual(check_architecture_mode(True,{'architecture_mode':'SNAPSHOT_PER_CYCLE'}),'SNAPSHOT_PER_CYCLE')
+        self.assertEqual(check_architecture_mode(False,{'architecture_mode':'LEGACY_R1_ARCHITECTURE'}),'LEGACY_R1_ARCHITECTURE')
+        self.assertEqual(check_architecture_mode(True,{}),None)  # undeclared: caller default
+        self.assertEqual(architecture_mode_from({'surface_mode':'LEGACY_R1_ARCHITECTURE'}),'LEGACY_R1_ARCHITECTURE')
 
     def test_a_b_models_cycles_and_safety_authority_are_exact_base_bytes(self):
         paths=['src/chili_crane_control/src/chili_crane_control/'+n+'.py' for n in

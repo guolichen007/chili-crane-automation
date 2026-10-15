@@ -88,6 +88,8 @@ class PitSurfaceShadowNode(Node):
         try:
             self.config,semantic=configure(self)
             self.semantic=semantic
+            from chili_crane_control.grasp_interaction import check_architecture_mode
+            check_architecture_mode(self.snapshot_mode,self.config)
             self.builder=PitSurfaceBuilder(self.config,semantic,self.surface_session_id)
             self.disturbance=SurfaceDisturbanceTracker(self.config)
         except (OSError,ValueError,TypeError,KeyError) as exc:
@@ -163,6 +165,7 @@ class PitSurfaceShadowNode(Node):
                 self.latest=None;self.last_receive=None;self.last_scan_mid_epoch=0.
                 self.last_snapshot_message=None;self.last_published_generation=-1
                 self.inputs.pop('meta',None);self.inputs.pop('context',None)
+                self.mask_pairs.reset()
         except (ValueError,TypeError,KeyError) as exc:self.error=str(exc)
 
     def freeze_binding(self,m):
@@ -289,7 +292,8 @@ class PitSurfaceShadowNode(Node):
                 points=decode_cloud(cloud,c['maximum_input_points'])
                 timing=scan_epochs(epoch,points['timestamp'],points['sensor_id'])
                 (geometry,grab_arrival),(clearance,clear_arrival)=self.mask_pairs.closest(
-                    timing.mid_epoch,c['maximum_grab_mask_time_skew_sec'])
+                    timing.mid_epoch,c['maximum_grab_mask_time_skew_sec'],
+                    minimum_epoch_ns=self.cycle_gate.scan_start_ns)
                 if (geometry.validity not in (3,4) or clearance.validity not in (3,4)
                         or geometry.model_id in ('','UNKNOWN','NOT_CONFIGURED')
                         or geometry.geometry_version in ('','UNKNOWN','NOT_CONFIGURED')

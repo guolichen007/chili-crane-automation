@@ -6,6 +6,37 @@ from .cycle import CycleState
 from .interaction_contracts import Evidence, TargetBinding, BindingLedger
 from .load_features import LoadFeatureEstimator, VerticalMotionEstimator, configured_number
 
+# Snapshot-per-cycle R2 needs only the current-cycle safety contract. The two
+# legacy refresh margins below only gated the removed continuous
+# SurfaceRefreshEvidence / updated-surface path and must not block R2 startup.
+COMMON_REQUIRED = (
+    'maximum_evidence_skew_sec', 'contact_persistence_sec', 'penetration_depth_m',
+    'penetration_persistence_sec', 'bound_clearance_margin_m', 'minimum_observed_rise_m',
+    'maximum_stable_velocity_mps', 'maximum_stable_acceleration_mps2', 'payload_settling_sec',
+    'closure_persistence_sec', 'unload_persistence_sec',
+)
+LEGACY_REFRESH_REQUIRED = ('collapse_margin_m', 'updated_clearance_margin_m')
+
+ARCHITECTURE_MODES = ('SNAPSHOT_PER_CYCLE', 'LEGACY_R1_ARCHITECTURE')
+
+
+def architecture_mode_from(config):
+    """Unified R2 mode; ``surface_mode`` remains the legacy alias."""
+    return config.get('architecture_mode', config.get('surface_mode'))
+
+
+def check_architecture_mode(snapshot_mode, config):
+    """Reject a node whose ``cycle_snapshot_mode`` parameter contradicts the
+    declared config mode, instead of silently running a mixed-mode stack."""
+    mode = architecture_mode_from(config)
+    if mode is None:
+        return None  # No declared mode: caller keeps its own default.
+    if mode not in ARCHITECTURE_MODES:
+        raise ValueError('PHASE2C_ARCHITECTURE_MODE_NOT_CONFIGURED')
+    if bool(snapshot_mode) != (mode == 'SNAPSHOT_PER_CYCLE'):
+        raise ValueError('PHASE2C_ARCHITECTURE_MODE_MISMATCH')
+    return mode
+
 
 @dataclass(frozen=True)
 class GrabObservation:
@@ -126,8 +157,8 @@ class Persistence:
 class GraspInteractionEngine:
     def __init__(self,config,semantic=None):
         self.config=dict(config)
-        mode=config.get('surface_mode','LEGACY_R1_ARCHITECTURE')
-        if mode not in ('SNAPSHOT_PER_CYCLE','LEGACY_R1_ARCHITECTURE'):raise ValueError('SURFACE_MODE_NOT_CONFIGURED')
+        mode=architecture_mode_from(config) or 'LEGACY_R1_ARCHITECTURE'
+        if mode not in ARCHITECTURE_MODES:raise ValueError('SURFACE_MODE_NOT_CONFIGURED')
         self.snapshot_mode=mode=='SNAPSHOT_PER_CYCLE'
         self.semantic=semantic
         if any(config.get(k) is not False for k in ('physical_output_enabled','automatic_control_enabled',
@@ -324,10 +355,7 @@ class GraspInteractionEngine:
         if self.pit_exit is not None and self.evidence_phase is not None and CycleState[phase]<CycleState[self.evidence_phase]:
             return self._empty(phase,'CYCLE_EVIDENCE_PHASE_REGRESSION_CONFLICT',True)
         self.evidence_phase=phase
-        required=('maximum_evidence_skew_sec','contact_persistence_sec','penetration_depth_m','penetration_persistence_sec',
-                  'collapse_margin_m','bound_clearance_margin_m','updated_clearance_margin_m','minimum_observed_rise_m',
-                  'maximum_stable_velocity_mps','maximum_stable_acceleration_mps2','payload_settling_sec',
-                  'closure_persistence_sec','unload_persistence_sec')
+        required=COMMON_REQUIRED if self.snapshot_mode else COMMON_REQUIRED+LEGACY_REFRESH_REQUIRED
         if not all(configured_number(c,k,True) for k in required):return self._empty(phase,'INTERACTION_PARAMETERS_NOT_CONFIGURED')
         if grab is not None and (grab.extrinsic_id!=c.get('geometry_calibration_id')
                 or grab.evidence.frame_id!=b.evidence.frame_id or grab.evidence.source_type!=c.get('source_type')):

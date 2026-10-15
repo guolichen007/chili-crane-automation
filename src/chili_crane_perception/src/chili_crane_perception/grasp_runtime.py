@@ -27,6 +27,8 @@ class GraspProposalShadowNode(Node):
         self.snapshot_mode=bool(self.get_parameter('cycle_snapshot_mode').value)
         try:
             self.config,semantic=configure(self)
+            from chili_crane_control.grasp_interaction import check_architecture_mode
+            check_architecture_mode(self.snapshot_mode,self.config)
             geofence=OperationalGeofence(yaml.safe_load(Path(self.config['geofence_file']).read_text(encoding='utf-8')),semantic)
             self.planner=GraspPlanner(self.config,geofence)
             self.recent=SurfaceDisturbanceTracker(self.config)
