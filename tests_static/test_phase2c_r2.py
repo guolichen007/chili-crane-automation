@@ -120,6 +120,20 @@ class SnapshotHarness:
 
 
 class SnapshotCycleTests(unittest.TestCase):
+    def test_independent_scan_observers_preserve_producer_start_and_reject_old_window(self):
+        h=SnapshotHarness();h.bind();_,b,proof=h.proposal_and_binding()
+        consumer=SnapshotCycleGate('SYNTHETIC',2.)
+        # The later consumer did not receive the producer's first heartbeat.
+        joined=(proof.scan_start_ns+proof.window_start_ns)//2
+        e=Evidence.at(joined/1e9,2,calibration_id='synthetic-cycle')
+        observation=CycleObservation(e,b.run_id,b.task_id,b.cycle_id,b.cycle_index,CycleState.SCAN)
+        consumer.observe(observation,h.t)
+        self.assertNotEqual(consumer.scan_start_ns,proof.scan_start_ns)
+        self.assertTrue(consumer.accepts(proof,h.t))
+        self.assertEqual(proof.scan_start_ns,h.window.gate.scan_start_ns)
+        self.assertFalse(consumer.accepts(replace(proof,window_start_ns=joined),h.t))
+        self.assertFalse(consumer.accepts(replace(proof,scan_start_ns=proof.window_end_ns),h.t))
+
     def test_scan_build_snapshot_and_actual_phase2b_candidate(self):
         h=SnapshotHarness();b,p=h.bind()
         self.assertGreater(b.surface_generation,0);self.assertTrue(p.matches_binding(b,h.t,1.,'SYNTHETIC'))

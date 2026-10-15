@@ -145,6 +145,7 @@ class GraspProposalShadowNode(Node):
         self.pending_surface=None
 
     def event(self,m):
+        if self.snapshot_mode:return
         if self.planner is None or self.latest is None:
             return
         try:
@@ -209,8 +210,10 @@ class GraspProposalShadowNode(Node):
             output=self.serialized_proposal
             output.evidence.evidence_age_sec=age
             if self.snapshot_mode:
-                from chili_crane_control.snapshot_cycle_transport import annotate_cycle
-                self.cycle_gate.snapshot_ready=True;annotate_cycle(output,self.cycle_gate)
+                # Keep the surface producer's scan_start/window proof intact.
+                self.cycle_gate.snapshot_ready=True
+                output.surface_cycle_state=self.cycle_gate.state
+                output.observed_cycle_state=int(self.cycle_gate.cycle.phase)
             output.planning_compute_count=self.planner.compute_count
             output.planning_cache_hit_count=self.planner.cache_hit_count
             self.pub.publish(output)

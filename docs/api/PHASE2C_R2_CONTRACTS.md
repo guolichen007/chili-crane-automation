@@ -20,6 +20,9 @@ Surface status 的证据年龄仍按原 measurement epoch 增长，不以 heartb
 新 cycle 首次 SCAN 清空整个 builder window、cache 与规划资格，记录 scan_start。
 只接纳 scan_start 之后的完整新帧。同 producer session 的 generation 跨窗口单调增加。
 新 cycle_id/index 需要上一 cycle 的已观察 COMPLETE/ABORTED；不接受 active 偷换 binding。
+DDS 节点可在不同 SCAN heartbeat 加入。Surface 的 scan_start 是扫描来源，proposal 原样保留；
+每个消费者要求 window_start 同时晚于该来源起点与自身首次观察本 SCAN 的时刻，不比较两个接收时刻相等。
+晚加入时若窗口含更早帧，须等待这些帧退出窗口；不得改写起点或伪造 fresh。
 
 ## ScanProof 与 binding
 

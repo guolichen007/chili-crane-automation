@@ -93,8 +93,12 @@ class SnapshotCycleGate:
                 and self.cycle.phase in (CycleState.SCAN,CycleState.PLAN_PICK))
 
     def accepts(self,proof,now):
-        return (self.planning(now) and proof.key==self.cycle.key and proof.scan_start_ns==self.scan_start_ns
-                and 0<self.scan_start_ns<proof.window_start_ns<=proof.window_end_ns
+        # DDS observers can join on different SCAN heartbeats. The producer's
+        # scan_start is provenance; our first SCAN is an independent lower bound.
+        # Require the whole window after both, without rewriting producer proof.
+        return (self.planning(now) and proof.key==self.cycle.key
+                and 0<proof.scan_start_ns<proof.window_start_ns<=proof.window_end_ns
+                and self.scan_start_ns<proof.window_start_ns
                 and proof.evidence.epoch_ns==proof.window_end_ns
                 and proof.evidence.fresh(now,self.ttl,self.source))
 
