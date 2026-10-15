@@ -8,6 +8,9 @@ install(PROGRAMS scripts/fail_safe_safety_supervisor.py
 install(PROGRAMS scripts/grasp_interaction_shadow_node.py DESTINATION lib/${PROJECT_NAME})
 if(BUILD_TESTING)
   find_package(ament_cmake_pytest REQUIRED)
+  ament_add_pytest_test(phase2c_r2 ../../tests_static/test_phase2c_r2.py
+    TIMEOUT 180
+    APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_perception/src)
   ament_add_pytest_test(phase2c_contracts ../../tests_static/test_phase2c_contracts.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
   ament_add_pytest_test(phase2c_evidence ../../tests_static/test_phase2c_evidence.py

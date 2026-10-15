@@ -1,5 +1,18 @@
 # Project Context
 
+## Phase2C-R2 工程化快照周期（2026-10-15，当前授权）
+
+基线 7f8378d9e670c4145836264e268ce3a500a438a7；分支 codex/phase2c-r2-engineering-snapshot-cycle。
+当前指令 SUPERSEDES 下方 R1/R1.1/R1.2 连续料面生命周期的主链与 acceptance 要求，历史结论不改写。
+SCAN 一次 -> B snapshot/proposal -> PLAN_PICK/binding -> 整抓冻结料面 -> 当前抓 PIT_EXIT/UNLOAD/COMPLETE -> 下一 cycle 新 SCAN。
+SCAN 外禁止融合；SCAN/PLAN_PICK 外禁止有效规划。新 SCAN 清空旧窗口，携带 cycle identity/scan_start/window proof，拒绝旧料面复用。
+SurfaceInteractionLifecycle、partial refresh、updated_clear、next_plan 退出 R2 full-stack 主路径，不作为 binding 或当前抓 admission。
+原 TaskCycles、Phase2A 模型/算法、B grid/planner hard gates、geofence、硬件与安全授权不变。
+LiDAR cloud/meta/context 同帧束；独立高频 grab/IO/load 不覆写帧束。严格 pairing、owned PGID 清理、localhost/domain、normal/symlink 独立环境须验收。
+GRAB_DESCENT_TARGET_Z_FIELD_CALIBRATION=NOT_RUN：当前 proposal 仅形成 XY，真实下降 Z 等 CAD/reference/入料深度/坑底余量/Z 停止误差确认。
+同 exact HEAD 的 CI 全绿后最多 PASS_CI_SOFTWARE_SHADOW_NOT_FIELD；不得封板。IPC 在代码审查后再执行；FIELD/DO/FULL_AUTO=NOT_RUN。
+见 [ADR0014](decisions/ADR0014_Phase2C_R2工程化快照周期.md)。不 merge main，不进入 Phase2D。
+
 ## Phase2C-R1.2 最终窄修（2026-10-14，当前授权）
 
 BASE_SHA=7389e88a4f45268b302320e0f805ca5da953c166；新分支 codex/phase2c-r1-2-final-closeout。

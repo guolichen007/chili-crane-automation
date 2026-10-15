@@ -14,7 +14,9 @@ from chili_crane_control.cycle import TaskCycles,CycleState
 
 
 def configuration():
-    return yaml.safe_load((ROOT/'config/algorithms/phase2c_interaction.synthetic.yaml').read_text())
+    config=yaml.safe_load((ROOT/'config/algorithms/phase2c_interaction.synthetic.yaml').read_text())
+    config['surface_mode']='LEGACY_R1_ARCHITECTURE'  # Historical evidence regression, not R2 acceptance.
+    return config
 
 
 class Harness:

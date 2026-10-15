@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import os
 from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -38,11 +39,13 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(ast.literal_eval(next(k.value for k in declarations['commissioning'].keywords
                                                if k.arg=='default_value')),'false')
         text=ast.unparse(stack)
-        self.assertIn('interaction_config_file=interaction',text)
+        self.assertIn('cycle_snapshot_mode=True',text)
+        self.assertNotIn('interaction_config_file=interaction',text)
         self.assertNotIn('--enable-isolated-bench-output',text)
         for path in (ROOT/'src/chili_crane_bringup/launch').glob('*production*'):
             self.assertNotIn('commissioning',path.read_text(encoding='utf-8'))
 
+    @unittest.skipUnless(os.environ.get('CHILI_RUN_LEGACY_R1_ARCHITECTURE')=='1','LEGACY_R1_ARCHITECTURE refresh admission')
     def test_payload_confirmed_while_refresh_pending_and_old_generation_rejected(self):
         h=Harness();h.warm();h.interact();r=h.lift(refresh=False)
         self.assertEqual(r.payload['state'],'PAYLOAD_CONFIRMED')
@@ -111,6 +114,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(h.engine.active_run_id,'run')
 
 
+@unittest.skipUnless(os.environ.get('CHILI_RUN_LEGACY_R1_ARCHITECTURE')=='1','LEGACY_R1_ARCHITECTURE partial refresh')
 class VisibilityTests(unittest.TestCase):
     def run_visibility(self,visibility):
         run=SyntheticInteractionRun(configuration(),ROOT/'config/safety/pit_operational_geofence.template.yaml')

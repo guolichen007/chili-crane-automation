@@ -1,6 +1,7 @@
 config_state: SYNTHETIC_NON_PRODUCTION
 config_version: phase2c-synthetic-v1
 source_type: SYNTHETIC
+surface_mode: SNAPSHOT_PER_CYCLE
 semantic_map_file: null
 physical_output_enabled: false
 automatic_control_enabled: false

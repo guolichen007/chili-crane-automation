@@ -126,6 +126,9 @@ class Persistence:
 class GraspInteractionEngine:
     def __init__(self,config,semantic=None):
         self.config=dict(config)
+        mode=config.get('surface_mode','LEGACY_R1_ARCHITECTURE')
+        if mode not in ('SNAPSHOT_PER_CYCLE','LEGACY_R1_ARCHITECTURE'):raise ValueError('SURFACE_MODE_NOT_CONFIGURED')
+        self.snapshot_mode=mode=='SNAPSHOT_PER_CYCLE'
         self.semantic=semantic
         if any(config.get(k) is not False for k in ('physical_output_enabled','automatic_control_enabled',
                 'camera_control_authority','valid_for_control')):
@@ -152,7 +155,7 @@ class GraspInteractionEngine:
         for name in ('contact','closure','payload','unload'):setattr(self,'_last_'+name,None)
         self.motion=VerticalMotionEstimator(self.config['motion'])
 
-    def bind(self,binding,now):
+    def bind(self,binding,now,scan_proof=None):
         if not binding.evidence.fresh(now,self.config.get('evidence_ttl_sec') or 0.,self.config.get('source_type')):
             raise ValueError('BINDING_INPUT_STALE_OR_NOT_CONFIGURED')
         if not 0 <= now-binding.binding_epoch_ns/1e9 <= self.config['evidence_ttl_sec']:
@@ -171,7 +174,13 @@ class GraspInteractionEngine:
             raise ValueError('NEW_SESSION_REQUIRES_FRESH_SCAN')
         if self.binding is not None and binding.cycle_id==self.binding.cycle_id:
             raise ValueError('NEW_CYCLE_ID_REQUIRED')
-        if self.binding is not None and self.committed and (
+        if self.snapshot_mode:
+            if scan_proof is None or not scan_proof.matches_binding(binding,now,self.config['evidence_ttl_sec'],self.config['source_type']):
+                raise ValueError('BINDING_REQUIRES_CURRENT_CYCLE_NEW_SCAN_PROOF')
+            if (self.binding is not None and binding.surface_session_id==self.binding.surface_session_id
+                    and binding.surface_generation<=self.binding.surface_generation):
+                raise ValueError('NEXT_CYCLE_REQUIRES_NEW_SCAN_GENERATION')
+        elif self.binding is not None and self.committed and (
                 binding.surface_generation<=self.binding.surface_generation
                 or self.last_refresh is None or not (self.last_refresh.generation_ready or self.last_refresh.ready)
                 or not self.last_refresh.evidence.fresh(now,self.config['evidence_ttl_sec'],self.config['source_type'])
@@ -222,6 +231,7 @@ class GraspInteractionEngine:
 
     def consider_refresh(self,refresh,now):
         """Fresh next-scan evidence may arrive after the old owner is terminal."""
+        if self.snapshot_mode:return False
         b,c=self.binding,self.config
         valid=(b is not None and refresh is not None and (refresh.generation_ready or refresh.ready)
             and refresh.binding_id==b.binding_id and refresh.binding_digest==b.binding_digest_sha256
@@ -289,13 +299,14 @@ class GraspInteractionEngine:
         return InteractionResult(phase,reason,abort,dict(state='CONTACT_UNKNOWN'),
             dict(state='INTERACTION_COMMITTED' if self.committed else 'NO_INTERACTION',
                  interaction_id=(self.binding.binding_id+':interaction') if self.binding else '',
-                 epoch=self.commit_epoch,source_counter=self.commit_counter,invalidate=self.committed,
+                 epoch=self.commit_epoch,source_counter=self.commit_counter,invalidate=self.committed and not self.snapshot_mode,
                  swept=tuple(self.swept)),dict(state='CLOSURE_UNKNOWN'),dict(state='PAYLOAD_UNKNOWN'),
             dict(clear_of_bound_surface=False,clear_of_updated_surface=False,clear_of_material_surface=False,
                  clear_of_pit=False,safe_lift_height=False,pit_exit_confirmed=False,refresh_ready=False),dict(state='UNLOAD_UNKNOWN'),
             self.load.features,False,(),False,diagnostics)
 
     def evaluate(self,phase,grab,hoist,io,load,now,lineage=None,refresh=None,cart=None,zone=None,next_candidate=None):
+        if self.snapshot_mode:refresh=None;next_candidate=None
         phase=phase.name if isinstance(phase,CycleState) else phase
         if phase not in CycleState.__members__:return self._empty(str(phase),'CYCLE_STATE_UNKNOWN',True)
         if self.rescan_required:return self._empty(phase,'NEW_SESSION_FULL_RESCAN_REQUIRED')
@@ -392,7 +403,7 @@ class GraspInteractionEngine:
                     and rise>=c['minimum_observed_rise_m'])
         bound_clear=(self.committed and rise_order and hoist.motion in ('UP','STOPPED')
                      and grab.bottom_lower-b.surface_upper_m>=c['bound_clearance_margin_m'])
-        generation_ok=self.consider_refresh(refresh,now)
+        generation_ok=False if self.snapshot_mode else self.consider_refresh(refresh,now)
         refresh_ok=(generation_ok and refresh.ready
                     and all(math.isfinite(v) for v in (refresh.lower,refresh.nominal,refresh.upper))
                     and refresh.lower<=refresh.nominal<=refresh.upper)
@@ -436,6 +447,8 @@ class GraspInteractionEngine:
             and vertical_settled and settling_window_valid and features.fresh and features.baseline_valid and calibrated and loaded)
         diagnostics=dict(closure_confirmed=closure=='CLOSURE_CONFIRMED',interaction_committed=self.committed,
             gate_evaluation='EVALUATED',
+            surface_mode='SNAPSHOT_PER_CYCLE' if self.snapshot_mode else 'LEGACY_R1_ARCHITECTURE',
+            next_plan_reason='DEFERRED_TO_NEXT_SCAN' if self.snapshot_mode else 'LEGACY_REFRESH_PLANNING',
             bound_clear=bound_clear,raise_seen=rise_order,vertical_velocity=motion.velocity,
             vertical_acceleration=motion.acceleration,vertical_settled=vertical_settled,
             load_sensor_valid=features.fresh,load_sensor_fresh=features.fresh,load_baseline_valid=features.baseline_valid,
@@ -500,7 +513,7 @@ class GraspInteractionEngine:
             dict(state=contact,gap_lower=gap_lower,gap_upper=gap_upper,descending=descending,overlap=overlap,
                  load_change=contact_change,persistence_sec=duration),
             dict(state=interaction,interaction_id=b.binding_id+':interaction',epoch=self.commit_epoch,
-                 source_counter=self.commit_counter,invalidate=self.committed,swept=tuple(self.swept)),
+                 source_counter=self.commit_counter,invalidate=self.committed and not self.snapshot_mode,swept=tuple(self.swept)),
             dict(state=closure,open_limit=io.open_limit if io_ok else False,closed_limit=io.closed_limit if io_ok else False,
                  opening_state=grab.opening_state,close_started=self.close_started or 0.),
             dict(state=payload,velocity=motion.velocity,acceleration=motion.acceleration,**{'rise':rise}),

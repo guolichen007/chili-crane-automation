@@ -81,10 +81,13 @@ class PitSurfaceShadowNode(Node):
     def __init__(self):
         super().__init__('pit_surface_shadow_node')
         self.surface_session_id=uuid.uuid4().hex
+        self.declare_parameter('cycle_snapshot_mode',False)
+        self.snapshot_mode=bool(self.get_parameter('cycle_snapshot_mode').value)
         self.config,self.builder,self.disturbance={},None,None
         self.error='NOT_CONFIGURED'
         try:
             self.config,semantic=configure(self)
+            self.semantic=semantic
             self.builder=PitSurfaceBuilder(self.config,semantic,self.surface_session_id)
             self.disturbance=SurfaceDisturbanceTracker(self.config)
         except (OSError,ValueError,TypeError,KeyError) as exc:
@@ -99,10 +102,20 @@ class PitSurfaceShadowNode(Node):
         self.last_published_generation=-1
         self.next_debug=0.
         self.interaction_lifecycle=None
+        from chili_crane_control.snapshot_cycle import SnapshotCycleGate
+        self.cycle_gate=SnapshotCycleGate(self.config.get('source_type'),self.config.get('frame_ttl_sec',0.))
+        if self.snapshot_mode and self.builder is not None:
+            from .snapshot_surface import CycleSnapshotWindow
+            self.snapshot_window=CycleSnapshotWindow(self.config,self.semantic,self.surface_session_id)
+            self.builder=self.snapshot_window.builder;self.cycle_gate=self.snapshot_window.gate
+        if self.snapshot_mode:
+            from chili_crane_msgs.msg import CycleStatus,TargetBinding
+            self.create_subscription(CycleStatus,'task/cycle_status',self.cycle,QOS)
+            self.create_subscription(TargetBinding,'phase2c/target_binding',self.freeze_binding,SNAPSHOT_QOS)
         self.frozen_snapshot_history=deque(maxlen=32)
         self.declare_parameter('interaction_config_file','')
         interaction_file=self.get_parameter('interaction_config_file').value
-        if interaction_file and self.builder is not None:
+        if interaction_file and self.builder is not None and not self.snapshot_mode:
             from .surface_interaction import SurfaceInteractionLifecycle
             from chili_crane_msgs.msg import TargetBinding,SurfaceInteractionEvidence,LiftEvidence,SurfaceRefreshEvidence
             try:
@@ -131,7 +144,40 @@ class PitSurfaceShadowNode(Node):
         self.create_timer(.05,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
 
     def cloud(self,m):
+        if self.snapshot_mode and not self.cycle_gate.scanning(source_now(self,self.config)):return
         self.latest=(m,time.monotonic())  # latest-wins, no unbounded pending queue.
+
+    def cycle(self,m):
+        from chili_crane_control.snapshot_cycle_transport import cycle_observation
+        try:
+            if self.builder is not None and self.snapshot_window.observe(cycle_observation(m),source_now(self,self.config)):
+                self.builder=self.snapshot_window.builder
+                self.latest=None;self.last_receive=None;self.last_scan_mid_epoch=0.
+                self.last_snapshot_message=None;self.last_published_generation=-1
+                self.inputs.pop('meta',None);self.inputs.pop('context',None)
+        except (ValueError,TypeError,KeyError) as exc:self.error=str(exc)
+
+    def freeze_binding(self,m):
+        try:self.cycle_gate.freeze((m.run_id,m.task_id,m.cycle_id,int(m.cycle_index)))
+        except ValueError as exc:self.cycle_gate.blocked=True;self.error=str(exc)
+
+    def publish_frozen(self,now):
+        """No grid.snapshot/expire/fusion while frozen, even after original TTL."""
+        from chili_crane_control.snapshot_cycle_transport import annotate_cycle
+        message=self.last_snapshot_message
+        if message is None:
+            status=PitSurfaceStatus(validity=1,reason=self.cycle_gate.reason,
+                surface_session_id=self.surface_session_id,valid_for_control=False)
+            status.evidence.validity=1;status.evidence.evidence_age_sec=status.evidence_age_sec=1e9
+        else:
+            status=copy.deepcopy(message.status)
+            status.evidence_age_sec=max(0.,now-seconds(status.header.stamp))
+            status.evidence.evidence_age_sec=status.evidence_age_sec
+            status.reason=self.cycle_gate.state
+            if not self.cycle_gate.planning(now):status.spatial_eligible=False
+            if status.evidence_age_sec>self.config['surface_ttl_sec']:
+                status.validity=status.evidence.validity=2;status.spatial_eligible=False
+        self.status_pub.publish(annotate_cycle(status,self.cycle_gate))
 
     def interaction_binding(self,m):
         from chili_crane_control.interaction_transport import binding_from_message
@@ -170,6 +216,7 @@ class PitSurfaceShadowNode(Node):
         except (ValueError,TypeError,KeyError,AttributeError) as exc:self.get_logger().warning(str(exc))
 
     def event(self,m):
+        if self.snapshot_mode:return  # New scans replace the whole window in R2.
         if self.disturbance is None:
             return
         try:
@@ -196,6 +243,8 @@ class PitSurfaceShadowNode(Node):
             return
         b,c=self.builder,self.config
         now=source_now(self,c)
+        if self.snapshot_mode and not self.cycle_gate.scanning(now):
+            self.latest=None;self.publish_frozen(now);return
         interaction_pause=False
         if self.interaction_lifecycle is not None and self.interaction_lifecycle.binding is not None and 'grab' in self.inputs:
             geometry,received_grab=self.inputs['grab']
@@ -214,6 +263,8 @@ class PitSurfaceShadowNode(Node):
                 meta,meta_arrival=self.inputs['meta']
                 context_msg,ctx_arrival=self.inputs['context']
                 epoch=seconds(cloud.header.stamp)
+                if self.snapshot_mode and int(round(epoch*1e9))<=self.cycle_gate.scan_start_ns:
+                    raise ValueError('FRAME_NOT_AFTER_CURRENT_SCAN_START')
                 if meta.measurement_stamp != cloud.header.stamp or context_msg.header.stamp != cloud.header.stamp:
                     if time.monotonic()-arrival <= c['frame_ttl_sec']:
                         self.latest=item
@@ -269,7 +320,8 @@ class PitSurfaceShadowNode(Node):
                     # wholesale clear merely for motion. Unaffected samples still
                     # expire by their ORIGINAL epochs in the frozen grid.
                     self.last_receive=arrival;self.last_scan_mid_epoch=timing.mid_epoch
-                elif b.ingest(np.c_[points['x'],points['y'],points['z']],points['sensor_id'],frame,ctx,grab,now):
+                elif (self.snapshot_window.ingest if self.snapshot_mode else b.ingest)(
+                        np.c_[points['x'],points['y'],points['z']],points['sensor_id'],frame,ctx,grab,now):
                     self.last_receive=arrival
                     self.last_grab=grab
                     self.last_scan_mid_epoch=timing.mid_epoch
@@ -292,13 +344,17 @@ class PitSurfaceShadowNode(Node):
                     raise ValueError('GRAB_MASK_STALE_OR_MOVING')
             except (ValueError,TypeError,KeyError) as exc:
                 b.grid.clear(str(exc))
-        snapshot=b.grid.snapshot(now)
+        snapshot=self.snapshot_window.snapshot(now) if self.snapshot_mode else b.grid.snapshot(now)
         if self.interaction_lifecycle is not None:
             snapshot=self.interaction_lifecycle.planning_snapshot(snapshot,now)
         if snapshot.generation != self.last_published_generation:
             if self.interaction_lifecycle is not None:self.frozen_snapshot_history.append(snapshot)
             tick=time.perf_counter()
             message=snapshot_to_message(snapshot,source_now(self,c),b.grid.last_counter)
+            if self.snapshot_mode:
+                from chili_crane_control.snapshot_cycle_transport import annotate_cycle
+                self.cycle_gate.snapshot_ready=message.status.spatial_eligible
+                annotate_cycle(message.status,self.cycle_gate)
             b.grid.stage_ms['snapshot_serialization']=(time.perf_counter()-tick)*1000
             tick=time.perf_counter()
             payload=serialize_message(message)

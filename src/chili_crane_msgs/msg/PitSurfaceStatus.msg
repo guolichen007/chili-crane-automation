@@ -37,3 +37,10 @@ uint32 pit_active_cell_count
 uint32 observed_cell_count
 uint32 support_qualified_cell_count
 uint32 dual_supported_cell_count
+# R2 orchestration context; empty in standalone Phase2B.
+string surface_cycle_state
+string scan_run_id
+string scan_task_id
+string scan_cycle_id
+uint64 scan_cycle_index
+builtin_interfaces/Time scan_start_stamp

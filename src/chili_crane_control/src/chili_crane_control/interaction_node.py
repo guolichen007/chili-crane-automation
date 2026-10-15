@@ -44,6 +44,9 @@ class InteractionShadowNode(Node):
             semantic=yaml.safe_load(Path(semantic_file).read_text(encoding='utf-8')) if semantic_file else None
             self.engine=GraspInteractionEngine(self.config,semantic)
         except (OSError,ValueError,KeyError,TypeError) as exc:self.error=str(exc)
+        from .snapshot_cycle import SnapshotCycleGate
+        self.snapshot_mode=self.engine is not None and self.engine.snapshot_mode
+        self.cycle_gate=SnapshotCycleGate(self.config.get('source_type'),self.config.get('evidence_ttl_sec',0.))
         self.state_pub=self.create_publisher(GraspInteractionState,'phase2c/interaction_state',STATE_QOS)
         self.binding_pub=self.create_publisher(TargetBinding,'phase2c/target_binding',BIND_QOS)
         kinds=(('contact',ContactEvidence),('interaction',SurfaceInteractionEvidence),('closure',ClosureEvidence),
@@ -59,7 +62,8 @@ class InteractionShadowNode(Node):
                 ('context',PlanningSpatialContext,'planning/spatial_context',QOS),
                 ('refresh',SurfaceRefreshEvidence,'perception/surface_refresh_evidence',STATE_QOS),
                 ('cart',UnloadingCartState,'perception/unloading_cart_state',QOS),('zone',UnloadSafeZone,'planning/unload_safe_zone',QOS)):
-            self.create_subscription(kind,topic,latest_callback(self.inputs,key),qos)
+            if not (self.snapshot_mode and key in ('context','refresh')):
+                self.create_subscription(kind,topic,latest_callback(self.inputs,key),qos)
         self.create_subscription(GraspProposal,'planning/grasp_proposal_shadow',self.proposal,STATE_QOS)
         self.create_timer(.05,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
 
@@ -67,6 +71,7 @@ class InteractionShadowNode(Node):
 
     def surface_status(self,m):
         if self.engine is None:return
+        if self.snapshot_mode:self.inputs['scan_status']=(m,time.monotonic())
         try:
             b=self.engine.binding
             e=observation_evidence(m)
@@ -91,6 +96,11 @@ class InteractionShadowNode(Node):
             self.error=str(exc)
 
     def proposal(self,m):
+        if self.snapshot_mode:
+            from .snapshot_cycle_transport import proof_from_proposal
+            try:
+                if not self.cycle_gate.accepts(proof_from_proposal(m),self.now()):return
+            except (ValueError,TypeError,KeyError):return
         if self.engine is not None and self.engine.surface_session_id not in (None,m.surface_session_id):return
         self.inputs['proposal']=(m,time.monotonic())
         self.proposal_history.append((m,time.monotonic()))
@@ -115,22 +125,45 @@ class InteractionShadowNode(Node):
             expected=replace(expected,evidence=b.evidence,binding_digest_sha256='')
             if expected.binding_digest_sha256!=b.binding_digest_sha256:
                 raise ValueError('BINDING_REQUIRES_CURRENT_PHASE2B_HARD_GATE_CANDIDATE')
-            if not self.engine.active_cycle and self.engine.binding is not None:
+            proof=None
+            if self.snapshot_mode:
+                from .snapshot_cycle_transport import proof_from_proposal,proof_from_status
+                proof=proof_from_proposal(proposal)
+                status,_=self.input('scan_status')
+                current=proof_from_status(status)
+                if (not self.cycle_gate.accepts(proof,self.now()) or self.cycle_gate.cycle.phase!=CycleState.PLAN_PICK
+                        or not self.cycle_gate.accepts(current,self.now())
+                        or (current.session,current.generation,current.snapshot_id)!=(proof.session,proof.generation,proof.snapshot_id)):
+                    raise ValueError('BINDING_REQUIRES_CURRENT_FROZEN_SCAN_SNAPSHOT')
+            elif not self.engine.active_cycle and self.engine.binding is not None:
                 refresh,re=self.input('refresh',True)
                 if refresh is not None:
                     if refresh.surface_generation<self.refresh_generation_floor:
                         raise ValueError('REFRESH_GENERATION_REGRESSION_CONFLICT')
                     self.engine.consider_refresh(replace(refresh_from_message(refresh),evidence=re),self.now())
-            self.engine.bind(b,self.now());self.binding_pub.publish(binding_to_message(b))
+            self.engine.bind(b,self.now(),proof);self.binding_pub.publish(binding_to_message(b))
+            if self.snapshot_mode:self.cycle_gate.freeze((b.run_id,b.task_id,b.cycle_id,b.cycle_index))
             self.inputs.pop('refresh',None)
-            self.cycle_input=None;self.cycle_error='CYCLE_INPUT_MISSING';self.refresh_generation_floor=b.surface_generation
+            if not self.snapshot_mode:self.cycle_input=None;self.cycle_error='CYCLE_INPUT_MISSING'
+            self.refresh_generation_floor=b.surface_generation
             self.error='SHADOW_ONLY'
         except (ValueError,TypeError,KeyError,AttributeError) as exc:
             self.error=str(exc);self.get_logger().warning(self.error)
 
     def cycle(self,m):
-        if self.engine is None or self.engine.binding is None:return
+        if self.engine is None:return
         try:
+            if self.snapshot_mode:
+                from .snapshot_cycle_transport import cycle_observation
+                reset=self.cycle_gate.observe(cycle_observation(m),self.now())
+                if reset:
+                    self.proposal_history.clear();self.inputs.pop('proposal',None)
+                    if self.engine.binding is not None:self.engine.invalidate_pit_exit()
+                self.phase=CycleState(m.state).name;self.cycle_input=(m,time.monotonic());self.cycle_error=''
+                if self.engine.binding is not None and self.phase in ('COMPLETE','ABORTED'):
+                    self.engine.last_phase=self.phase
+                return
+            if self.engine.binding is None:return
             b=self.engine.binding;e=observation_evidence(m)
             ttl=self.config.get('evidence_ttl_sec') or 0.
             if m.run_id!=b.run_id and self.engine.active_cycle:
@@ -163,6 +196,10 @@ class InteractionShadowNode(Node):
         try:
             if self.engine is None or self.engine.binding is None:raise ValueError(self.error)
             b=self.engine.binding
+            if self.snapshot_mode:
+                if not self.cycle_gate.fresh(self.now()):raise ValueError(self.cycle_gate.reason)
+                if self.cycle_gate.cycle.key!=(b.run_id,b.task_id,b.cycle_id,b.cycle_index):
+                    raise ValueError('NEW_CYCLE_SCAN_REQUIRED')
             if self.cycle_error:raise ValueError(self.cycle_error)
             if self.cycle_input is None:raise ValueError('CYCLE_INPUT_MISSING')
             cycle,cycle_arrival=self.cycle_input
@@ -190,46 +227,50 @@ class InteractionShadowNode(Node):
             load,le=self.input('load',True)
             l=LoadSample(le,load.value,load.unit,load.load_state==load.LOAD_SENSOR_FAULT,
                          load.load_state==load.LOAD_SUSPENDED_EMPTY) if load is not None else None
-            refresh,re=self.input('refresh',True)
-            if (refresh is not None and re.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type'])
-                    and (refresh.binding_id,refresh.binding_digest_sha256,refresh.surface_session_id,re.calibration_id,re.frame_id)==
-                       (b.binding_id,b.binding_digest_sha256,b.surface_session_id,b.spatial_calibration_id,b.evidence.frame_id)):
-                if refresh.surface_generation<self.refresh_generation_floor:
-                    raise ValueError('REFRESH_GENERATION_REGRESSION_CONFLICT')
-                self.refresh_generation_floor=max(self.refresh_generation_floor,refresh.surface_generation)
-            try:r=refresh_from_message(refresh) if refresh is not None else None
-            except ValueError:r=None
-            if r is not None:r=replace(r,evidence=re)
+            r=None
+            if not self.snapshot_mode:
+                refresh,re=self.input('refresh',True)
+                if (refresh is not None and re.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type'])
+                        and (refresh.binding_id,refresh.binding_digest_sha256,refresh.surface_session_id,re.calibration_id,re.frame_id)==
+                           (b.binding_id,b.binding_digest_sha256,b.surface_session_id,b.spatial_calibration_id,b.evidence.frame_id)):
+                    if refresh.surface_generation<self.refresh_generation_floor:
+                        raise ValueError('REFRESH_GENERATION_REGRESSION_CONFLICT')
+                    self.refresh_generation_floor=max(self.refresh_generation_floor,refresh.surface_generation)
+                try:r=refresh_from_message(refresh) if refresh is not None else None
+                except ValueError:r=None
+                if r is not None:r=replace(r,evidence=re)
             cart,ce=self.input('cart',True);zone,ze=self.input('zone',True)
             ca=CartObservation(ce,cart.station_id,cart.present,cart.aligned,cart.full,cart.overflow) if cart is not None else None
             zo=ZoneObservation(ze,(zone.x_min,zone.x_max,zone.y_min,zone.y_max,zone.z_min,zone.z_max),
                 zone.geometry_version,zone.flow_projection_verified) if zone is not None else None
             lineage=b.lineage
-            if 'proposal' in self.inputs:
-                proposal,_=self.inputs['proposal']
-                if proposal.validity in (3,4) and proposal.selected_candidate_id:
-                    lineage=tuple(getattr(proposal,key) for key in ('map_id','semantic_version','pit_id','surface_session_id',
-                        'spatial_calibration_id','geofence_id','geofence_version','geofence_config_sha256','kernel_id'))
-            post_exit=(self.engine.pit_exit is not None and self.phase in
-                ('MOVE_TO_UNLOAD','VERIFY_CART','POSITION_UNLOAD','OPEN_GRAB','VERIFY_EMPTY','COMPLETE'))
-            context,live=self.input('context',post_exit)
-            live_fresh=live is not None and live.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type'])
-            if not post_exit and (not live_fresh or not context.platform_motion_stable):
-                raise ValueError('LIVE_SPATIAL_CONTEXT_STALE_OR_UNSTABLE')
-            # A historical pit exit does not need a fresh pit planning transform
-            # at the unload station. Any fresh conflicting lineage still rejects.
-            if live_fresh and (context.target_frame!=b.evidence.frame_id or context.source_type!=self.config['source_type']
-                    or context.transform_state!=('FIELD_VALIDATED' if self.config['source_type']=='PHYSICAL' else 'SYNTHETIC_VALIDATED')
-                    or (context.map_id,context.semantic_version,context.pit_id,context.calibration_id)!=
-                       (b.map_id,b.semantic_version,b.pit_id,b.spatial_calibration_id)):
-                raise ValueError('LIVE_SPATIAL_LINEAGE_STALE_OR_CONFLICT')
             next_candidate=None
-            try:
-                proposal,pe=self.input('proposal')
-                if pe.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type']):
-                    next_candidate=binding_from_proposal(proposal,b.run_id,b.task_id,b.cycle_id+':next',
-                                                         b.cycle_index+1,self.now())
-            except ValueError:pass
+            if not self.snapshot_mode:
+                if 'proposal' in self.inputs:
+                    proposal,_=self.inputs['proposal']
+                    if proposal.validity in (3,4) and proposal.selected_candidate_id:
+                        lineage=tuple(getattr(proposal,key) for key in ('map_id','semantic_version','pit_id','surface_session_id',
+                            'spatial_calibration_id','geofence_id','geofence_version','geofence_config_sha256','kernel_id'))
+                post_exit=(self.engine.pit_exit is not None and self.phase in
+                    ('MOVE_TO_UNLOAD','VERIFY_CART','POSITION_UNLOAD','OPEN_GRAB','VERIFY_EMPTY','COMPLETE'))
+                context,live=self.input('context',post_exit)
+                live_fresh=live is not None and live.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type'])
+                if not post_exit and (not live_fresh or not context.platform_motion_stable):
+                    raise ValueError('LIVE_SPATIAL_CONTEXT_STALE_OR_UNSTABLE')
+                # A historical pit exit does not need a fresh pit planning transform
+                # at the unload station. Any fresh conflicting lineage still rejects.
+                if live_fresh and (context.target_frame!=b.evidence.frame_id or context.source_type!=self.config['source_type']
+                        or context.transform_state!=('FIELD_VALIDATED' if self.config['source_type']=='PHYSICAL' else 'SYNTHETIC_VALIDATED')
+                        or (context.map_id,context.semantic_version,context.pit_id,context.calibration_id)!=
+                           (b.map_id,b.semantic_version,b.pit_id,b.spatial_calibration_id)):
+                    raise ValueError('LIVE_SPATIAL_LINEAGE_STALE_OR_CONFLICT')
+                next_candidate=None
+                try:
+                    proposal,pe=self.input('proposal')
+                    if pe.fresh(self.now(),self.config['evidence_ttl_sec'],self.config['source_type']):
+                        next_candidate=binding_from_proposal(proposal,b.run_id,b.task_id,b.cycle_id+':next',
+                                                             b.cycle_index+1,self.now())
+                except ValueError:pass
             result=self.engine.evaluate(self.phase,g,h,i,l,self.now(),lineage,r,ca,zo,next_candidate)
             derived=replace(ge,calibration_id=b.spatial_calibration_id,config_version=self.config['config_version'])
             state=result_to_message(result,b,derived,self.config)

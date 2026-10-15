@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import os
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
@@ -68,6 +69,7 @@ class OwnedCycleRun:
         return self.run.last_result
 
 
+@unittest.skipUnless(os.environ.get('CHILI_RUN_LEGACY_R1_ARCHITECTURE')=='1','LEGACY_R1_ARCHITECTURE; R2 has its own owner-driven acceptance')
 class CurrentCycleTests(unittest.TestCase):
     def test_partial_refresh_current_cycle_exit(self):
         owned=OwnedCycleRun();r=owned.run.last_result
@@ -239,6 +241,7 @@ class PackagingTests(unittest.TestCase):
         for file in (ROOT/'src/chili_crane_bringup/launch').glob('*production*'):
             self.assertNotIn('commissioning',file.read_text(encoding='utf-8'))
 
+    @unittest.skipUnless(os.environ.get('CHILI_RUN_LEGACY_R1_ARCHITECTURE')=='1','LEGACY_R1_ARCHITECTURE runner contract')
     def test_ctest_integrated_scenarios_budget_explicit_and_internal_wait_unchanged(self):
         text=(ROOT/'src/chili_crane_perception/CMakeLists.txt').read_text(encoding='utf-8')
         self.assertIn('test_phase2c_delivery.py\n    TIMEOUT 180',text)

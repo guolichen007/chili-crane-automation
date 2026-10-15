@@ -29,3 +29,12 @@ uint64 planning_cache_hit_count
 chili_crane_msgs/GraspCandidate[<=4096] candidates
 bool valid_for_control
 chili_crane_msgs/EvidenceMetadata evidence
+# R2 scan proof copied from the actual surface; never an actuator target Z.
+string surface_cycle_state
+string scan_run_id
+string scan_task_id
+string scan_cycle_id
+uint64 scan_cycle_index
+builtin_interfaces/Time scan_start_stamp
+builtin_interfaces/Time surface_window_start
+builtin_interfaces/Time surface_window_end

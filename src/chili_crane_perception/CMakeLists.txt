@@ -27,11 +27,14 @@ if(BUILD_TESTING)
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
   ament_add_pytest_test(phase2b_mask ../../tests_static/test_phase2b_mask.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src)
+  option(CHILI_RUN_LEGACY_R1_ARCHITECTURE "Run archived R1 surface lifecycle tests" OFF)
+  if(CHILI_RUN_LEGACY_R1_ARCHITECTURE)
   ament_add_pytest_test(phase2c_surface ../../tests_static/test_phase2c_surface.py
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_control/src)
   ament_add_pytest_test(phase2c_delivery ../../tests_static/test_phase2c_delivery.py
     TIMEOUT 180
     APPEND_ENV PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}/src:${CMAKE_CURRENT_SOURCE_DIR}/../chili_crane_control/src)
+  endif()
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(perception_contract_compile_test test/perception_contract_compile_test.cpp)
   if(TARGET perception_contract_compile_test)

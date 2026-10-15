@@ -23,6 +23,8 @@ class GraspProposalShadowNode(Node):
         super().__init__('grasp_proposal_shadow_node')
         self.config,self.planner={},None
         self.error='NOT_CONFIGURED'
+        self.declare_parameter('cycle_snapshot_mode',False)
+        self.snapshot_mode=bool(self.get_parameter('cycle_snapshot_mode').value)
         try:
             self.config,semantic=configure(self)
             geofence=OperationalGeofence(yaml.safe_load(Path(self.config['geofence_file']).read_text(encoding='utf-8')),semantic)
@@ -38,6 +40,12 @@ class GraspProposalShadowNode(Node):
         self.pending_surface=None
         self.decoded_message,self.decoded_snapshot=None,None
         self.serialized_proposal,self.last_result=None,None
+        from chili_crane_control.snapshot_cycle import SnapshotCycleGate
+        self.cycle_gate=SnapshotCycleGate(self.config.get('source_type'),self.config.get('frame_ttl_sec',0.))
+        if self.snapshot_mode:
+            from chili_crane_msgs.msg import CycleStatus,TargetBinding
+            self.create_subscription(CycleStatus,'task/cycle_status',self.cycle,QOS)
+            self.create_subscription(TargetBinding,'phase2c/target_binding',self.freeze_binding,SNAPSHOT_QOS)
         self.pub=self.create_publisher(GraspProposal,'planning/grasp_proposal_shadow',PROPOSAL_QOS)
         self.markers=self.create_publisher(MarkerArray,'planning/grasp_proposal_markers',QOS)
         self.create_subscription(PitSurfaceSnapshot,'perception/pit_surface_snapshot',self.surface,SNAPSHOT_QOS)
@@ -47,6 +55,11 @@ class GraspProposalShadowNode(Node):
         self.create_timer(.1,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
 
     def surface(self,m):
+        if self.snapshot_mode:
+            from chili_crane_control.snapshot_cycle_transport import proof_from_status
+            try:
+                if not self.cycle_gate.accepts(proof_from_status(m.status),source_now(self,self.config)):return
+            except (ValueError,TypeError,KeyError):return
         decision=self.surface_sessions.begin(m.status.surface_session_id)
         if decision not in ('NEW_SESSION','SAME_SESSION'):
             if decision == 'SESSION_HISTORY_CAPACITY_EXCEEDED':
@@ -62,6 +75,18 @@ class GraspProposalShadowNode(Node):
         self.pending_surface=(m,time.monotonic())
         self.admit_surface()
 
+    def cycle(self,m):
+        from chili_crane_control.snapshot_cycle_transport import cycle_observation
+        try:
+            reset=self.cycle_gate.observe(cycle_observation(m),source_now(self,self.config))
+            if reset or not self.cycle_gate.planning(source_now(self,self.config)):self.reset_surface_state()
+        except (ValueError,TypeError,KeyError):self.reset_surface_state()
+
+    def freeze_binding(self,m):
+        try:self.cycle_gate.freeze((m.run_id,m.task_id,m.cycle_id,int(m.cycle_index)))
+        except ValueError:self.cycle_gate.blocked=True
+        self.reset_surface_state()
+
     def reset_surface_state(self):
         self.latest,self.pending_surface=None,None
         self.decoded_message,self.decoded_snapshot=None,None
@@ -73,6 +98,7 @@ class GraspProposalShadowNode(Node):
             self.recent=SurfaceDisturbanceTracker(self.config)
 
     def admit_surface(self):
+        if self.snapshot_mode and not self.cycle_gate.planning(source_now(self,self.config)):return
         if self.pending_surface is None or self.planner is None or self.spatial_context_input is None:
             return
         m,arrival=self.pending_surface
@@ -148,8 +174,11 @@ class GraspProposalShadowNode(Node):
             self.get_logger().warning(str(exc))
 
     def tick(self):
-        self.admit_surface()
         try:
+            if self.snapshot_mode and not self.cycle_gate.planning(source_now(self,self.config)):
+                raise ValueError('PLANNING_FROZEN_ACTIVE_CYCLE' if self.cycle_gate.cycle is not None
+                    and (self.cycle_gate.bound or self.cycle_gate.cycle.phase.value>=2) else 'SCAN_REQUIRED')
+            self.admit_surface()
             if self.planner is None or self.latest is None or self.spatial_context_input is None:
                 raise ValueError(self.error if self.planner is None else 'SURFACE_OR_CONTEXT_MISSING')
             message,arrival=self.latest
@@ -204,6 +233,9 @@ class GraspProposalShadowNode(Node):
                 m.header=copy.deepcopy(self.latest[0].status.header)
                 m.evidence=copy.deepcopy(self.latest[0].status.evidence)
             m.evidence.evidence_age_sec=1e9;m.evidence.validity=m.validity
+            if self.snapshot_mode:
+                from chili_crane_control.snapshot_cycle_transport import annotate_cycle
+                annotate_cycle(m,self.cycle_gate)
             self.pub.publish(m)
             self.markers.publish(MarkerArray(markers=[Marker(action=Marker.DELETEALL)]))
 
