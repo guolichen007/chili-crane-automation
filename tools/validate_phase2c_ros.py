@@ -211,14 +211,17 @@ class SnapshotRun:
             # No SCAN heartbeat before all three real consumers have joined.
             self.wait(discovered)
             self.cycle_discovery_ready=True
-        def scan_drained():
-            p=self.received.get('proposal');s=self.received.get('surface');m=self.received.get('snapshot')
-            return (p is not None and s is not None and m is not None and s.spatial_eligible
-                and p.scan_cycle_id==self.cycles.cycle_id and bool(p.selected_candidate_id)
-                and p.surface_snapshot_id==s.snapshot_id==m.status.snapshot_id
+        def surface_drained():
+            s=self.received.get('surface');m=self.received.get('snapshot')
+            return (s is not None and m is not None and s.spatial_eligible and s.support_qualified_cell_count>0
+                and s.scan_cycle_id==self.cycles.cycle_id and s.snapshot_id==m.status.snapshot_id
                 and s.evidence.source_counter==self.frame_counter)
-        self.wait(scan_drained,send=lambda:self.send(empty=True))
+        self.wait(surface_drained,send=lambda:self.send(empty=True))
         self.hold_bundle=True  # All published frames consumed before owner leaves SCAN.
+        self.wait(lambda:'proposal' in self.received and bool(self.received['proposal'].selected_candidate_id)
+            and self.received['proposal'].scan_cycle_id==self.cycles.cycle_id
+            and self.received['proposal'].surface_snapshot_id==self.received['surface'].snapshot_id,
+            send=lambda:self.send(empty=True))
         assert self.cycles.accept_scan(int(self.received['proposal'].evidence.source_counter),fresh=True)
         self.send(empty=True)
         self.wait(lambda:'surface' in self.received and self.received['surface'].observed_cycle_state==int(CycleState.PLAN_PICK)
@@ -299,6 +302,9 @@ class SnapshotRun:
             timeout=10.,send=lambda:self.send(value=100.))
         assert not self.received['state'].next_cycle_surface_ready;assert self.admission();self.send()
         assert self.cycles.state==CycleState.COMPLETE
+        self.wait(lambda:self.state_is_current()
+            and self.received['surface'].observed_cycle_state==int(CycleState.COMPLETE)
+            and self.received['proposal'].observed_cycle_state==int(CycleState.COMPLETE),send=self.send)
         self.checks.update(PIT_EXIT_USES_BOUND_SURFACE='PASS',COMPLETE_DOES_NOT_REQUIRE_NEXT_PLAN='PASS')
         old=self.binding;old_proposal=copy.deepcopy(self.saved_proposal)
         assert self.cycles.next_cycle(continue_task=True)
