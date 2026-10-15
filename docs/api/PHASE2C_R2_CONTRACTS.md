@@ -23,6 +23,9 @@ Surface status 的证据年龄仍按原 measurement epoch 增长，不以 heartb
 DDS 节点可在不同 SCAN heartbeat 加入。Surface 的 scan_start 是扫描来源，proposal 原样保留；
 每个消费者要求 window_start 同时晚于该来源起点与自身首次观察本 SCAN 的时刻，不比较两个接收时刻相等。
 晚加入时若窗口含更早帧，须等待这些帧退出窗口；不得改写起点或伪造 fresh。
+Surface 适配层保留最多 32 对原始 grab geometry/clearance 观测，按 MID_SCAN 选择同 epoch/counter/frame 的一对。
+其原 stamp、arrival、provenance、freshness 和原 maximum_grab_mask_time_skew_sec 检查均保留；
+不能把最新 20Hz 几何错用于较早的 5Hz cloud，也不能外推、改 stamp 或增加时差阈值。
 
 ## ScanProof 与 binding
 

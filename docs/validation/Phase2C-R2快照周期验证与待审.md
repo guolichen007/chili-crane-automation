@@ -16,7 +16,7 @@ SCAN 建窗、PLAN_PICK 停止融合，binding 立即冻结。下一 cycle 必�
 
 ## Windows 本地证据
 
-Python 3.11 纯算法/静态测试：unittest 474 项，448 通过、26 跳过；pytest 同为 448 通过、26 跳过。
+Python 3.11 纯算法/静态测试：unittest 477 项，451 通过、26 跳过；pytest 同为 451 通过、26 跳过。
 跳过含 ROS 安装态、Linux 进程 ownership、明确历史 R1 生命周期测试，不计作通过。
 架构 46 场景；Phase2A 25 场景与 R1 200 序列；Phase2B 21 场景/64 序列与 R1 workload 回归通过，安全违例计数均为 0。
 R2 14 项 native 测试覆盖冻结、TTL 后不可变、新 scan 真观测、异步节点加入、旧料面/旧 proposal 拒绝、

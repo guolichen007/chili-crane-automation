@@ -201,8 +201,14 @@ class SnapshotRun:
         self.spin(.05)
 
     def scan_and_bind(self):
-        self.wait(lambda:'proposal' in self.received and self.received['proposal'].scan_cycle_id==self.cycles.cycle_id
-            and bool(self.received['proposal'].selected_candidate_id),send=lambda:self.send(empty=True))
+        def scan_drained():
+            p=self.received.get('proposal');s=self.received.get('surface');m=self.received.get('snapshot')
+            return (p is not None and s is not None and m is not None and s.spatial_eligible
+                and p.scan_cycle_id==self.cycles.cycle_id and bool(p.selected_candidate_id)
+                and p.surface_snapshot_id==s.snapshot_id==m.status.snapshot_id
+                and s.evidence.source_counter==self.frame_counter)
+        self.wait(scan_drained,send=lambda:self.send(empty=True))
+        self.hold_bundle=True  # All published frames consumed before owner leaves SCAN.
         assert self.cycles.accept_scan(int(self.received['proposal'].evidence.source_counter),fresh=True)
         self.send(empty=True)
         self.wait(lambda:'surface' in self.received and self.received['surface'].observed_cycle_state==int(CycleState.PLAN_PICK)
@@ -219,6 +225,7 @@ class SnapshotRun:
             send=lambda:self.send(empty=True))
         self.binding=b
         self.wait(lambda:self.received['proposal'].reason=='PLANNING_FROZEN_ACTIVE_CYCLE',send=lambda:self.send(empty=True))
+        self.hold_bundle=False
         self.frozen_generation=s.surface_generation;self.frozen_cells=hashlib.sha256(repr(self.received['snapshot'].cells).encode()).hexdigest()
         self.active_frozen=True;self.poison=True
         for _ in range(12):self.send(empty=True)

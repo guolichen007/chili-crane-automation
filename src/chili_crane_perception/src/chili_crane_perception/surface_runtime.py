@@ -94,6 +94,8 @@ class PitSurfaceShadowNode(Node):
             self.error=str(exc)
         self.latest=None
         self.inputs={}
+        from .grab_mask_pairs import GrabMaskPairs
+        self.mask_pairs=GrabMaskPairs()
         self.last_receive=None
         self.last_grab=None
         self.last_event=None
@@ -139,9 +141,14 @@ class PitSurfaceShadowNode(Node):
                 (PlanningSpatialContext,'planning/spatial_context','context'),
                 (GrabGeometrySafetyState,'perception/grab_geometry_safety','grab'),
                 (GrabClearanceState,'perception/grab_clearance','clearance')):
-            self.create_subscription(kind,topic,lambda m,key=key:self.inputs.update({key:(m,time.monotonic())}),QOS)
+            self.create_subscription(kind,topic,lambda m,key=key:self.input_evidence(key,m),QOS)
         self.create_subscription(SurfaceDisturbance,'planning/surface_disturbance_shadow',self.event,EVENT_QOS)
         self.create_timer(.05,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
+
+    def input_evidence(self,key,message):
+        arrival=time.monotonic()
+        self.inputs[key]=(message,arrival)
+        if key in ('grab','clearance'):self.mask_pairs.add(key,message,arrival)
 
     def cloud(self,m):
         if self.builder is None:return
@@ -279,8 +286,10 @@ class PitSurfaceShadowNode(Node):
                         or max(time.monotonic()-arrival,time.monotonic()-meta_arrival,time.monotonic()-ctx_arrival,
                                context_msg.evidence.evidence_age_sec) > c['frame_ttl_sec']):
                     raise ValueError('INPUT_PROVENANCE_OR_RESIDENCE_STALE')
-                geometry,grab_arrival=self.inputs['grab']
-                clearance,clear_arrival=self.inputs['clearance']
+                points=decode_cloud(cloud,c['maximum_input_points'])
+                timing=scan_epochs(epoch,points['timestamp'],points['sensor_id'])
+                (geometry,grab_arrival),(clearance,clear_arrival)=self.mask_pairs.closest(
+                    timing.mid_epoch,c['maximum_grab_mask_time_skew_sec'])
                 if (geometry.validity not in (3,4) or clearance.validity not in (3,4)
                         or geometry.model_id in ('','UNKNOWN','NOT_CONFIGURED')
                         or geometry.geometry_version in ('','UNKNOWN','NOT_CONFIGURED')
@@ -303,8 +312,6 @@ class PitSurfaceShadowNode(Node):
                     geometry.tracking_state,geometry.measurement_accepted,geometry.motion_stable,
                     tuple((p.x,p.y) for p in geometry.conservative_footprint.points),geometry.bottom_lower_bound_m,
                     geometry.top_upper_bound_m,max(geometry.evidence_age_sec,time.monotonic()-grab_arrival),geometry.extrinsic_state)
-                points=decode_cloud(cloud,c['maximum_input_points'])
-                timing=scan_epochs(epoch,points['timestamp'],points['sensor_id'])
                 if timing.mid_epoch <= self.last_scan_mid_epoch:
                     raise ValueError('POINT_TIME_FRAME_REGRESSION')
                 frame=dict(epoch=epoch,source_counter=int(meta.source_counter),frame_id=cloud.header.frame_id,
