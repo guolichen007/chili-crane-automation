@@ -233,6 +233,11 @@ class SnapshotRun:
             lift=dict(pit_exit_confirmed=m.lift.pit_exit_confirmed),unload=dict(state=m.unload.reason))
         return self.cycles.advance(evidence_verified=evidence_allows_advance(self.cycles,r))
 
+    def state_is_current(self):
+        m=self.received.get('state')
+        return m is not None and (m.run_id,m.task_id,m.cycle_id,m.task_cycle_state)==(
+            self.cycles.run_id,self.cycles.task_id,self.cycles.cycle_id,self.cycles.state.name)
+
     def grasp(self):
         self.scan_and_bind()
         assert self.cycles.advance(evidence_verified=True);self.send(empty=True)  # mock positioning
@@ -246,7 +251,9 @@ class SnapshotRun:
         assert self.admission()
         for _ in range(8):self.send(z=.76,opening=2,closed=True,opened=False)
         self.wait(lambda:self.received['state'].closure.reason=='CLOSURE_CONFIRMED',send=lambda:self.send(z=.76,opening=2,closed=True,opened=False))
-        assert self.admission();self.send(z=.76,opening=2,closed=True,opened=False);assert self.admission()
+        assert self.admission()
+        self.wait(self.state_is_current,send=lambda:self.send(z=.76,opening=2,closed=True,opened=False))
+        assert self.admission()
         for i in range(25):self.send(z=.76+3.24*(i+1)/25,motion=1,opening=2,closed=True,opened=False,value=101.,stable=False)
         self.wait(lambda:self.received['state'].payload.reason=='PAYLOAD_CONFIRMED',timeout=9.,
             send=lambda:self.send(opening=2,closed=True,opened=False,value=101.))
@@ -264,7 +271,8 @@ class SnapshotRun:
             self.send(opening=2,closed=True,opened=False,value=101.)
         for _ in range(12):self.send(value=100.)
         assert self.cycles.advance(evidence_verified=True)
-        self.wait(lambda:self.received['state'].unload.reason=='UNLOAD_CONFIRMED',timeout=10.,send=lambda:self.send(value=100.))
+        self.wait(lambda:self.state_is_current() and self.received['state'].unload.reason=='UNLOAD_CONFIRMED',
+            timeout=10.,send=lambda:self.send(value=100.))
         assert not self.received['state'].next_cycle_surface_ready;assert self.admission();self.send()
         assert self.cycles.state==CycleState.COMPLETE
         self.checks.update(PIT_EXIT_USES_BOUND_SURFACE='PASS',COMPLETE_DOES_NOT_REQUIRE_NEXT_PLAN='PASS')

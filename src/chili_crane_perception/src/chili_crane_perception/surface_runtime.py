@@ -144,6 +144,7 @@ class PitSurfaceShadowNode(Node):
         self.create_timer(.05,self.tick,clock=Clock(clock_type=ClockType.STEADY_TIME))
 
     def cloud(self,m):
+        if self.builder is None:return
         if self.snapshot_mode and not self.cycle_gate.scanning(source_now(self,self.config)):return
         self.latest=(m,time.monotonic())  # latest-wins, no unbounded pending queue.
 
