@@ -581,6 +581,17 @@ def check_ubuntu_validation_script(root: Path, errors: List[str]) -> None:
     text = path.read_text(encoding="utf-8")
     if not text.startswith("#!/usr/bin/env bash\nset -euo pipefail\n"):
         errors.append("Ubuntu22 validation script must be fail-fast")
+    stage = root / 'scripts/validation/ubuntu22_ros2_stage.sh'
+    launcher = root / 'tools/validate_mock_owned.py'
+    if not stage.exists() or not launcher.exists():
+        errors.append('Ubuntu22 independent stage or owned mock launcher missing')
+        return
+    if 'env -i' not in text or 'for stage in normal symlink' not in text:
+        errors.append('Ubuntu22 normal/symlink must start in independent clean environments')
+    stage_text=stage.read_text(encoding='utf-8')
+    for required in ('/opt/ros/humble/setup.sh','local_setup.sh','check_ros_overlay.py','--probe 10','--forbidden-root'):
+        if required not in stage_text:errors.append('Ubuntu22 isolated stage missing: '+required)
+    text+='\n'+stage_text+'\n'+launcher.read_text(encoding='utf-8')
     for required in ("--workspace", "--evidence-dir", "--expected-sha", "22.04",
                      "humble", "3.10", " build --base-paths", "colcon test", "validate_ros2_mock.py"):
         if required not in text:

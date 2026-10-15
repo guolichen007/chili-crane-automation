@@ -144,6 +144,7 @@ class SnapshotCycleTests(unittest.TestCase):
         self.assertEqual(r.payload['state'],'PAYLOAD_CONFIRMED');self.assertTrue(r.lift['pit_exit_confirmed'])
         self.assertFalse(r.interaction['invalidate']);self.assertFalse(r.lift['clear_of_updated_surface'])
         self.assertFalse(r.next_cycle_surface_ready);self.assertIsNone(h.engine.last_refresh)
+        self.assertNotIn('SURFACE_INVALIDATION_REQUIRED',h.engine.events)
         self.assertTrue(evidence_allows_advance(h.cycles,r))
 
     def test_complete_does_not_require_next_plan(self):
@@ -160,10 +161,17 @@ class SnapshotCycleTests(unittest.TestCase):
         stale=replace(old,cycle_id=h.cycles.cycle_id,cycle_index=2,binding_id='replayed',
             binding_epoch_ns=int(h.t*1e9),binding_digest_sha256='')
         with self.assertRaises(ValueError):h.engine.bind(stale,h.t)
+        forged_fresh=replace(stale,evidence=replace(stale.evidence,epoch_ns=int(h.t*1e9)),binding_digest_sha256='')
+        old_proof=ScanProof((stale.run_id,stale.task_id,stale.cycle_id,stale.cycle_index),h.window.gate.scan_start_ns,
+            int(old_snapshot.window_start*1e9),int(old_snapshot.window_end*1e9),old.surface_session_id,
+            old.surface_generation,old.surface_snapshot_id,forged_fresh.evidence)
+        with self.assertRaisesRegex(ValueError,'NEW_SCAN_PROOF'):h.engine.bind(forged_fresh,h.t,old_proof)
+        h.xyz[:,2]=.65
         for _ in range(3):self.assertTrue(h.scan())
         self.assertTrue(h.cycles.accept_scan(h.counter,fresh=True));h.t+=.01;h.counter+=1;h.observe_cycle()
         _,new,proof=h.proposal_and_binding();h.engine.bind(new,h.t,proof)
         self.assertGreater(new.surface_generation,old.surface_generation);self.assertIsNone(h.engine.last_refresh)
+        self.assertLess(new.surface_nominal_m,old.surface_nominal_m-.1)
 
     def test_active_surface_restart_requires_abort(self):
         h=SnapshotHarness();h.grasp()

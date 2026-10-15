@@ -39,6 +39,7 @@ uint32 support_qualified_cell_count
 uint32 dual_supported_cell_count
 # R2 orchestration context; empty in standalone Phase2B.
 string surface_cycle_state
+uint8 observed_cycle_state
 string scan_run_id
 string scan_task_id
 string scan_cycle_id

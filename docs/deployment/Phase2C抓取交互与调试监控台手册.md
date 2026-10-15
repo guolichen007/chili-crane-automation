@@ -1,6 +1,12 @@
 # Phase2C 抓取交互证据与调试监控台使用手册
 
-R1.2 当前契约见 [current-cycle closeout](../api/PHASE2C_R12_CONTRACTS.md)。
+当前 R2 以 [snapshot cycle 合同](../api/PHASE2C_R2_CONTRACTS.md) 和
+[R2 验证与待审](../validation/Phase2C-R2快照周期验证与待审.md) 为准。
+full-stack 显式开启 cycle_snapshot_mode：只在 SCAN 融合、只在 SCAN/PLAN_PICK 规划，binding 后冻结至终态。
+下一 cycle 清空窗口重新扫描。下文 R1 局部 invalidation/refresh/next-plan 操作仅供历史法证，不适用于 R2 主链。
+真实下降 Z 尚未标定；当前 proposal 仅形成 XY，不得将默认 z 视为生产下降目标。
+
+历史 R1.2 契约见 [current-cycle closeout](../api/PHASE2C_R12_CONTRACTS.md)。
 SUPERSEDED：旧 RAISE admission 要求 updated clear；旧 VERIFY_EMPTY 要求下一候选。
 当前 RAISE 用 PAYLOAD_CONFIRMED + PIT_EXIT_CONFIRMED，VERIFY_EMPTY 用 UNLOAD_CONFIRMED。
 PIT_EXIT 是当前 binding 的历史事件；refresh 过期/缺失不取消它，新的来源/时序/几何冲突则清除并阻断。

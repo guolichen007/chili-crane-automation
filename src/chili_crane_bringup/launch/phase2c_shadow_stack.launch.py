@@ -34,7 +34,7 @@ def generate_launch_description():
              parameters=[dict(clock,config_file=surface,cycle_snapshot_mode=True)]),
         Node(package='chili_crane_control',executable='grasp_interaction_shadow_node.py',namespace=namespace,
              output='screen',
-             parameters=[dict(clock,config_file=interaction)]),
+             parameters=[dict(clock,config_file=interaction,cycle_snapshot_mode=True)]),
         Node(package='chili_crane_commissioning',executable='commissioning_console.py',namespace=namespace,
              output='screen',
              condition=IfCondition(LaunchConfiguration('commissioning')),

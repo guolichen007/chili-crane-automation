@@ -11,6 +11,7 @@ def cycle_observation(m):
 def annotate_cycle(m,gate):
     m.surface_cycle_state=gate.state
     if gate.cycle is not None:
+        m.observed_cycle_state=int(gate.cycle.phase)
         m.scan_run_id,m.scan_task_id,m.scan_cycle_id,m.scan_cycle_index=gate.cycle.key
         m.scan_start_stamp=stamp(gate.scan_start_ns)
     return m

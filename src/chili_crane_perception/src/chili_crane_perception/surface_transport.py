@@ -168,7 +168,7 @@ def proposal_to_message(proposal,surface_message,age):
     m.evidence=copy.deepcopy(s.evidence)
     m.evidence.evidence_age_sec=age
     m.evidence.validity,m.evidence.reason=m.validity,m.reason
-    for key in ('surface_cycle_state','scan_run_id','scan_task_id','scan_cycle_id','scan_cycle_index','scan_start_stamp'):
+    for key in ('surface_cycle_state','observed_cycle_state','scan_run_id','scan_task_id','scan_cycle_id','scan_cycle_index','scan_start_stamp'):
         setattr(m,key,copy.deepcopy(getattr(s,key)))
     m.surface_window_start=copy.deepcopy(s.window_start)
     m.surface_window_end=copy.deepcopy(s.window_end)

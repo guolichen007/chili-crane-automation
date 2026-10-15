@@ -31,6 +31,7 @@ bool valid_for_control
 chili_crane_msgs/EvidenceMetadata evidence
 # R2 scan proof copied from the actual surface; never an actuator target Z.
 string surface_cycle_state
+uint8 observed_cycle_state
 string scan_run_id
 string scan_task_id
 string scan_cycle_id

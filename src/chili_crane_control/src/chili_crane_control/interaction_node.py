@@ -35,17 +35,19 @@ class InteractionShadowNode(Node):
     def __init__(self):
         super().__init__('grasp_interaction_shadow_node')
         self.declare_parameter('config_file','')
+        self.declare_parameter('cycle_snapshot_mode',True)
+        self.snapshot_mode=bool(self.get_parameter('cycle_snapshot_mode').value)
         self.config,self.engine={},None;self.error='NOT_CONFIGURED';self.inputs={};self.phase='SCAN';self.cycle_input=None
         self.cycle_error='CYCLE_INPUT_MISSING';self.refresh_generation_floor=0
         self.proposal_history=deque(maxlen=32)
         try:
             self.config=yaml.safe_load(Path(self.get_parameter('config_file').value).read_text(encoding='utf-8'))
+            if self.snapshot_mode:self.config['surface_mode']='SNAPSHOT_PER_CYCLE'
             semantic_file=self.config.get('semantic_map_file')
             semantic=yaml.safe_load(Path(semantic_file).read_text(encoding='utf-8')) if semantic_file else None
             self.engine=GraspInteractionEngine(self.config,semantic)
         except (OSError,ValueError,KeyError,TypeError) as exc:self.error=str(exc)
         from .snapshot_cycle import SnapshotCycleGate
-        self.snapshot_mode=self.engine is not None and self.engine.snapshot_mode
         self.cycle_gate=SnapshotCycleGate(self.config.get('source_type'),self.config.get('evidence_ttl_sec',0.))
         self.state_pub=self.create_publisher(GraspInteractionState,'phase2c/interaction_state',STATE_QOS)
         self.binding_pub=self.create_publisher(TargetBinding,'phase2c/target_binding',BIND_QOS)
@@ -132,6 +134,7 @@ class InteractionShadowNode(Node):
                 status,_=self.input('scan_status')
                 current=proof_from_status(status)
                 if (not self.cycle_gate.accepts(proof,self.now()) or self.cycle_gate.cycle.phase!=CycleState.PLAN_PICK
+                        or status.observed_cycle_state!=int(CycleState.PLAN_PICK)
                         or not self.cycle_gate.accepts(current,self.now())
                         or (current.session,current.generation,current.snapshot_id)!=(proof.session,proof.generation,proof.snapshot_id)):
                     raise ValueError('BINDING_REQUIRES_CURRENT_FROZEN_SCAN_SNAPSHOT')

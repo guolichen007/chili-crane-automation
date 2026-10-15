@@ -1,10 +1,11 @@
 # 辣椒地池行车自动抓取框架
 
-当前 Phase2C：不可变抓点、抓取交互/稳态载荷证据、局部料面失效/新点刷新与独立本地调试监控台。
-已交付 Windows 静态/纯算法代码，Ubuntu安装态交工控机22.04验收；不是完整软件封板或生产控制。
-入口：[交付与待验记录](docs/validation/Phase2C软件交付与工控机待验.md)、
+当前 Phase2C-R2：每 cycle 新扫描、冻结料面与抓点绑定、抓斗/载荷证据、离坑和卸料确认；下一 cycle 重新扫描。
+局部料面生命周期退出 full-stack 主链。保留原 TaskCycles、Phase2A/B 核心算法和安全授权。
+入口：[R2 合同](docs/api/PHASE2C_R2_CONTRACTS.md)、[R2 验证与待审](docs/validation/Phase2C-R2快照周期验证与待审.md)、
+[历史交付记录](docs/validation/Phase2C软件交付与工控机待验.md)、
 [使用手册](docs/deployment/Phase2C抓取交互与调试监控台手册.md)、
-[ADR0012](docs/decisions/ADR0012_Phase2C抓取交互证据与料面生命周期.md)、
+[ADR0014](docs/decisions/ADR0014_Phase2C_R2工程化快照周期.md)、
 [ADR0013](docs/decisions/ADR0013_调试控制台与台架输出隔离.md)。
 FIELD/BENCH/FULL_AUTO 全部 NOT_RUN，物理/自动/相机控制禁用；新消息全体消费者必须同SHA重建。
 

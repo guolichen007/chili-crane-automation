@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+from owned_ros_process import start_owned, stop_owned
 import signal
 import sys
 import tempfile
@@ -42,7 +43,7 @@ def validate_clearance_age(node, config_file, geometry, qos, evidence_dir):
         observe,qos)
     pub=node.create_publisher(GrabGeometrySafetyState,namespace+"/perception/grab_geometry_safety",qos)
     log=(evidence_dir/"clearance-age-contract.log").open("w",encoding="utf-8")
-    child=subprocess.Popen(["ros2","run","chili_crane_perception","grab_clearance_node.py","--ros-args",
+    child=start_owned(["ros2","run","chili_crane_perception","grab_clearance_node.py","--ros-args",
         "-r","__ns:="+namespace,"-r","__node:=clearance_age_contract","-p","config_file:="+str(config_file)],
         stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
     try:
@@ -81,20 +82,7 @@ def validate_clearance_age(node, config_file, geometry, qos, evidence_dir):
                     CLEARANCE_MEASUREMENT_EPOCH_UNCHANGED="PASS",CLEARANCE_EVENTUALLY_STALE="PASS",
                     geometry_publications=1,clearance_samples=len(samples))
     finally:
-        # ros2 run is a wrapper process. Signal its OWN isolated group, including
-        # the executable child, rather than leaving a stale timer node behind.
-        try:
-            os.killpg(child.pid,signal.SIGINT)
-        except ProcessLookupError:
-            pass
-        try:
-            child.wait(timeout=8)
-        except subprocess.TimeoutExpired:
-            try:
-                os.killpg(child.pid,signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            child.wait(timeout=5)
+        stop_owned(child)
         log.close()
         node.destroy_subscription(sub)
         node.destroy_publisher(pub)
@@ -111,8 +99,10 @@ def main():
                                 "installation_preview_node.py", "capture_lidar_calibration_scene.py"))):
         listing = subprocess.check_output(["ros2","pkg","executables",package], text=True)
         assert all(name in listing for name in expected), listing
-    subprocess.run(["ros2","run","chili_crane_slam","capture_lidar_calibration_scene.py","--help"],
-                   check=True, timeout=20, stdout=subprocess.DEVNULL)
+    help_child=start_owned(["ros2","run","chili_crane_slam","capture_lidar_calibration_scene.py","--help"],
+        stdout=subprocess.DEVNULL)
+    try:assert help_child.wait(timeout=20)==0
+    finally:stop_owned(help_child)
     with tempfile.TemporaryDirectory(prefix="phase2a-ros-synthetic-") as tmp:
         tmp = Path(tmp)
         config = fixture()
@@ -126,10 +116,10 @@ def main():
         file = tmp / "shadow.yaml"
         file.write_text(yaml.safe_dump(config), encoding="utf-8")
         log = (args.evidence_dir / "shadow-launch.log").open("w", encoding="utf-8")
-        process = subprocess.Popen(["ros2","launch","chili_crane_bringup","phase2a_perception_shadow.launch.py",
+        process = start_owned(["ros2","launch","chili_crane_bringup","phase2a_perception_shadow.launch.py",
             "config_file:="+str(file)], stdout=log, stderr=subprocess.STDOUT)
         preview_log = (args.evidence_dir / "installed-preview.log").open("w",encoding="utf-8")
-        preview = subprocess.Popen(["ros2","run","chili_crane_slam","installation_preview_node.py","--ros-args",
+        preview = start_owned(["ros2","run","chili_crane_slam","installation_preview_node.py","--ros-args",
             "-r","__ns:=/crane_01","-p","site_config:="+str(ROOT/"config/sites/crane_01")],
             stdout=preview_log,stderr=subprocess.STDOUT)
         rclpy.init()
@@ -211,13 +201,7 @@ def main():
         finally:
             node.destroy_node()
             rclpy.shutdown()
-            for child in (preview,process):
-                child.send_signal(2)
-                try:
-                    child.wait(timeout=8)
-                except subprocess.TimeoutExpired:
-                    child.terminate()
-                    child.wait(timeout=5)
+            for child in (preview,process):stop_owned(child)
             log.close()
             preview_log.close()
 

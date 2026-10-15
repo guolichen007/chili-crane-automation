@@ -43,105 +43,32 @@ printf 'EVIDENCE_SCOPE: UBUNTU22_ROS2_SOFTWARE_ONLY\n'
   ros2 pkg xml rclpy
 } > "$run_dir/software-environment.txt" 2>&1
 dpkg-query -W > "$run_dir/apt-package-versions.txt"
-python3 tools/check_repo_contracts.py
-python3 -m compileall -q src tools tests_static
-python3 -m unittest discover -s tests_static -p "test_*.py"
-python3 -m pytest -q tests_static | tee "$run_dir/pytest-static.txt"
-python3 tools/validate_architecture_scenarios.py | tee "$run_dir/architecture-scenarios.json"
-python3 tools/validate_phase2a_synthetic.py --output "$run_dir/phase2a-monte-carlo.json"
-timeout 600s python3 tools/validate_phase2a_r1.py --output "$run_dir/phase2a-r1-sequences.json"
-timeout 600s python3 tools/validate_phase2b_synthetic.py --output "$run_dir/phase2b-sequences.json"
-timeout 90s python3 tools/validate_phase2c_synthetic.py --output "$run_dir/phase2c-synthetic.json"
-rosdep check --from-paths src --ignore-src --rosdistro humble
-colcon --log-base "$run_dir/log" build --base-paths "$workspace/src" \
-  --build-base "$run_dir/build" --install-base "$run_dir/install" \
-  --cmake-args -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTING=ON
-package_test_status=0
-colcon --log-base "$run_dir/log" test --base-paths "$workspace/src" \
-  --build-base "$run_dir/build" --install-base "$run_dir/install" \
-  --return-code-on-test-failure || package_test_status=$?
-colcon test-result --test-result-base "$run_dir/build" --verbose
-[ "$package_test_status" = 0 ]
-set +u
-. "$run_dir/install/setup.bash"
-set -u
-timeout 180s python3 tools/validate_phase2b_r1.py --output "$run_dir/phase2b-r1-normal.json"
-timeout 35s python3 tools/validate_dual_lidar_ros.py | tee "$run_dir/dual-lidar-synthetic-ros.json"
-timeout 35s python3 tools/validate_ptp_timescale_ros.py | tee "$run_dir/ptp-timescale-synthetic-ros.json"
-timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-dir "$run_dir/phase1c" | tee "$run_dir/installation-capture-synthetic-ros.json"
-bash scripts/validation/rviz_installation_smoke.sh "$workspace" "$run_dir/rviz" | tee "$run_dir/rviz-smoke-result.txt"
-timeout 45s python3 tools/validate_phase2a_ros.py --evidence-dir "$run_dir/phase2a-normal" | tee "$run_dir/phase2a-normal-result.json"
-timeout 65s python3 tools/validate_phase2b_ros.py --evidence-dir "$run_dir/phase2b-normal" | tee "$run_dir/phase2b-normal-result.json"
-timeout 150s python3 tools/validate_phase2b_r11_ros.py --evidence-dir "$run_dir/phase2b-r11-normal" | tee "$run_dir/phase2b-r11-normal-result.json"
-timeout 300s python3 tools/validate_phase2c_ros.py --evidence-dir "$run_dir/phase2c-normal" | tee "$run_dir/phase2c-normal-result.json"
-# Cross-run shared-runner P95 is not a regression comparison. Read the frozen
-# exact base into an owned temporary evidence directory (never another project
-# or Git worktree), then bracket current timing with baseline on the same host.
-# Both use the same installed ROS type support; old messages leave new session
-# fields empty. This is software workload timing, not old/new DDS compatibility.
-baseline_dir="$(mktemp -d "$run_dir/phase2b-r11-baseline-XXXXXX")"
-git archive 8ee41886dfb8d084b2b01d505b770c98bf2fefde config src tools/validate_phase2b_r1.py | tar -x -C "$baseline_dir"
-timeout 180s python3 "$baseline_dir/tools/validate_phase2b_r1.py" --output "$run_dir/phase2b-r11-base-before.json"
-timeout 180s python3 tools/validate_phase2b_r1.py --output "$run_dir/phase2b-r11-current-paired.json"
-timeout 180s python3 "$baseline_dir/tools/validate_phase2b_r1.py" --output "$run_dir/phase2b-r11-base-after.json"
-sh scripts/validation/rviz_phase2b_smoke.sh "$workspace" "$run_dir/phase2b-rviz"
-# Independent install tree catches executable modes hidden by normal install copies.
-colcon --log-base "$run_dir/symlink-log" build --symlink-install --base-paths "$workspace/src" \
-  --build-base "$run_dir/symlink-build" --install-base "$run_dir/symlink-install"
-(
-  set +u
-  . "$run_dir/symlink-install/setup.bash"
-  set -u
-  package_test_status=0
-  colcon --log-base "$run_dir/symlink-log" test --base-paths "$workspace/src" \
-    --build-base "$run_dir/symlink-build" --install-base "$run_dir/symlink-install" \
-    --return-code-on-test-failure || package_test_status=$?
-  colcon test-result --test-result-base "$run_dir/symlink-build" --verbose
-  [ "$package_test_status" = 0 ]
-  timeout 180s python3 tools/validate_phase2b_r1.py --output "$run_dir/phase2b-r1-symlink.json"
-  for package in chili_crane_slam chili_crane_hardware chili_crane_control chili_crane_perception chili_crane_commissioning; do
-    ros2 pkg executables "$package"
-  done
-  timeout 35s python3 tools/validate_installation_calibration_ros.py --evidence-dir "$run_dir/symlink-phase1c"
-  timeout 45s python3 tools/validate_phase2a_ros.py --evidence-dir "$run_dir/phase2a-symlink"
-  timeout 65s python3 tools/validate_phase2b_ros.py --evidence-dir "$run_dir/phase2b-symlink"
-  timeout 150s python3 tools/validate_phase2b_r11_ros.py --evidence-dir "$run_dir/phase2b-r11-symlink"
-  timeout 300s python3 tools/validate_phase2c_ros.py --evidence-dir "$run_dir/phase2c-symlink"
-) 2>&1 | tee "$run_dir/symlink-executables-and-transport.log"
-ros2 launch chili_crane_bringup mock_system.launch.py > "$run_dir/mock-launch.log" 2>&1 &
-launch_pid=$!
-cleanup() {
-  kill -INT "$launch_pid" 2>/dev/null || true
-  # Bounded shutdown without deleting build/install or evidence.
-  for attempt in 1 2 3 4 5; do
-    kill -0 "$launch_pid" 2>/dev/null || break
-    sleep 1
-  done
-  kill -TERM "$launch_pid" 2>/dev/null || true
-  wait "$launch_pid" 2>/dev/null || true
-}
-trap cleanup EXIT
-timeout 35s python3 tools/validate_ros2_mock.py --timeout-sec 25 | tee "$run_dir/mock-evidence.json"
-kill -0 "$launch_pid"
+# Each build starts from a separate clean process environment. Never source
+# normal before building or loading symlink. Keep only explicit test provenance.
+domain="${ROS_DOMAIN_ID:-42}"
+python3 -c 'import sys; d=sys.argv[1]; assert d.isascii() and d.isdecimal() and 0 <= int(d) <= 232' "$domain"
+printf 'ROS_LOCALHOST_ONLY=1\nROS_DOMAIN_ID=%s\n' "$domain" > "$run_dir/ros-domain.txt"
+for stage in normal symlink; do
+  env -i HOME="$HOME" PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    LANG=C.UTF-8 PYTHONNOUSERSITE=1 ROS_LOCALHOST_ONLY=1 ROS_DOMAIN_ID="$domain" \
+    CHILI_CI_IMAGE_REFERENCE="${CHILI_CI_IMAGE_REFERENCE:-NOT_REPORTED}" \
+    sh "$workspace/scripts/validation/ubuntu22_ros2_stage.sh" "$stage" "$workspace" "$run_dir" "$expected_sha"
+done
 cat > "$run_dir/result.yaml" <<EOF
 EVIDENCE_SHA: $expected_sha
+ARCHITECTURE_MODE: SNAPSHOT_PER_CYCLE
 ROS2_BUILD_STATUS: PASS
 ROS2_TEST_STATUS: PASS
-DUAL_LIDAR_SYNTHETIC_ROS_STATUS: PASS
-PTP_TIMESCALE_SYNTHETIC_ROS_STATUS: PASS
-INSTALLATION_CAPTURE_TRANSPORT_STATUS: PASS
-RVIZ_CONFIGURATION_LOAD_STATUS: PASS
-ROS2_MOCK_LAUNCH_STATUS: PASS
-MOCK_FAIL_CLOSED_STATUS: PASS
-MOCK_SCENARIO_STATUS: PASS
-PHASE2C_INSTALLED_SHADOW_STATUS: PASS_INSTALLED_SYNTHETIC
-PHASE2C_SYMLINK_SHADOW_STATUS: PASS_INSTALLED_SYNTHETIC
-COMMISSIONING_SIMULATION_STATUS: PASS_SOFTWARE
+NORMAL_OVERLAY_PRESENT_IN_SYMLINK_ENV: NO
+MIXED_PACKAGE_RESOLUTION: NO
+PHASE2C_R2_NORMAL_PROBE: 10/10
+PHASE2C_R2_SYMLINK_PROBE: 10/10
+PHASE2C_R2_INSTALLED_NORMAL: PASS
+PHASE2C_R2_INSTALLED_SYMLINK: PASS
+VALIDATOR_OWNED_PROCESS_LEAK_COUNT: 0
+GRAB_DESCENT_TARGET_Z_FIELD_CALIBRATION: NOT_RUN
 BENCH_DO_STATUS: NOT_RUN
-ADAM6052_LIVE_STATUS: NOT_RUN
-ADAM6251_LIVE_STATUS: NOT_RUN
-PULL_WIRE_LIVE_STATUS: NOT_RUN
-PHYSICAL_DO_STATUS: NOT_RUN
 FIELD_STATUS: NOT_RUN
+FULL_AUTO: NOT_RUN
 EOF
 printf 'RESULT: %s\n' "$run_dir/result.yaml"

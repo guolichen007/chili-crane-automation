@@ -1,5 +1,6 @@
 """Cycle observations gate snapshots; TaskCycles alone owns transitions."""
 from dataclasses import dataclass
+import math
 from .cycle import CycleState
 from .interaction_contracts import Evidence, identity, require_observation_successor
 
@@ -42,14 +43,16 @@ class ScanProof:
 class SnapshotCycleGate:
     """Bounded observer, not a second FSM. Stale/conflicting input blocks work."""
     def __init__(self,source,ttl):
-        self.source,self.ttl=source,ttl
+        self.source=source
+        self.ttl=ttl if type(ttl) in (int,float) and math.isfinite(ttl) and ttl>0 else 0.
         self.cycle=None;self.scan_start_ns=0;self.bound=False;self.blocked=True
         self.conflict=False;self.reason='SCAN_REQUIRED';self.snapshot_ready=False
 
     def observe(self,current,now):
         previous=self.cycle
         try:
-            if (not all(identity(v) for v in current.key[:3]) or type(current.cycle_index) is not int
+            if (self.source not in ('PHYSICAL','SIMULATED','REPLAY','SYNTHETIC')
+                    or not all(identity(v) for v in current.key[:3]) or type(current.cycle_index) is not int
                     or current.cycle_index<1 or not isinstance(current.phase,CycleState)
                     or not current.evidence.fresh(now,self.ttl,self.source)):
                 raise ValueError('CYCLE_STATUS_STALE_OR_INVALID')

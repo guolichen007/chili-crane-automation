@@ -9,6 +9,7 @@ import signal
 import uuid
 from pathlib import Path
 import subprocess
+from owned_ros_process import start_owned, stop_owned
 import tempfile
 import time
 import numpy as np
@@ -49,7 +50,7 @@ def main():
             path.write_text(yaml.safe_dump(value),'utf-8')
         log=(args.evidence_dir/'phase2b-launch.log').open('w',encoding='utf-8')
         namespace='phase2b_r1_'+uuid.uuid4().hex[:12]
-        child=subprocess.Popen(['ros2','launch','chili_crane_bringup','phase2b_surface_shadow.launch.py',
+        child=start_owned(['ros2','launch','chili_crane_bringup','phase2b_surface_shadow.launch.py',
             'config_file:='+str(config),'namespace:='+namespace],stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
         rclpy.init();node=Node('phase2b_transport_acceptance',namespace=namespace)
         received={};forbidden=[];subs=[];snapshot_history=[]
@@ -209,12 +210,7 @@ def main():
                 CONTROL_TOPIC_MESSAGES=len(forbidden),PHYSICAL_ACTUATION_STATUS='NOT_RUN',valid_for_control=False)))
         finally:
             node.destroy_node();rclpy.shutdown()
-            # Launch forwards SIGINT to its workers. Sending it to the entire
-            # group as well double-interrupts destroy_node(), polluting logs.
-            # Keep the owned-session group only for bounded forced cleanup.
-            if child.poll() is None:child.send_signal(signal.SIGINT)
-            try:child.wait(timeout=8)
-            except subprocess.TimeoutExpired:os.killpg(child.pid,signal.SIGTERM);child.wait(timeout=5)
+            stop_owned(child)
             log.close()
 
 

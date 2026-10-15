@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import signal
 import subprocess
+from owned_ros_process import start_owned, stop_owned
 import tempfile
 import time
 import uuid
@@ -64,17 +65,14 @@ def main():
                 remaps=['-r','planning/grasp_proposal_shadow:='+proposal_topic]
             name='pit_surface_shadow_node.py' if kind=='surface' else 'grasp_proposal_shadow_node.py'
             log=(args.evidence_dir/(kind+'-'+str(launch_counts[kind])+'.log')).open('w',encoding='utf-8');logs.append(log)
-            processes[kind]=subprocess.Popen(['ros2','run','chili_crane_perception',name,'--ros-args',
+            processes[kind]=start_owned(['ros2','run','chili_crane_perception',name,'--ros-args',
                 '-r','__ns:=/'+namespace,'-p','config_file:='+str(config)]+remaps,
                 stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
 
         def stop(kind):
             child=processes.pop(kind,None)
             if child is None:return
-            if child.poll() is None:
-                os.killpg(child.pid,signal.SIGINT)
-                try:child.wait(timeout=8)
-                except subprocess.TimeoutExpired:os.killpg(child.pid,signal.SIGTERM);child.wait(timeout=5)
+            stop_owned(child)
 
         rclpy.init();node=Node('phase2b_r11_acceptance',namespace=namespace)
         received={};forbidden=[];snapshot_history=[]

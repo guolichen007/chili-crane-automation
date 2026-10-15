@@ -393,7 +393,8 @@ class GraspInteractionEngine:
                   or intersection and phase=='CLOSE' and self.lower_started is not None and actual_closure)
         if reliable and not self.committed:
             self.committed=True;self.commit_epoch=epoch;self.commit_counter=grab.evidence.counter
-            self.events.extend(('INTERACTION_COMMITTED','SURFACE_INVALIDATION_REQUIRED'))
+            self.events.append('INTERACTION_COMMITTED')
+            if not self.snapshot_mode:self.events.append('SURFACE_INVALIDATION_REQUIRED')
         interaction='INTERACTION_COMMITTED' if self.committed else 'INTERACTION_POSSIBLE' if intersection else 'NO_INTERACTION'
         if phase=='RAISE' and self.raise_started is None:
             self.raise_started=epoch;self.events.append('RAISE_STARTED')

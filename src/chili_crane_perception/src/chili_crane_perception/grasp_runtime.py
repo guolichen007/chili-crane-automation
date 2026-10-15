@@ -208,6 +208,9 @@ class GraspProposalShadowNode(Node):
                 self.last_result=result
             output=self.serialized_proposal
             output.evidence.evidence_age_sec=age
+            if self.snapshot_mode:
+                from chili_crane_control.snapshot_cycle_transport import annotate_cycle
+                self.cycle_gate.snapshot_ready=True;annotate_cycle(output,self.cycle_gate)
             output.planning_compute_count=self.planner.compute_count
             output.planning_cache_hit_count=self.planner.cache_hit_count
             self.pub.publish(output)
