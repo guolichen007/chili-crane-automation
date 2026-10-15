@@ -56,6 +56,7 @@ class SnapshotRun:
         self.mutations=0;self.active_proposals=0;self.old_reuse=0;self.checks={}
         self.binding=None;self.counter=0;self.frame_counter=0;self.hold_bundle=False;self.poison=False
         self.invalid_bundle_faults=0
+        self.cycle_discovery_ready=False
         self.processes={};self.logs={};self.commands={}
         for kind,topic,key,qos in (
             (PitSurfaceStatus,'perception/pit_surface_status','surface',QOS),
@@ -201,6 +202,15 @@ class SnapshotRun:
         self.spin(.05)
 
     def scan_and_bind(self):
+        if not self.cycle_discovery_ready:
+            required={'pit_surface_shadow_node','grasp_proposal_shadow_node','grasp_interaction_shadow_node'}
+            def discovered():
+                endpoints=self.node.get_subscriptions_info_by_topic('task/cycle_status')
+                names={info.node_name for info in endpoints if info.node_namespace=='/'+self.namespace}
+                return required<=names and self.pubs['binding'].get_subscription_count()>0
+            # No SCAN heartbeat before all three real consumers have joined.
+            self.wait(discovered)
+            self.cycle_discovery_ready=True
         def scan_drained():
             p=self.received.get('proposal');s=self.received.get('surface');m=self.received.get('snapshot')
             return (p is not None and s is not None and m is not None and s.spatial_eligible
@@ -221,8 +231,15 @@ class SnapshotRun:
         b=binding_from_proposal(p,self.cycles.run_id,self.cycles.task_id,self.cycles.cycle_id,self.cycles.cycle_index,
             self.node.get_clock().now().nanoseconds/1e9)
         self.pubs['binding'].publish(binding_to_message(b))
+        next_retry=time.monotonic()+.2
+        def await_binding():
+            nonlocal next_retry
+            self.send(empty=True)
+            if time.monotonic()>=next_retry:
+                # Exact same request only: never select a replacement candidate.
+                self.pubs['binding'].publish(binding_to_message(b));next_retry=time.monotonic()+.2
         self.wait(lambda:'binding' in self.received and self.received['binding'].binding_digest_sha256==b.binding_digest_sha256,
-            send=lambda:self.send(empty=True))
+            send=await_binding)
         self.binding=b
         self.wait(lambda:self.received['proposal'].reason=='PLANNING_FROZEN_ACTIVE_CYCLE',send=lambda:self.send(empty=True))
         self.hold_bundle=False
